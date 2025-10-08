@@ -7,6 +7,10 @@ set(PKG_CONTENT_ID "IV0000-${PKG_TITLE_ID}_00-PS4SUBSYS0000000")
 
 get_filename_component(CURRENT_FOLDER_NAME ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 
+if(TARGET ${PKG_TITLE_ID})
+	message(FATAL_ERROR "Test name collision detected: ${PKG_TITLE_ID}.")
+endif()
+
 project(${PKG_TITLE_ID} VERSION 0.0.1)
 set(PRJ_ADD_LIBS SceSystemService)
 
