@@ -86,7 +86,11 @@ jobs:
           fetch-depth: 1
       
       - name: Install prerequisites
-        run: "sudo apt update -y && sudo apt install -y ninja-build clang-19 lld-19"
+        run: |
+          sudo apt update -y
+          sudo apt install -y ninja-build clang-19 lld-19
+          wget http://archive.ubuntu.com/ubuntu/pool/main/o/openssl1.0/libssl1.0.0_1.0.2n-1ubuntu5_amd64.deb
+          sudo dpkg -i libssl1.0.0_1.0.2n-1ubuntu5_amd64.deb
 
       - name: Configure project
         run: |
@@ -94,6 +98,8 @@ jobs:
           cmake -S. -Bbuild -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-19 -DCMAKE_CXX_COMPILER=clang++-19 -DGITHUB_ACTIONS_WORKFLOW=ON
 
       - name: Build project
+        env:
+          DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: 1
         run: |
           echo "::add-matcher::.github/matchers/cmake.json"
           echo "::add-matcher::.github/matchers/compilers.json"
