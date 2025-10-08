@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [ "$OO_PS4_TOOLCHAIN" -eq "" ]; then
+if [[ "$OO_PS4_TOOLCHAIN" == "" ]]; then
 	echo "No OO_PS4_TOOLCHAIN is set";
 	exit 1;
 fi
@@ -23,7 +23,7 @@ $OO_PS4_TOOLCHAIN/bin/linux/PkgTool.Core sfo_setentry sce_sys/param.sfo TITLE --
 $OO_PS4_TOOLCHAIN/bin/linux/PkgTool.Core sfo_setentry sce_sys/param.sfo TITLE_ID --type Utf8 --maxsize 12 --value "$PKG_TITLE_ID"
 $OO_PS4_TOOLCHAIN/bin/linux/PkgTool.Core sfo_setentry sce_sys/param.sfo VERSION --type Utf8 --maxsize 8 --value "$PKG_VERSION"
 
-if [ "$PKG_SHOULDBUILD" -eq "nopkg" ]; then
+if [[ "$PKG_SHOULDBUILD" == "nopkg" ]]; then
 	exit 0;
 fi
 
