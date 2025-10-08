@@ -7,19 +7,19 @@ set(PKG_CONTENT_ID "IV0000-${PKG_TITLE_ID}_00-PS4SUBSYS0000000")
 
 get_filename_component(CURRENT_FOLDER_NAME ${CMAKE_CURRENT_SOURCE_DIR} NAME)
 
-project(eboot VERSION 0.0.1)
+project(${PKG_TITLE_ID} VERSION 0.0.1)
 set(PRJ_ADD_LIBS SceSystemService)
 
 add_subdirectory(code)
 
-add_executable(eboot
-  $<TARGET_OBJECTS:eboot_obj>
+add_executable(${PKG_TITLE_ID}
+  $<TARGET_OBJECTS:${PKG_TITLE_ID}_obj>
   ${OO_PS4_TOOLCHAIN}/lib/crt1.o
 )
 
-set_target_properties(eboot PROPERTIES OUTPUT_NAME "eboot" SUFFIX ".elf" PREFIX "")
-target_link_libraries(eboot PRIVATE ${PRJ_ADD_LIBS})
-add_dependencies(eboot CppUTest)
+set_target_properties(${PKG_TITLE_ID} PROPERTIES OUTPUT_NAME "eboot" SUFFIX ".elf" PREFIX "")
+target_link_libraries(${PKG_TITLE_ID} PRIVATE ${PRJ_ADD_LIBS})
+add_dependencies(${PKG_TITLE_ID} CppUTest)
 
 if(CMAKE_HOST_WIN32)
   set(ORBIS_BIN_PATH ${OO_PS4_TOOLCHAIN}/bin/windows)
@@ -30,7 +30,7 @@ else()
 endif()
 
 # Create eboot.bin from generated elf file
-add_custom_command(TARGET eboot POST_BUILD COMMAND
+add_custom_command(TARGET ${PKG_TITLE_ID} POST_BUILD COMMAND
   ${CMAKE_COMMAND} -E env "OO_PS4_TOOLCHAIN=${OO_PS4_TOOLCHAIN}"
   ${ORBIS_BIN_PATH}/create-fself -in "${CMAKE_CURRENT_BINARY_DIR}/eboot.elf"
   --out "${CMAKE_CURRENT_BINARY_DIR}/eboot.oelf" --eboot "${CMAKE_CURRENT_SOURCE_DIR}/eboot.bin" --paid 0x3800000000000011
@@ -38,7 +38,7 @@ add_custom_command(TARGET eboot POST_BUILD COMMAND
 
 # Create param.sfo and pkg file
 if(CMAKE_HOST_WIN32)
-  add_custom_command(TARGET eboot POST_BUILD
+  add_custom_command(TARGET ${PKG_TITLE_ID} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E env "OO_PS4_TOOLCHAIN=${OO_PS4_TOOLCHAIN}"
     cmd /c ${INTEST_SOURCE_ROOT}/package.bat
     "\"${PKG_TITLE}\""
@@ -49,7 +49,7 @@ if(CMAKE_HOST_WIN32)
     COMMENT "Running package.bat..."
   )
 elseif(CMAKE_HOST_LINUX)
-  add_custom_command(TARGET eboot POST_BUILD
+  add_custom_command(TARGET ${PKG_TITLE_ID} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E env "OO_PS4_TOOLCHAIN=${OO_PS4_TOOLCHAIN}"
 		"${INTEST_SOURCE_ROOT}/package.sh"
     "\"${PKG_TITLE}\""
