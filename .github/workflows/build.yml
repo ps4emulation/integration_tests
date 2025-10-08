@@ -1,0 +1,107 @@
+name: build tests
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+    paths:
+      - '.github/workflows/build.yml'
+      - '**/CMakeLists.txt'
+      - 'CMakeLists.txt'
+      - '**.cmake'
+      - '**.cpp'
+      - '**.cxx'
+      - '**.cc'
+      - '**.c'
+      - '**.hpp'
+      - '**.hh'
+      - '**.h'
+  push:
+    paths:
+      - '.github/workflows/build.yml'
+      - '**/CMakeLists.txt'
+      - 'CMakeLists.txt'
+      - '**.cmake'
+      - '**.cpp'
+      - '**.cxx'
+      - '**.cc'
+      - '**.c'
+      - '**.hpp'
+      - '**.hh'
+      - '**.h'
+  workflow_dispatch:
+
+jobs:
+  formatting-check:
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository }}
+    permissions:
+      contents: write
+    name: Formatting Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Test formatting
+        uses: DoozyX/clang-format-lint-action@8b8bbdd8669eec54682e720ebe2fb19d9387fdb0
+        with:
+          source: ./
+          exclude: ./third_party
+          extensions: h,hpp,cpp,c,cc
+          clangFormatVersion: 19
+          inplace: true
+
+      - name: Generate patch file
+        run: |
+          git diff > formatting.patch
+          find *.patch -type f -size 0 -delete
+
+      - name: Upload patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-format
+          path: formatting.patch
+          if-no-files-found: ignore
+
+      - name: Error if fixed
+        run: |
+          if rm formatting.patch; then
+            echo "# Looks like you messed something up!" >> $GITHUB_STEP_SUMMARY
+            echo "1. Download the \`code-format\` artifact above" >> $GITHUB_STEP_SUMMARY
+            echo "2. Unpack the patch file" >> $GITHUB_STEP_SUMMARY
+            echo "3. Use \`git apply formatting.patch\` command to apply it to your repo" >> $GITHUB_STEP_SUMMARY
+            echo "4. Push the applied changes to your Pull Request" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+  build:
+    needs: formatting-check
+    name: Build Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      
+      - name: Install prerequisites
+        run: "sudo apt update -y && sudo apt install -y ninja-build clang-19 lld-19"
+
+      - name: Configure project
+        run: |
+          echo "::add-matcher::tools/matchers/cmake.json"
+          cmake -S. -Bbuild -GNinja -DCMAKE_BUILD_TYPE=Release DCMAKE_C_COMPILER=clang-19 DCMAKE_CXX_COMPILER=clang++-19
+
+      - name: Build project
+        run: |
+          echo "::add-matcher::tools/matchers/cmake.json"
+          echo "::add-matcher::tools/matchers/compilers.json"
+          cmake --build build -j4
+
+      - name: Upload project artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ps4-integration-tests
+          path: |
+            ./build/install/*

@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.24)
 
-set(PKG_TITLE "PS4 Subsystems Test")
-set(PKG_VERSION "1.2")
-set(PKG_TITLE_ID "DDRM00002")
+set(PKG_TITLE "PS4 Unit Test")
+set(PKG_VERSION "1.0")
+set(PKG_TITLE_ID "ITES00001")
 set(PKG_CONTENT_ID "IV0000-${PKG_TITLE_ID}_00-PS4SUBSYS0000000")
 
 get_filename_component(CURRENT_FOLDER_NAME ${CMAKE_CURRENT_SOURCE_DIR} NAME)
@@ -36,11 +36,11 @@ add_custom_command(TARGET eboot POST_BUILD COMMAND
   --out "${CMAKE_CURRENT_BINARY_DIR}/eboot.oelf" --eboot "${CMAKE_CURRENT_SOURCE_DIR}/eboot.bin" --paid 0x3800000000000011
 )
 
-# Create param.sfo
+# Create param.sfo and pkg file
 if(CMAKE_HOST_WIN32)
   add_custom_command(TARGET eboot POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E env "OO_PS4_TOOLCHAIN=${OO_PS4_TOOLCHAIN}"
-    cmd /c package.bat
+    cmd /c ${INTEST_SOURCE_ROOT}/package.bat
     "${PKG_TITLE}"
     "${PKG_VERSION}"
     "${PKG_TITLE_ID}"
@@ -50,7 +50,7 @@ if(CMAKE_HOST_WIN32)
   )
 elseif(CMAKE_HOST_LINUX)
   add_custom_command(TARGET eboot POST_BUILD
-    COMMAND "${PROJECT_SOURCE_DIR}/package.sh" -E env "OO_PS4_TOOLCHAIN=${OO_PS4_TOOLCHAIN}"
+    COMMAND "${INTEST_SOURCE_ROOT}/package.sh" -E env "OO_PS4_TOOLCHAIN=${OO_PS4_TOOLCHAIN}"
     "${PKG_TITLE}"
     "${PKG_VERSION}"
     "${PKG_TITLE_ID}"
@@ -64,6 +64,10 @@ endif()
 
 # install
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/eboot.bin
+  DESTINATION ${CMAKE_INSTALL_PREFIX}/${CURRENT_FOLDER_NAME})
+
+file(GLOB PKG_FILE "${CMAKE_CURRENT_SOURCE_DIR}/*.pkg")
+install(FILES ${PKG_FILE}
   DESTINATION ${CMAKE_INSTALL_PREFIX}/${CURRENT_FOLDER_NAME})
 
 install(DIRECTORY
