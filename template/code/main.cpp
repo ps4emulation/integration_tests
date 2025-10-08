@@ -1,10 +1,13 @@
 #include "CppUTest/CommandLineTestRunner.h"
 
+#include <orbis/SystemService.h>
 #include <cstdint>
 #include <sstream>
 
 int main(int ac, char** av) {
   // No buffering
   setvbuf(stdout, NULL, _IONBF, 0);
-  return RUN_ALL_TESTS(ac, av);
+  int result = RUN_ALL_TESTS(ac, av);
+  sceSystemServiceLoadExec("EXIT", nullptr);
+  return result;
 }
