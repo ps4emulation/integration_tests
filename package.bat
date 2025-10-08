@@ -1,6 +1,11 @@
 @echo off
 SETLOCAL EnableDelayedExpansion
 
+if "%OO_PS4_TOOLCHAIN%"=="" (
+	echo "Toolchain is not set"
+	exit /b 1
+)
+
 Rem Package information
 set PKG_TITLE=%1
 set PKG_VERSION=%2

@@ -1,5 +1,10 @@
 #!/bin/bash
 
+if [ "$OO_PS4_TOOLCHAIN" -eq "" ]; then
+	echo "No OO_PS4_TOOLCHAIN is set";
+	exit 1;
+fi
+
 PKG_TITLE="$1"
 PKG_VERSION="$2"
 PKG_TITLE_ID="$3"

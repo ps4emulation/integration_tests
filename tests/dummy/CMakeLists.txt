@@ -50,7 +50,8 @@ if(CMAKE_HOST_WIN32)
   )
 elseif(CMAKE_HOST_LINUX)
   add_custom_command(TARGET eboot POST_BUILD
-    COMMAND "${INTEST_SOURCE_ROOT}/package.sh" -E env "OO_PS4_TOOLCHAIN=${OO_PS4_TOOLCHAIN}"
+    COMMAND ${CMAKE_COMMAND} -E env "OO_PS4_TOOLCHAIN=${OO_PS4_TOOLCHAIN}"
+		"${INTEST_SOURCE_ROOT}/package.sh"
     "\"${PKG_TITLE}\""
     "\"${PKG_VERSION}\""
     "\"${PKG_TITLE_ID}\""
