@@ -57,7 +57,7 @@ elseif(CMAKE_HOST_LINUX)
     "\"${PKG_TITLE_ID}\""
     "\"${PKG_CONTENT_ID}\""
     WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-    COMMENT "Running package.bat..."
+    COMMENT "Running package.sh..."
   )
 else()
   message(FATAL_ERROR "Unsupported OS")
@@ -77,5 +77,10 @@ install(DIRECTORY
 
 install(DIRECTORY
   ${CMAKE_CURRENT_SOURCE_DIR}/sce_module
+  DESTINATION ${CMAKE_INSTALL_PREFIX}/${CURRENT_FOLDER_NAME}
+)
+
+install(DIRECTORY
+  ${CMAKE_CURRENT_SOURCE_DIR}/assets
   DESTINATION ${CMAKE_INSTALL_PREFIX}/${CURRENT_FOLDER_NAME}
 )

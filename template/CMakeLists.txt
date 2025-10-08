@@ -50,13 +50,14 @@ if(CMAKE_HOST_WIN32)
   )
 elseif(CMAKE_HOST_LINUX)
   add_custom_command(TARGET eboot POST_BUILD
-    COMMAND "${INTEST_SOURCE_ROOT}/package.sh" -E env "OO_PS4_TOOLCHAIN=${OO_PS4_TOOLCHAIN}"
+    COMMAND ${CMAKE_COMMAND} -E env "OO_PS4_TOOLCHAIN=${OO_PS4_TOOLCHAIN}"
+		"${INTEST_SOURCE_ROOT}/package.sh"
     "\"${PKG_TITLE}\""
     "\"${PKG_VERSION}\""
     "\"${PKG_TITLE_ID}\""
     "\"${PKG_CONTENT_ID}\""
     WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-    COMMENT "Running package.bat..."
+    COMMENT "Running package.sh..."
   )
 else()
   message(FATAL_ERROR "Unsupported OS")
@@ -76,5 +77,10 @@ install(DIRECTORY
 
 install(DIRECTORY
   ${CMAKE_CURRENT_SOURCE_DIR}/sce_module
+  DESTINATION ${CMAKE_INSTALL_PREFIX}/${CURRENT_FOLDER_NAME}
+)
+
+install(DIRECTORY
+  ${CMAKE_CURRENT_SOURCE_DIR}/assets
   DESTINATION ${CMAKE_INSTALL_PREFIX}/${CURRENT_FOLDER_NAME}
 )
