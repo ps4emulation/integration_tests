@@ -90,13 +90,13 @@ jobs:
 
       - name: Configure project
         run: |
-          echo "::add-matcher::tools/matchers/cmake.json"
+          echo "::add-matcher::.github/matchers/cmake.json"
           cmake -S. -Bbuild -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-19 -DCMAKE_CXX_COMPILER=clang++-19 -DGITHUB_ACTIONS_WORKFLOW=ON
 
       - name: Build project
         run: |
-          echo "::add-matcher::tools/matchers/cmake.json"
-          echo "::add-matcher::tools/matchers/compilers.json"
+          echo "::add-matcher::.github/matchers/cmake.json"
+          echo "::add-matcher::.github/matchers/compilers.json"
           cmake --build build -j4
 
       - name: Upload project artifacts
