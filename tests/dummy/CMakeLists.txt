@@ -40,6 +40,12 @@ add_custom_command(TARGET ${PKG_TITLE_ID} POST_BUILD COMMAND
   --out "${CMAKE_CURRENT_BINARY_DIR}/eboot.oelf" --eboot "${CMAKE_CURRENT_SOURCE_DIR}/eboot.bin" --paid 0x3800000000000011
 )
 
+if(OO_PS4_NOPKG)
+	set(PKG_SHOULDBUILD "nopkg")
+	else()
+	set(PKG_SHOULDBUILD "pkg")
+endif()
+
 # Create param.sfo and pkg file
 if(CMAKE_HOST_WIN32)
   add_custom_command(TARGET ${PKG_TITLE_ID} POST_BUILD
@@ -49,6 +55,7 @@ if(CMAKE_HOST_WIN32)
     "\"${PKG_VERSION}\""
     "\"${PKG_TITLE_ID}\""
     "\"${PKG_CONTENT_ID}\""
+    "\"${PKG_SHOULDBUILD}\""
     WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
     COMMENT "Running package.bat..."
   )
@@ -60,6 +67,7 @@ elseif(CMAKE_HOST_LINUX)
     "\"${PKG_VERSION}\""
     "\"${PKG_TITLE_ID}\""
     "\"${PKG_CONTENT_ID}\""
+    "\"${PKG_SHOULDBUILD}\""
     WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
     COMMENT "Running package.sh..."
   )

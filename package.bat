@@ -11,6 +11,7 @@ set PKG_TITLE=%1
 set PKG_VERSION=%2
 set PKG_TITLE_ID=%3
 set PKG_CONTENT_ID=%4
+set PKG_SHOULDBUILD=%5
 
 Rem Create param.sfo
 %OO_PS4_TOOLCHAIN%\bin\windows\PkgTool.Core.exe sfo_new sce_sys/param.sfo
@@ -24,6 +25,8 @@ Rem Create param.sfo
 %OO_PS4_TOOLCHAIN%\bin\windows\PkgTool.Core.exe sfo_setentry sce_sys/param.sfo TITLE --type Utf8 --maxsize 128 --value %PKG_TITLE%
 %OO_PS4_TOOLCHAIN%\bin\windows\PkgTool.Core.exe sfo_setentry sce_sys/param.sfo TITLE_ID --type Utf8 --maxsize 12 --value %PKG_TITLE_ID%
 %OO_PS4_TOOLCHAIN%\bin\windows\PkgTool.Core.exe sfo_setentry sce_sys/param.sfo VERSION --type Utf8 --maxsize 8 --value %PKG_VERSION%
+
+if "%PKG_SHOULDBUILD%"=="nopkg" exit /b 0
 
 Rem Get a list of assets for packaging
 set module_files=
