@@ -91,7 +91,7 @@ jobs:
       - name: Configure project
         run: |
           echo "::add-matcher::tools/matchers/cmake.json"
-          cmake -S. -Bbuild -GNinja -DCMAKE_BUILD_TYPE=Release DCMAKE_C_COMPILER=clang-19 DCMAKE_CXX_COMPILER=clang++-19
+          cmake -S. -Bbuild -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-19 -DCMAKE_CXX_COMPILER=clang++-19 -DGITHUB_ACTIONS_WORKFLOW=ON
 
       - name: Build project
         run: |
