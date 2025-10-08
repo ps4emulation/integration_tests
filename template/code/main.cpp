@@ -1,7 +1,7 @@
 #include "CppUTest/CommandLineTestRunner.h"
 
-#include <orbis/SystemService.h>
 #include <cstdint>
+#include <orbis/SystemService.h>
 #include <sstream>
 
 int main(int ac, char** av) {
