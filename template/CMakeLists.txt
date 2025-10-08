@@ -42,9 +42,9 @@ if(CMAKE_HOST_WIN32)
     COMMAND ${CMAKE_COMMAND} -E env "OO_PS4_TOOLCHAIN=${OO_PS4_TOOLCHAIN}"
     cmd /c ${INTEST_SOURCE_ROOT}/package.bat
     "\"${PKG_TITLE}\""
-    "${PKG_VERSION}"
-    "${PKG_TITLE_ID}"
-    "${PKG_CONTENT_ID}"
+    "\"${PKG_VERSION}\""
+    "\"${PKG_TITLE_ID}\""
+    "\"${PKG_CONTENT_ID}\""
     WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
     COMMENT "Running package.bat..."
   )
@@ -52,9 +52,9 @@ elseif(CMAKE_HOST_LINUX)
   add_custom_command(TARGET eboot POST_BUILD
     COMMAND "${INTEST_SOURCE_ROOT}/package.sh" -E env "OO_PS4_TOOLCHAIN=${OO_PS4_TOOLCHAIN}"
     "\"${PKG_TITLE}\""
-    "${PKG_VERSION}"
-    "${PKG_TITLE_ID}"
-    "${PKG_CONTENT_ID}"
+    "\"${PKG_VERSION}\""
+    "\"${PKG_TITLE_ID}\""
+    "\"${PKG_CONTENT_ID}\""
     WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
     COMMENT "Running package.bat..."
   )
