@@ -114,5 +114,5 @@ jobs:
         if: ${{ github.event_name == 'push' }}
         with:
           make_latest: true
-        files: |
-          ./build/ps4_tests.zip
+          files: |
+            ./build/ps4_tests.zip
