@@ -51,11 +51,11 @@ if(CMAKE_HOST_WIN32)
   add_custom_command(TARGET ${PKG_TITLE_ID} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E env "OO_PS4_TOOLCHAIN=${OO_PS4_TOOLCHAIN}"
     cmd /c ${INTEST_SOURCE_ROOT}/package.bat
-    "\"${PKG_TITLE}\""
-    "\"${PKG_VERSION}\""
-    "\"${PKG_TITLE_ID}\""
-    "\"${PKG_CONTENT_ID}\""
-    "\"${PKG_SHOULDBUILD}\""
+    "${PKG_TITLE}"
+    "${PKG_VERSION}"
+    "${PKG_TITLE_ID}"
+    "${PKG_CONTENT_ID}"
+    "${PKG_SHOULDBUILD}"
     WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
     COMMENT "Running package.bat..."
   )
@@ -63,11 +63,11 @@ elseif(CMAKE_HOST_LINUX)
   add_custom_command(TARGET ${PKG_TITLE_ID} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E env "OO_PS4_TOOLCHAIN=${OO_PS4_TOOLCHAIN}"
 		"${INTEST_SOURCE_ROOT}/package.sh"
-    "\"${PKG_TITLE}\""
-    "\"${PKG_VERSION}\""
-    "\"${PKG_TITLE_ID}\""
-    "\"${PKG_CONTENT_ID}\""
-    "\"${PKG_SHOULDBUILD}\""
+    "${PKG_TITLE}"
+    "${PKG_VERSION}"
+    "${PKG_TITLE_ID}"
+    "${PKG_CONTENT_ID}"
+    "${PKG_SHOULDBUILD}"
     WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
     COMMENT "Running package.sh..."
   )
