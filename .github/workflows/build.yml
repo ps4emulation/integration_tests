@@ -16,20 +16,10 @@ on:
       - '**.hh'
       - '**.h'
   push:
+    tags:
+      - 'v*'
     branches:
       - 'main'
-    paths:
-      - '.github/workflows/build.yml'
-      - '**/CMakeLists.txt'
-      - 'CMakeLists.txt'
-      - '**.cmake'
-      - '**.cpp'
-      - '**.cxx'
-      - '**.cc'
-      - '**.c'
-      - '**.hpp'
-      - '**.hh'
-      - '**.h'
 
 jobs:
   formatting-check:
@@ -78,6 +68,8 @@ jobs:
 
   build:
     needs: formatting-check
+    permissions:
+      contents: write
     name: Build Tests
     runs-on: ubuntu-latest
     steps:
@@ -96,7 +88,7 @@ jobs:
       - name: Configure project
         run: |
           echo "::add-matcher::.github/matchers/cmake.json"
-          cmake -S. -Bbuild -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-19 -DCMAKE_CXX_COMPILER=clang++-19 -DOO_PS4_LINKER_SUFFIX=-19 -DOO_PS4_NOPKG=ON
+          cmake -S. -Bbuild -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-19 -DCMAKE_CXX_COMPILER=clang++-19 -DOO_PS4_LINKER_SUFFIX=-19 -DOO_PS4_NOPKG=${{ github.event_name == 'push' && OFF || ON }}
 
       - name: Build project
         env:
@@ -113,3 +105,9 @@ jobs:
           name: ps4-integration-tests
           path: |
             ./build/install/*
+
+      - name: Release stuff
+        uses: softprops/action-gh-release@v2
+        if: ${{ github.event_name == 'push' }}
+        with:
+          make_latest: true
