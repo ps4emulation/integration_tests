@@ -88,7 +88,7 @@ jobs:
       - name: Configure project
         run: |
           echo "::add-matcher::.github/matchers/cmake.json"
-          cmake -S. -Bbuild -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-19 -DCMAKE_CXX_COMPILER=clang++-19 -DOO_PS4_LINKER_SUFFIX=-19 -DOO_PS4_NOPKG=${{ github.event_name == 'push' && OFF || ON }}
+          cmake -S. -Bbuild -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-19 -DCMAKE_CXX_COMPILER=clang++-19 -DOO_PS4_LINKER_SUFFIX=-19 -DOO_PS4_NOPKG=${{ github.event_name == 'push' && "OFF" || "ON" }}
 
       - name: Build project
         env:
