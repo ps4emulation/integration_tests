@@ -16,6 +16,8 @@ on:
       - '**.hh'
       - '**.h'
   push:
+    branches:
+      - 'main'
     paths:
       - '.github/workflows/build.yml'
       - '**/CMakeLists.txt'
@@ -28,7 +30,6 @@ on:
       - '**.hpp'
       - '**.hh'
       - '**.h'
-  workflow_dispatch:
 
 jobs:
   formatting-check:
@@ -89,7 +90,7 @@ jobs:
         run: |
           sudo apt update -y
           sudo apt install -y ninja-build clang-19 lld-19
-          wget http://archive.ubuntu.com/ubuntu/pool/main/o/openssl1.0/libssl1.0.0_1.0.2n-1ubuntu5_amd64.deb
+          wget http://azure.archive.ubuntu.com/ubuntu/pool/main/o/openssl1.0/libssl1.0.0_1.0.2n-1ubuntu5_amd64.deb
           sudo dpkg -i libssl1.0.0_1.0.2n-1ubuntu5_amd64.deb
 
       - name: Configure project
@@ -107,6 +108,7 @@ jobs:
 
       - name: Upload project artifacts
         uses: actions/upload-artifact@v4
+        if: ${{ github.event_name != 'push' }}
         with:
           name: ps4-integration-tests
           path: |
