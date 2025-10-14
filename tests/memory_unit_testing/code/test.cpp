@@ -27,6 +27,10 @@ int32_t  sceKernelMemoryPoolExpand(int64_t start, int64_t end, uint64_t len, uin
 int32_t  sceKernelMemoryPoolReserve(uint64_t addr_in, uint64_t len, uint64_t alignment, int32_t flags, uint64_t addr_out);
 int32_t  sceKernelMemoryPoolCommit(uint64_t addr, uint64_t len, int32_t type, int32_t prot, int32_t flags);
 int32_t  sceKernelMemoryPoolDecommit(uint64_t addr, uint64_t len, int32_t flags);
+
+int32_t  sceKernelOpen(const char* path, int32_t flags, uint16_t mode);
+int64_t  sceKernelWrite(int32_t fd, const void* buf, uint64_t size);
+int32_t  sceKernelClose(int32_t fd);
 }
 
 // Some error codes
@@ -448,23 +452,29 @@ TEST(MemoryUnitTests, MapMemoryTest) {
   result = sceKernelMapFlexibleMemory(&addr, 0x4000, 0, 0x2000);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
-  // Other notable behavior seen in libkernel code (and will be tested with success cases): 
-  // If address is not specified, it defaults to 0x200000000
-  // Not possible to test here, but there's a condition it follows that instead defaults to 0x880000000
-  // On SDK version < 1.70, flag Fixed with unspecified address would remove the Fixed flag.
+  /**
+   * Other sceKernelMapFlexibleMemory Notes:
+   * If address is not specified, it defaults to 0x200000000
+   * Not possible to test here, but there's a condition it follows that instead defaults to 0x880000000
+   * On SDK version < 1.70, flag Fixed with unspecified address would remove the Fixed flag.
+   */
 
   // Now for edge cases in sceKernelMapDirectMemory. This function allows flags:
-  // Fixed (0x10) | NoOverwrite (0x80) | DmemCompat (0x400) | Sanitize (0x200000) | NoCoalesce (0x400000)
-  // For games compiled with sdk version < 2.50, DmemCompat does nothing.
-  // For older titles, it will redirect sceKernelMapDirectMemory to sceKernelMapDirectMemory2.
-  // We can't test the latter case, but we can test for the former during the success cases.
-  // Note that the sanitize flag probably fails on retail hardware? This will be tested later.
+  // Fixed (0x10) | NoOverwrite (0x80) | DmemCompat (0x400) | Sanitizer (0x200000) | NoCoalesce (0x400000)
   result = sceKernelMapDirectMemory(&addr, 0x4000, 0, 1, 0, 0);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
   result = sceKernelMapDirectMemory(&addr, 0x4000, 0, 0x100, 0, 0);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
   result = sceKernelMapDirectMemory(&addr, 0x4000, 0, 0x2000, 0, 0);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  /**
+   * Notes:
+   * Flag DmemCompat is exclusive to libkernel code, mmap flag 0x400 is Stack.
+   * For games compiled with sdk version < 2.50, DmemCompat does nothing.
+   * For newer titles, it will redirect sceKernelMapDirectMemory to sceKernelMapDirectMemory2.
+   * We can check for edge cases specific to the latter case when testing sys_mmap_dmem later.
+   */
 
   // Protection should be a bitwise-or'ed combination of flags. It can be zero,
   // or include Read (1) | Write (2) | Execute (4) | GpuRead (0x10) | GpuWrite (0x20).
@@ -475,8 +485,14 @@ TEST(MemoryUnitTests, MapMemoryTest) {
   result = sceKernelMapDirectMemory(&addr, 0x4000, 64, 0, 0, 0);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
+  /**
+   * Note: 
+   * The execute protection causes sceKernelMapDirectMemory calls to fail. 
+   * This will likely come up in sys_mmap tests.
+   */
+
   // Input address, length, phys_addr, and alignment all must be page-aligned.
-  addr = (uint64_t)0x2000002000;
+  addr = (uint64_t)0x200002000;
   result = sceKernelMapDirectMemory(&addr, 0x4000, 0, 0, 0, 0);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
   addr = 0;
@@ -495,8 +511,152 @@ TEST(MemoryUnitTests, MapMemoryTest) {
   result = sceKernelMapDirectMemory(&addr, 0x4000, 0, 0, 0, 0x100000000);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
-  // Other notable behavior seen in libkernel code (and will be tested with success cases): 
-  // If address is not specified, it defaults to 0x200000000
-  // Not possible to test here, but there's a condition it follows that instead defaults to 0x880000000
-  // On SDK version < 1.70, flag Fixed with unspecified address would remove the Fixed flag.
+  /**
+   * Other sceKernelMapDirectMemory Notes:
+   * If address is not specified, it defaults to 0x200000000
+   * Not possible to test here, but there's a condition it follows that instead defaults to 0x880000000
+   * On SDK version < 1.70, flag Fixed with unspecified address would remove the Fixed flag.
+   */
+
+  // Now for sys_mmap edge cases.
+  // To test each of these, I'll use sceKernelMmap (which is just a wrapper for the syscall that converts errors to ORBIS errors)
+  // If sys_mmap is called with the Sanitizer flag, then non-devkit consoles return EINVAL.
+  addr = 0x200000000;
+  uint64_t addr_out = 0;
+
+  // For this test call, use flags Sanitizer (0x200000) | System (0x2000) | Anon (0x1000) | NoOverwrite (0x80) | Fixed (0x10)
+  // This combination of flags is what sceKernelMapSanitizerShadowMemory uses.
+  addr = 0x300000000;
+  result = sceKernelMmap(addr, 0x4000, 0, 0x203090, -1, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // If length == 0, return EINVAL
+  addr = 0x200000000;
+  result = sceKernelMmap(addr, 0, 0, 0x1000, -1, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // If flags include Void (0x100) or Anon (0x1000), and phys_addr is non-zero or fd is not -1, return EINVAL.
+  // Note: Void flag means this is reserving memory, sceKernelReserveVirtualRange uses it internally.
+  result = sceKernelMmap(addr, 0x4000, 0, 0x1000, -1, 0x4000, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  result = sceKernelMmap(addr, 0x4000, 0, 0x1000, 0, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  result = sceKernelMmap(addr, 0x4000, 0, 0x100, -1, 0x4000, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  result = sceKernelMmap(addr, 0x4000, 0, 0x100, 0, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // Successful call with anon flag for comparison.
+  result = sceKernelMmap(addr, 0x4000, 0, 0x1000, -1, 0, &addr_out);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr_out, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  // Successful call with void flag for comparison.
+  result = sceKernelMmap(addr, 0x4000, 0, 0x100, -1, 0, &addr_out);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr_out, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  // If flags include Stack (0x400) and prot does not include CpuReadWrite or fd is not -1, return EINVAL.
+  result = sceKernelMmap(addr, 0x4000, 0, 0x400, -1, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  result = sceKernelMmap(addr, 0x4000, 3, 0x400, 0, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // Note: I can't get stack flag to succeed, it probably has some other restriction I'll find deeper in the code.
+  // Calling with the "valid" parameters assumed here causes ENOMEM.
+
+  /**
+   * Other notes here:
+   * Stack and Void flags append Anon flag internally.
+   * Stack, Anon, and Void flags skip fget_mmap call (which gets the file object for the fd input)
+   * If Fixed is not specified and address is 0, then it's set to 0x200000000
+   * Length parameter is aligned up to the nearest page.
+   */
+
+  // If flag Fixed (0x10) is specified, address must have the same offset as phys_addr.
+  // This effectively prevents misaligned mappings, unless you manually opened a dmem file yourself.
+  addr = 0x200002000;
+  result = sceKernelMmap(addr, 0x4000, 0, 0x1010, -1, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  /**
+   * Notes:
+   * This is where sys_mmap calls fget_mmap to get a file for mmap.
+   * I still need to decompile everything here, especially the switch case for file type.
+   * Insert error cases here if there are any errors that I can expose through homebrew.
+   */
+
+  // If an unopened file descriptor is specified, then returns EBADF.
+  result = sceKernelMmap(addr, 0x4000, 1, 0, 100, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EBADF, result);
+
+  // If prot dictates a mapping with read access, but the file doesn't have read access, then returns EACCES
+  int32_t fd = sceKernelOpen("/download0/test.txt", 0x601, 0777);
+  CHECK(fd > 0);
+  
+  // For testing purposes, write 16KB of empty space to the file.
+  char buf[16384];
+  memset(buf, 0, sizeof(buf));
+  int64_t bytes_written = sceKernelWrite(fd, buf, sizeof(buf));
+  CHECK_EQUAL(16384, bytes_written);
+
+  // This sceKernelMmap should try mapping the file to memory with read permissions, but fail since the file is opened as write-only.
+  result = sceKernelMmap(addr, 0x4000, 1, 0, fd, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+
+  // GPU file mmaps are prone to crashing PS4.
+  // result = sceKernelMmap(addr, 0x4000, 0x10, 0, fd, 0, &addr_out);
+  // CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+
+  // This sceKernelClose should succeed.
+  result = sceKernelClose(fd);
+  CHECK_EQUAL(result, 0);
+
+  // If prot dictates a mapping with write access, but the file doesn't have write access, then returns EACCES
+  fd = sceKernelOpen("/download0/test.txt", 0x600, 0777);
+  CHECK(fd > 0);
+
+  // This sceKernelMmap should try mapping the file to memory with read permissions, but fail since the file is opened as write-only.
+  result = sceKernelMmap(addr, 0x4000, 2, 0, fd, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+
+  // GPU file mmaps are prone to crashing PS4.
+  // result = sceKernelMmap(addr, 0x4000, 0x20, 0, fd, 0, &addr_out);
+  // CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+
+  result = sceKernelClose(fd);
+  CHECK_EQUAL(result, 0);
+
+  // Success? for reference
+  fd = sceKernelOpen("/download0/test.txt", 0x602, 0777);
+  CHECK(fd > 0);
+
+  //Read-write file with CpuReadWrite prot, this should succeed (here as a sanity check, not ready for actual success tests yet).
+  result = sceKernelMmap(addr, 0x4000, 0x3, 0, fd, 0, &addr_out);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr_out, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  // GPU file mmaps are prone to crashing PS4.
+  // result = sceKernelMmap(addr, 0x4000, 0x30, 0, fd, 0, &addr_out);
+  // CHECK_EQUAL(0, result);
+  // result = sceKernelMunmap(addr_out, 0x4000);
+  // CHECK_EQUAL(0, result);
+
+  result = sceKernelClose(fd);
+  CHECK_EQUAL(result, 0);
+
+  /**
+   * Notes:
+   * Somewhere later down the line, CpuRead prot is appended to mappings with CpuWrite.
+   * (This begs the question, will CpuWrite on a file mmap actually succeed for write-only files, or is there another check later?)
+   * 
+   * Based on decompilation, Sanitizer flag with a valid address (below a hardcoded 0x800000000000) restricts prot here.
+   * Specifically, if address input > 0xfc00000000, prot is restricted to GpuReadWrite.
+   * If address input is still zero here (Fixed flag with null address input?), then address defaults to 0xfc00000000.
+   */
+
+  // Next stop: Hell. Also called, vm_mmap2.
 }
