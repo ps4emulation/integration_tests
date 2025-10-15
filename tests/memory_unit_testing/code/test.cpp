@@ -6,10 +6,13 @@
 extern "C" {
 uint64_t sceKernelGetDirectMemorySize();
 
+int32_t  sceKernelEnableDmemAliasing();
+
 int32_t  sceKernelAvailableDirectMemorySize(int64_t start, int64_t end, uint64_t alignment, int64_t* phys_addr, uint64_t* size);
 int32_t  sceKernelAllocateDirectMemory(int64_t start, int64_t end, uint64_t size, uint64_t alignment, int32_t type, int64_t* phys_addr);
 int32_t  sceKernelAllocateMainDirectMemory(uint64_t size, uint64_t alignment, int32_t type, int64_t* phys_addr);
 int32_t  sceKernelMapDirectMemory(uint64_t* addr, uint64_t size, int32_t prot, int32_t flags, int64_t phys_addr, uint64_t alignment);
+int32_t  sceKernelMapDirectMemory2(uint64_t* addr, uint64_t size, int32_t type, int32_t prot, int32_t flags, int64_t phys_addr, uint64_t alignment);
 int32_t  sceKernelGetDirectMemoryType(int64_t phys_addr, int32_t* type, int64_t* start, int64_t* end);
 int32_t  sceKernelCheckedReleaseDirectMemory(int64_t phys_addr, uint64_t size);
 int32_t  sceKernelReleaseDirectMemory(int64_t phys_addr, uint64_t size);
@@ -589,38 +592,18 @@ TEST(MemoryUnitTests, MapMemoryTest) {
    */
 
   // If an unopened file descriptor is specified, then returns EBADF.
+  addr = 0x200000000;
   result = sceKernelMmap(addr, 0x4000, 1, 0, 100, 0, &addr_out);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EBADF, result);
 
-  // If prot dictates a mapping with read access, but the file doesn't have read access, then returns EACCES
-  int32_t fd = sceKernelOpen("/download0/test.txt", 0x601, 0777);
-  CHECK(fd > 0);
-  
-  // For testing purposes, write 16KB of empty space to the file.
-  char buf[16384];
-  memset(buf, 0, sizeof(buf));
-  int64_t bytes_written = sceKernelWrite(fd, buf, sizeof(buf));
-  CHECK_EQUAL(16384, bytes_written);
-
-  // This sceKernelMmap should try mapping the file to memory with read permissions, but fail since the file is opened as write-only.
-  result = sceKernelMmap(addr, 0x4000, 1, 0, fd, 0, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
-
-  // GPU file mmaps are prone to crashing PS4.
-  // result = sceKernelMmap(addr, 0x4000, 0x10, 0, fd, 0, &addr_out);
-  // CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
-
-  // This sceKernelClose should succeed.
-  result = sceKernelClose(fd);
-  CHECK_EQUAL(result, 0);
-
-  // If prot dictates a mapping with write access, but the file doesn't have write access, then returns EACCES
-  fd = sceKernelOpen("/download0/test.txt", 0x600, 0777);
+  int32_t fd = sceKernelOpen("/app0/assets/misc/test_file.txt", 0, 0666);
   CHECK(fd > 0);
 
-  // This sceKernelMmap should try mapping the file to memory with read permissions, but fail since the file is opened as write-only.
-  result = sceKernelMmap(addr, 0x4000, 2, 0, fd, 0, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  // This sceKernelMmap should try mapping the file to memory with read-write permissions... which succeeds somehow?
+  result = sceKernelMmap(addr, 0x4000, 3, 0, fd, 0, &addr_out);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr_out, 0x4000);
+  CHECK_EQUAL(0, result);
 
   // GPU file mmaps are prone to crashing PS4.
   // result = sceKernelMmap(addr, 0x4000, 0x20, 0, fd, 0, &addr_out);
@@ -629,34 +612,120 @@ TEST(MemoryUnitTests, MapMemoryTest) {
   result = sceKernelClose(fd);
   CHECK_EQUAL(result, 0);
 
-  // Success? for reference
-  fd = sceKernelOpen("/download0/test.txt", 0x602, 0777);
-  CHECK(fd > 0);
-
-  //Read-write file with CpuReadWrite prot, this should succeed (here as a sanity check, not ready for actual success tests yet).
-  result = sceKernelMmap(addr, 0x4000, 0x3, 0, fd, 0, &addr_out);
-  CHECK_EQUAL(0, result);
-  result = sceKernelMunmap(addr_out, 0x4000);
-  CHECK_EQUAL(0, result);
-
   // GPU file mmaps are prone to crashing PS4.
   // result = sceKernelMmap(addr, 0x4000, 0x30, 0, fd, 0, &addr_out);
   // CHECK_EQUAL(0, result);
   // result = sceKernelMunmap(addr_out, 0x4000);
   // CHECK_EQUAL(0, result);
 
-  result = sceKernelClose(fd);
-  CHECK_EQUAL(result, 0);
-
   /**
    * Notes:
-   * Somewhere later down the line, CpuRead prot is appended to mappings with CpuWrite.
-   * (This begs the question, will CpuWrite on a file mmap actually succeed for write-only files, or is there another check later?)
+   * Seems like I can't mmap files from read-write directories? Might have something to do with file creation modes perhaps?
+   * Somewhere along the line, mapping with flag stack fails. Probably some stack-specific flag check later on?
    * 
    * Based on decompilation, Sanitizer flag with a valid address (below a hardcoded 0x800000000000) restricts prot here.
    * Specifically, if address input > 0xfc00000000, prot is restricted to GpuReadWrite.
    * If address input is still zero here (Fixed flag with null address input?), then address defaults to 0xfc00000000.
    */
 
-  // Next stop: Hell. Also called, vm_mmap2.
+  // Next stop: Hell. Also called vm_mmap2.
+
+  /**
+   * Notes for vm_mmap2:
+   * Starts with a check for size == 0, returning EINVAL. This can't be tested because sys_mmap had an earlier return for this case.
+   * Then checks if our mapping will fit in the virtual memory limit? (if not return ENOMEM)
+   * Then checks if phys_addr is aligned, returning EINVAL if it isn't. sys_mmap aligned phys_addr for us though.
+   * If flags Fixed is specified, and address input is misaligned, return EINVAL. Again, sys_mmap checked this for us.
+   * A bunch of checks specific to file mmaps, most of which are un-important for homebrew testing (mostly internal stuff like devices)
+   */
+
+  /**
+   * Notes for sceKernelMapDirectMemory2:
+   * Alignment must be a power of 2, page aligned, and less than 0x100000000
+   * If alignment is less than page size, it's increased to the page size.
+   * Remaining behavior seems to rely on checks in sys_mmap_dmem.
+   */
+  addr = 0x200000000;
+  // Not power of 2
+  result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0, 0, 0xc000);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  // Not page aligned
+  result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0, 0, 0x100);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  // Too large.
+  result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0, 0, 0x100000000);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  /**
+   * Notes for sys_mmap_dmem:
+   * Starts with parameter checks.
+   * Address, phys_addr, and length must be page aligned. Length = 0 is not allowed.
+   * Flags must only contain Fixed, NoOverwrite, Sanitizer, NoCoalesce, and the alignment bits.
+   * Prot contains only CpuRead, CpuWrite, GpuRead, or GpuWrite.
+   * mtype must be less than 10
+   * If any of these error checks fail, the function returns EINVAL.
+   * 
+   * sys_mmap_dmem has an extra check for physical addresses overlapping.
+   * This check changes based on sceKernelEnableDmemAliasing?
+   */
+
+  // To run sys_mmap_dmem without worries from phys addresses, allocate some dmem
+  int64_t phys_addr = 0;
+  result = sceKernelAllocateMainDirectMemory(0x4000, 0, 0, &phys_addr);
+  CHECK_EQUAL(0, result);
+
+  // Misaligned addr
+  addr = 0x200002000;
+  result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0, phys_addr, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // Misaligned phys_addr
+  addr = 0x200000000;
+  result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0, phys_addr - 0x2000, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // Misaligned length
+  result = sceKernelMapDirectMemory2(&addr, 0x2000, 0, 1, 0, phys_addr, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // Zero length
+  result = sceKernelMapDirectMemory2(&addr, 0, 0, 1, 0, phys_addr, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // Invalid flags
+  result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 1, phys_addr, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // Invalid prot
+  result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 0x7, 0, phys_addr, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 0x8, 0, phys_addr, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // Invalid mtype
+  result = sceKernelMapDirectMemory2(&addr, 0x4000, 11, 1, 0, phys_addr, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // Negative mtype is valid here?
+  result = sceKernelMapDirectMemory2(&addr, 0x4000, -1, 1, 0, phys_addr, 0);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  // Overlapping phys addr (relying on libSceGnmDriver mapping)
+  result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0, 0, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EBUSY, result);
+
+  // Try enabling dmem aliasing
+  result = sceKernelEnableDmemAliasing();
+  CHECK_EQUAL(0, result);
+
+  // Overlapping phys addr works now.
+  result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0, 0, 0);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  // Might continue down this rabbit hole at some point, but I don't see too much of a point?
+  // I've gleamed the error cases they start with, everything else will just come from testing, as always.
 }
