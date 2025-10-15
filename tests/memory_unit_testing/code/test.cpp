@@ -685,8 +685,6 @@ TEST(MemoryUnitTests, MapMemoryTest) {
    * If address input is still zero here (Fixed flag with null address input?), then address defaults to 0xfc00000000.
    */
 
-  // Next stop: Hell. Also called vm_mmap2.
-
   /**
    * Notes for vm_mmap2:
    * Starts with a check for size == 0, returning EINVAL. This can't be tested because sys_mmap had an earlier return for this case.
