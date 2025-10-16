@@ -619,13 +619,29 @@ TEST(MemoryUnitTests, MapMemoryTest) {
   CHECK_EQUAL(0, result);
 
   // If flags include Stack (0x400) and prot does not include CpuReadWrite or fd is not -1, return EINVAL.
+  addr = 0xfc00000000;
   result = sceKernelMmap(addr, 0x4000, 0, 0x400, -1, 0, &addr_out);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
   result = sceKernelMmap(addr, 0x4000, 3, 0x400, 0, 0, &addr_out);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
-  // Note: I can't get stack flag to succeed, it probably has some other restriction I'll find deeper in the code.
-  // Calling with the "valid" parameters assumed here causes ENOMEM.
+  // Stack flag requires a specific address range to function properly.
+  // TODO: Figure out allowed range.
+  addr = 0xfb00000000;
+  result = sceKernelMmap(addr, 0x4000, 3, 0x400, -1, 0, &addr_out);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr_out, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  addr = 0xfc00000000;
+  result = sceKernelMmap(addr, 0x4000, 3, 0x400, -1, 0, &addr_out);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr_out, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  addr = 0x200000000;
+  result = sceKernelMmap(addr, 0x4000, 3, 0x400, -1, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_ENOMEM, result);
 
   /**
    * Other notes here:
@@ -656,28 +672,55 @@ TEST(MemoryUnitTests, MapMemoryTest) {
   int32_t fd = sceKernelOpen("/app0/assets/misc/test_file.txt", 0, 0666);
   CHECK(fd > 0);
 
-  // This sceKernelMmap should try mapping the file to memory with read-write permissions... which succeeds somehow?
+  // This sceKernelMmap should try mapping the file to memory with read-write permissions.
+  // Due to the flags, writing to this memory will likely fail (but that's to test when done with edge cases)
+  int64_t phys_addr = 0;
+  result = sceKernelAllocateMainDirectMemory(0x4000, 0, 0, &phys_addr);
+  CHECK_EQUAL(0, result);
+
   result = sceKernelMmap(addr, 0x4000, 3, 0, fd, 0, &addr_out);
   CHECK_EQUAL(0, result);
   result = sceKernelMunmap(addr_out, 0x4000);
   CHECK_EQUAL(0, result);
 
-  // GPU file mmaps are prone to crashing PS4.
-  // result = sceKernelMmap(addr, 0x4000, 0x20, 0, fd, 0, &addr_out);
-  // CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  // mmap with phys addr returns EACCES
+  result = sceKernelMmap(addr, 0x4000, 3, 0, fd, phys_addr, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+
+  result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x4000);
+  CHECK_EQUAL(0, result);
 
   result = sceKernelClose(fd);
   CHECK_EQUAL(result, 0);
 
-  // GPU file mmaps are prone to crashing PS4.
-  // result = sceKernelMmap(addr, 0x4000, 0x30, 0, fd, 0, &addr_out);
-  // CHECK_EQUAL(0, result);
-  // result = sceKernelMunmap(addr_out, 0x4000);
-  // CHECK_EQUAL(0, result);
+  // Try file mmap with read-write file
+  fd = sceKernelOpen("/download0/test_file.txt", 0x600, 0666);
+  CHECK(fd > 0);
+
+  // Files in read-write directories can't be mmapped?
+  result = sceKernelMmap(addr, 0x4000, 3, 0, fd, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  result = sceKernelMmap(addr, 0x4000, 3, 2, fd, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+
+  result = sceKernelClose(fd);
+  CHECK_EQUAL(result, 0);
+
+  fd = sceKernelOpen("/download0/test_file.txt", 0x602, 0666);
+  CHECK(fd > 0);
+
+  // Files in read-write directories can't be mmapped?
+  result = sceKernelMmap(addr, 0x4000, 3, 0, fd, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  result = sceKernelMmap(addr, 0x4000, 3, 2, fd, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+
+  result = sceKernelClose(fd);
+  CHECK_EQUAL(result, 0);
 
   /**
    * Notes:
-   * Seems like I can't mmap files from read-write directories? Might have something to do with file creation modes perhaps?
+   * File mmaps to GPU cause the PS4 to crash, this should get investigated.
    * Somewhere along the line, mapping with flag stack fails. Probably some stack-specific flag check later on?
    * 
    * Based on decompilation, Sanitizer flag with a valid address (below a hardcoded 0x800000000000) restricts prot here.
@@ -728,7 +771,7 @@ TEST(MemoryUnitTests, MapMemoryTest) {
    */
 
   // To run sys_mmap_dmem without worries from phys addresses, allocate some dmem
-  int64_t phys_addr = 0;
+  phys_addr = 0;
   result = sceKernelAllocateMainDirectMemory(0x4000, 0, 0, &phys_addr);
   CHECK_EQUAL(0, result);
 
@@ -782,6 +825,9 @@ TEST(MemoryUnitTests, MapMemoryTest) {
   addr = 0;
   result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0x10, phys_addr, 0);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x4000);
+  CHECK_EQUAL(0, result);
 
   // Overlapping phys addr (relying on libSceGnmDriver mapping)
   result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0, 0, 0);
