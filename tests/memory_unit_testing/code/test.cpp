@@ -146,6 +146,417 @@ TEST_GROUP(MemoryUnitTests) {void setup() {
 
 }};
 
+// These tests are at the top of the file so they run last.
+// This is to prevent issues related to sceKernelEnableDmemAliasing, which afaik cannot be undone without direct syscall usage.
+TEST(MemoryUnitTests, MapMemoryTest) {
+  // Most memory functions in libkernel rely on sceKernelMmap,
+  // leading to overlap in some edge cases.
+  // Start with testing libkernel's error returns for sceKernelMapFlexibleMemory
+  // If size is less than page size, or size is not page aligned, return EINVAL
+  uint64_t addr = 0;
+  int32_t result = sceKernelMapFlexibleMemory(&addr, 0x5000, 0, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  result = sceKernelMapFlexibleMemory(&addr, 0x2000, 0, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // Protection should be a bitwise-or'ed combination of flags. It can be zero,
+  // or include Read (1) | Write (2) | Execute (4) | GpuRead (0x10) | GpuWrite (0x20).
+  // If a value is inputted for protection that doesn't match those flags, it returns EINVAL.
+  result = sceKernelMapFlexibleMemory(&addr, 0x4000, 8, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  result = sceKernelMapFlexibleMemory(&addr, 0x4000, 64, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // The only permitted flags are: Fixed (0x10) | NoOverwrite (0x80) | NoCoalesce (0x400000)
+  // If flags is non-zero, and includes bits not contained in that list, then it returns EINVAL.
+  result = sceKernelMapFlexibleMemory(&addr, 0x4000, 0, 1);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  result = sceKernelMapFlexibleMemory(&addr, 0x4000, 0, 0x100);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  result = sceKernelMapFlexibleMemory(&addr, 0x4000, 0, 0x2000);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  /**
+   * Other sceKernelMapFlexibleMemory Notes:
+   * If address is not specified, it defaults to 0x200000000
+   * Not possible to test here, but there's a condition it follows that instead defaults to 0x880000000
+   * On SDK version < 1.70, flag Fixed with unspecified address would remove the Fixed flag.
+   */
+
+  // Now for edge cases in sceKernelMapDirectMemory. This function allows flags:
+  // Fixed (0x10) | NoOverwrite (0x80) | DmemCompat (0x400) | Sanitizer (0x200000) | NoCoalesce (0x400000)
+  result = sceKernelMapDirectMemory(&addr, 0x4000, 0, 1, 0, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  result = sceKernelMapDirectMemory(&addr, 0x4000, 0, 0x100, 0, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  result = sceKernelMapDirectMemory(&addr, 0x4000, 0, 0x2000, 0, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  /**
+   * Notes:
+   * Flag DmemCompat is exclusive to libkernel code, mmap flag 0x400 is Stack.
+   * For games compiled with sdk version < 2.50, DmemCompat does nothing.
+   * For newer titles, it will redirect sceKernelMapDirectMemory to sceKernelMapDirectMemory2.
+   * We can check for edge cases specific to the latter case when testing sys_mmap_dmem later.
+   */
+
+  // Protection should be a bitwise-or'ed combination of flags. It can be zero,
+  // or include Read (1) | Write (2) | Execute (4) | GpuRead (0x10) | GpuWrite (0x20).
+  // If a value is inputted for protection that doesn't match those flags, it returns EINVAL.
+  // Note that the execute flag causes mmap to fail, that will come up during later edge case tests.
+  result = sceKernelMapDirectMemory(&addr, 0x4000, 8, 0, 0, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  result = sceKernelMapDirectMemory(&addr, 0x4000, 64, 0, 0, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  /**
+   * Note: 
+   * The execute protection causes sceKernelMapDirectMemory calls to fail. 
+   * This will likely come up in sys_mmap tests.
+   */
+
+  // Input address, length, phys_addr, and alignment all must be page-aligned.
+  addr = (uint64_t)0x200002000;
+  result = sceKernelMapDirectMemory(&addr, 0x4000, 0, 0, 0, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  addr = 0x200000000;
+  result = sceKernelMapDirectMemory(&addr, 0x2000, 0, 0, 0, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  result = sceKernelMapDirectMemory(&addr, 0x4000, 0, 0, 0x2000, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  result = sceKernelMapDirectMemory(&addr, 0x4000, 0, 0, 0, 0x2000);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // Additionally, alignment must be a power of two.
+  result = sceKernelMapDirectMemory(&addr, 0x4000, 0, 0, 0, 0xc000);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // Finally, alignment must be less than 0x100000000
+  result = sceKernelMapDirectMemory(&addr, 0x4000, 0, 0, 0, 0x100000000);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  /**
+   * Other sceKernelMapDirectMemory Notes:
+   * If address is not specified, it defaults to 0x200000000
+   * Not possible to test here, but there's a condition it follows that instead defaults to 0x880000000
+   * On SDK version < 1.70, flag Fixed with unspecified address would remove the Fixed flag.
+   */
+
+  // Now for sceKernelReserveVirtualRange edge cases.
+  // Alignment must be power of two
+  addr = 0x200000000;
+  result = sceKernelReserveVirtualRange(&addr, 0x4000, 0, 0xc000);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // Flags can only be Fixed, NoOverwrite, and NoCoalesce
+  result = sceKernelReserveVirtualRange(&addr, 0x4000, 0x400, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  result = sceKernelReserveVirtualRange(&addr, 0x4000, 0x1000, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  
+  // Address input must be aligned.
+  addr = 0x200002000;
+  result = sceKernelReserveVirtualRange(&addr, 0x4000, 0, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // length input must be aligned.
+  addr = 0x200000000;
+  result = sceKernelReserveVirtualRange(&addr, 0x2000, 0, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // Alignment input must be aligned.
+  result = sceKernelReserveVirtualRange(&addr, 0x4000, 0, 0x2000);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // Alignment input must be less than 0x100000000
+  result = sceKernelReserveVirtualRange(&addr, 0x4000, 0, 0x100000000);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  /**
+   * Other notes for sceKernelReserveVirtualRange:
+   * If Fixed flag is specified and address is null, sdk ver 1.70 and below removes flag fixed.
+   * Games compiled for newer firmwares will instead return EINVAL.
+   */
+
+  // Now for sys_mmap edge cases.
+  // To test each of these, I'll use sceKernelMmap (which is just a wrapper for the syscall that converts errors to ORBIS errors)
+  // If sys_mmap is called with the Sanitizer flag, then non-devkit consoles return EINVAL.
+  addr = 0x200000000;
+  uint64_t addr_out = 0;
+
+  // For this test call, use flags Sanitizer (0x200000) | System (0x2000) | Anon (0x1000) | NoOverwrite (0x80) | Fixed (0x10)
+  // This combination of flags is what sceKernelMapSanitizerShadowMemory uses.
+  addr = 0x300000000;
+  result = sceKernelMmap(addr, 0x4000, 0, 0x203090, -1, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // If length == 0, return EINVAL
+  addr = 0x200000000;
+  result = sceKernelMmap(addr, 0, 0, 0x1000, -1, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // If flags include Void (0x100) or Anon (0x1000), and phys_addr is non-zero or fd is not -1, return EINVAL.
+  // Note: Void flag means this is reserving memory, sceKernelReserveVirtualRange uses it internally.
+  result = sceKernelMmap(addr, 0x4000, 0, 0x1000, -1, 0x4000, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  result = sceKernelMmap(addr, 0x4000, 0, 0x1000, 0, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  result = sceKernelMmap(addr, 0x4000, 0, 0x100, -1, 0x4000, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  result = sceKernelMmap(addr, 0x4000, 0, 0x100, 0, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // Successful call with anon flag for comparison.
+  result = sceKernelMmap(addr, 0x4000, 0, 0x1000, -1, 0, &addr_out);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr_out, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  // Successful call with void flag for comparison.
+  result = sceKernelMmap(addr, 0x4000, 0, 0x100, -1, 0, &addr_out);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr_out, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  // If flags include Stack (0x400) and prot does not include CpuReadWrite or fd is not -1, return EINVAL.
+  addr = 0xfc00000000;
+  result = sceKernelMmap(addr, 0x4000, 0, 0x400, -1, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  result = sceKernelMmap(addr, 0x4000, 3, 0x400, 0, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // Seems like stack flag acts as if fixed | no overwrite are both present?
+  addr = 0xfb00000000;
+  result = sceKernelMmap(addr, 0x4000, 3, 0x400, -1, 0, &addr_out);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr_out, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  addr = 0xfc00000000;
+  result = sceKernelMmap(addr, 0x4000, 3, 0x400, -1, 0, &addr_out);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr_out, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  addr = 0x200400000;
+  result = sceKernelMmap(addr, 0x4000, 3, 0x400, -1, 0, &addr_out);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr_out, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  addr = 0x200004000;
+  result = sceKernelMmap(addr, 0x4000, 3, 0x400, -1, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_ENOMEM, result);
+
+  /**
+   * Other notes here:
+   * Stack and Void flags append Anon flag internally.
+   * Stack, Anon, and Void flags skip fget_mmap call (which gets the file object for the fd input)
+   * If Fixed is not specified and address is 0, then it's set to 0x200000000
+   * Length parameter is aligned up to the nearest page.
+   */
+
+  // If flag Fixed (0x10) is specified, address must have the same offset as phys_addr.
+  // This effectively prevents misaligned mappings, unless you manually opened a dmem file yourself.
+  addr = 0x200002000;
+  result = sceKernelMmap(addr, 0x4000, 0, 0x1010, -1, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  /**
+   * Notes:
+   * This is where sys_mmap calls fget_mmap to get a file for mmap.
+   * I still need to decompile everything here, especially the switch case for file type.
+   * Insert error cases here if there are any errors that I can expose through homebrew.
+   */
+
+  // If an unopened file descriptor is specified, then returns EBADF.
+  addr = 0x200000000;
+  result = sceKernelMmap(addr, 0x4000, 1, 0, 100, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EBADF, result);
+
+  int32_t fd = sceKernelOpen("/app0/assets/misc/test_file.txt", 0, 0666);
+  CHECK(fd > 0);
+
+  // This sceKernelMmap should try mapping the file to memory with read-write permissions.
+  // Due to the flags, writing to this memory will likely fail (but that's to test when done with edge cases)
+  int64_t phys_addr = 0;
+  result = sceKernelAllocateMainDirectMemory(0x4000, 0, 0, &phys_addr);
+  CHECK_EQUAL(0, result);
+
+  result = sceKernelMmap(addr, 0x4000, 3, 0, fd, 0, &addr_out);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr_out, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  result = sceKernelMmap(addr, 0x4000, 7, 0, fd, 0, &addr_out);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr_out, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  // mmap with phys addr returns EACCES
+  result = sceKernelMmap(addr, 0x4000, 3, 0, fd, phys_addr, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+
+  result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  result = sceKernelClose(fd);
+  CHECK_EQUAL(result, 0);
+
+  // Try file mmap with read-write file
+  fd = sceKernelOpen("/download0/test_file.txt", 0x600, 0666);
+  CHECK(fd > 0);
+
+  // Files in read-write directories can't be mmapped?
+  result = sceKernelMmap(addr, 0x4000, 3, 0, fd, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  result = sceKernelMmap(addr, 0x4000, 3, 2, fd, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+
+  result = sceKernelClose(fd);
+  CHECK_EQUAL(result, 0);
+
+  fd = sceKernelOpen("/download0/test_file.txt", 0x602, 0666);
+  CHECK(fd > 0);
+
+  // Files in read-write directories can't be mmapped?
+  result = sceKernelMmap(addr, 0x4000, 3, 0, fd, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  result = sceKernelMmap(addr, 0x4000, 3, 2, fd, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+
+  result = sceKernelClose(fd);
+  CHECK_EQUAL(result, 0);
+
+  /**
+   * Notes:
+   * File mmaps to GPU cause the PS4 to crash, this should get investigated.
+   * Somewhere along the line, mapping with flag stack fails. Probably some stack-specific flag check later on?
+   * 
+   * Based on decompilation, Sanitizer flag with a valid address (below a hardcoded 0x800000000000) restricts prot here.
+   * Specifically, if address input > 0xfc00000000, prot is restricted to GpuReadWrite.
+   * If address input is still zero here (Fixed flag with null address input?), then address defaults to 0xfc00000000.
+   */
+
+  /**
+   * Notes for vm_mmap2:
+   * Starts with a check for size == 0, returning EINVAL. This can't be tested because sys_mmap had an earlier return for this case.
+   * Then checks if our mapping will fit in the virtual memory limit? (if not return ENOMEM)
+   * Then checks if phys_addr is aligned, returning EINVAL if it isn't. sys_mmap aligned phys_addr for us though.
+   * If flags Fixed is specified, and address input is misaligned, return EINVAL. Again, sys_mmap checked this for us.
+   * A bunch of checks specific to file mmaps, most of which are un-important for homebrew testing (mostly internal stuff like devices)
+   */
+
+  /**
+   * Notes for sceKernelMapDirectMemory2:
+   * Alignment must be a power of 2, page aligned, and less than 0x100000000
+   * If alignment is less than page size, it's increased to the page size.
+   * Remaining behavior seems to rely on checks in sys_mmap_dmem.
+   */
+  addr = 0x200000000;
+  // Not power of 2
+  result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0, 0, 0xc000);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  // Not page aligned
+  result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0, 0, 0x100);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  // Too large.
+  result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0, 0, 0x100000000);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  /**
+   * Notes for sys_mmap_dmem:
+   * Starts with parameter checks.
+   * Address, phys_addr, and length must be page aligned. Length = 0 is not allowed.
+   * Flags must only contain Fixed, NoOverwrite, Sanitizer, NoCoalesce, and the alignment bits.
+   * Prot contains only CpuRead, CpuWrite, GpuRead, or GpuWrite.
+   * mtype must be less than 10
+   * If any of these error checks fail, the function returns EINVAL.
+   * 
+   * sys_mmap_dmem also follows the same address input logic as sys_mmap.
+   * If address is null and map Fixed is specified, returns EINVAL.
+   * 
+   * sys_mmap_dmem has an extra check for physical addresses overlapping.
+   * This check is removed if sceKernelEnableDmemAliasing is called.
+   */
+
+  // To run sys_mmap_dmem without worries from phys addresses, allocate some dmem
+  phys_addr = 0;
+  result = sceKernelAllocateMainDirectMemory(0x4000, 0, 0, &phys_addr);
+  CHECK_EQUAL(0, result);
+
+  // Misaligned addr
+  addr = 0x200002000;
+  result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0, phys_addr, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // Misaligned phys_addr
+  addr = 0x200000000;
+  result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0, phys_addr - 0x2000, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // Misaligned length
+  result = sceKernelMapDirectMemory2(&addr, 0x2000, 0, 1, 0, phys_addr, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // Zero length
+  result = sceKernelMapDirectMemory2(&addr, 0, 0, 1, 0, phys_addr, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // Invalid flags
+  result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 1, phys_addr, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // Invalid prot
+  result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 0x7, 0, phys_addr, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 0x8, 0, phys_addr, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // Invalid mtype
+  result = sceKernelMapDirectMemory2(&addr, 0x4000, 11, 1, 0, phys_addr, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // -1 mtype skips assigning type.
+  result = sceKernelMapDirectMemory2(&addr, 0x4000, -1, 1, 0, phys_addr, 0);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  // Lower negatives are invalid.
+  result = sceKernelMapDirectMemory2(&addr, 0x4000, -2, 1, 0, phys_addr, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // Map Sanitizer
+  result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0x200000, phys_addr, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // null address with map fixed
+  addr = 0;
+  result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0x10, phys_addr, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  // Overlapping phys addr (relying on libSceGnmDriver mapping)
+  result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0, 0, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EBUSY, result);
+
+  // Try enabling dmem aliasing
+  result = sceKernelEnableDmemAliasing();
+  CHECK_EQUAL(0, result);
+
+  // Overlapping phys addr works now.
+  result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0, 0, 0);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  // Might continue down this rabbit hole at some point, but I don't see too much of a point?
+  // I've gleamed the error cases they start with, everything else will just come from testing, as always.
+}
+
 TEST(MemoryUnitTests, AvailableDirectMemoryTest) {
   // Not exactly a way for this one to fail. Just need it to test other functions.
   uint64_t dmem_size = sceKernelGetDirectMemorySize();
@@ -448,406 +859,8 @@ TEST(MemoryUnitTests, ReleaseDirectMemoryTest) {
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
 }
 
-TEST(MemoryUnitTests, MapMemoryTest) {
-  // Most memory functions in libkernel rely on sceKernelMmap,
-  // leading to overlap in some edge cases.
-  // Start with testing libkernel's error returns for sceKernelMapFlexibleMemory
-  // If size is less than page size, or size is not page aligned, return EINVAL
-  uint64_t addr = 0;
-  int32_t result = sceKernelMapFlexibleMemory(&addr, 0x5000, 0, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-  result = sceKernelMapFlexibleMemory(&addr, 0x2000, 0, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-
-  // Protection should be a bitwise-or'ed combination of flags. It can be zero,
-  // or include Read (1) | Write (2) | Execute (4) | GpuRead (0x10) | GpuWrite (0x20).
-  // If a value is inputted for protection that doesn't match those flags, it returns EINVAL.
-  result = sceKernelMapFlexibleMemory(&addr, 0x4000, 8, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-  result = sceKernelMapFlexibleMemory(&addr, 0x4000, 64, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-
-  // The only permitted flags are: Fixed (0x10) | NoOverwrite (0x80) | NoCoalesce (0x400000)
-  // If flags is non-zero, and includes bits not contained in that list, then it returns EINVAL.
-  result = sceKernelMapFlexibleMemory(&addr, 0x4000, 0, 1);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-  result = sceKernelMapFlexibleMemory(&addr, 0x4000, 0, 0x100);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-  result = sceKernelMapFlexibleMemory(&addr, 0x4000, 0, 0x2000);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-
-  /**
-   * Other sceKernelMapFlexibleMemory Notes:
-   * If address is not specified, it defaults to 0x200000000
-   * Not possible to test here, but there's a condition it follows that instead defaults to 0x880000000
-   * On SDK version < 1.70, flag Fixed with unspecified address would remove the Fixed flag.
-   */
-
-  // Now for edge cases in sceKernelMapDirectMemory. This function allows flags:
-  // Fixed (0x10) | NoOverwrite (0x80) | DmemCompat (0x400) | Sanitizer (0x200000) | NoCoalesce (0x400000)
-  result = sceKernelMapDirectMemory(&addr, 0x4000, 0, 1, 0, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-  result = sceKernelMapDirectMemory(&addr, 0x4000, 0, 0x100, 0, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-  result = sceKernelMapDirectMemory(&addr, 0x4000, 0, 0x2000, 0, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-
-  /**
-   * Notes:
-   * Flag DmemCompat is exclusive to libkernel code, mmap flag 0x400 is Stack.
-   * For games compiled with sdk version < 2.50, DmemCompat does nothing.
-   * For newer titles, it will redirect sceKernelMapDirectMemory to sceKernelMapDirectMemory2.
-   * We can check for edge cases specific to the latter case when testing sys_mmap_dmem later.
-   */
-
-  // Protection should be a bitwise-or'ed combination of flags. It can be zero,
-  // or include Read (1) | Write (2) | Execute (4) | GpuRead (0x10) | GpuWrite (0x20).
-  // If a value is inputted for protection that doesn't match those flags, it returns EINVAL.
-  // Note that the execute flag causes mmap to fail, that will come up during later edge case tests.
-  result = sceKernelMapDirectMemory(&addr, 0x4000, 8, 0, 0, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-  result = sceKernelMapDirectMemory(&addr, 0x4000, 64, 0, 0, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-
-  /**
-   * Note: 
-   * The execute protection causes sceKernelMapDirectMemory calls to fail. 
-   * This will likely come up in sys_mmap tests.
-   */
-
-  // Input address, length, phys_addr, and alignment all must be page-aligned.
-  addr = (uint64_t)0x200002000;
-  result = sceKernelMapDirectMemory(&addr, 0x4000, 0, 0, 0, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-  addr = 0x200000000;
-  result = sceKernelMapDirectMemory(&addr, 0x2000, 0, 0, 0, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-  result = sceKernelMapDirectMemory(&addr, 0x4000, 0, 0, 0x2000, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-  result = sceKernelMapDirectMemory(&addr, 0x4000, 0, 0, 0, 0x2000);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-
-  // Additionally, alignment must be a power of two.
-  result = sceKernelMapDirectMemory(&addr, 0x4000, 0, 0, 0, 0xc000);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-
-  // Finally, alignment must be less than 0x100000000
-  result = sceKernelMapDirectMemory(&addr, 0x4000, 0, 0, 0, 0x100000000);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-
-  /**
-   * Other sceKernelMapDirectMemory Notes:
-   * If address is not specified, it defaults to 0x200000000
-   * Not possible to test here, but there's a condition it follows that instead defaults to 0x880000000
-   * On SDK version < 1.70, flag Fixed with unspecified address would remove the Fixed flag.
-   */
-
-  // Now for sceKernelReserveVirtualRange edge cases.
-  // Alignment must be power of two
-  addr = 0x200000000;
-  result = sceKernelReserveVirtualRange(&addr, 0x4000, 0, 0xc000);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-
-  // Flags can only be Fixed, NoOverwrite, and NoCoalesce
-  result = sceKernelReserveVirtualRange(&addr, 0x4000, 0x400, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-  result = sceKernelReserveVirtualRange(&addr, 0x4000, 0x1000, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-  
-  // Address input must be aligned.
-  addr = 0x200002000;
-  result = sceKernelReserveVirtualRange(&addr, 0x4000, 0, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-
-  // length input must be aligned.
-  addr = 0x200000000;
-  result = sceKernelReserveVirtualRange(&addr, 0x2000, 0, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-
-  // Alignment input must be aligned.
-  result = sceKernelReserveVirtualRange(&addr, 0x4000, 0, 0x2000);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-
-  // Alignment input must be less than 0x100000000
-  result = sceKernelReserveVirtualRange(&addr, 0x4000, 0, 0x100000000);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-
-  /**
-   * Other notes for sceKernelReserveVirtualRange:
-   * If Fixed flag is specified and address is null, sdk ver 1.70 and below removes flag fixed.
-   * Games compiled for newer firmwares will instead return EINVAL.
-   */
-
-  // Now for sys_mmap edge cases.
-  // To test each of these, I'll use sceKernelMmap (which is just a wrapper for the syscall that converts errors to ORBIS errors)
-  // If sys_mmap is called with the Sanitizer flag, then non-devkit consoles return EINVAL.
-  addr = 0x200000000;
-  uint64_t addr_out = 0;
-
-  // For this test call, use flags Sanitizer (0x200000) | System (0x2000) | Anon (0x1000) | NoOverwrite (0x80) | Fixed (0x10)
-  // This combination of flags is what sceKernelMapSanitizerShadowMemory uses.
-  addr = 0x300000000;
-  result = sceKernelMmap(addr, 0x4000, 0, 0x203090, -1, 0, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-
-  // If length == 0, return EINVAL
-  addr = 0x200000000;
-  result = sceKernelMmap(addr, 0, 0, 0x1000, -1, 0, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-
-  // If flags include Void (0x100) or Anon (0x1000), and phys_addr is non-zero or fd is not -1, return EINVAL.
-  // Note: Void flag means this is reserving memory, sceKernelReserveVirtualRange uses it internally.
-  result = sceKernelMmap(addr, 0x4000, 0, 0x1000, -1, 0x4000, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-  result = sceKernelMmap(addr, 0x4000, 0, 0x1000, 0, 0, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-  result = sceKernelMmap(addr, 0x4000, 0, 0x100, -1, 0x4000, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-  result = sceKernelMmap(addr, 0x4000, 0, 0x100, 0, 0, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-
-  // Successful call with anon flag for comparison.
-  result = sceKernelMmap(addr, 0x4000, 0, 0x1000, -1, 0, &addr_out);
-  CHECK_EQUAL(0, result);
-  result = sceKernelMunmap(addr_out, 0x4000);
-  CHECK_EQUAL(0, result);
-
-  // Successful call with void flag for comparison.
-  result = sceKernelMmap(addr, 0x4000, 0, 0x100, -1, 0, &addr_out);
-  CHECK_EQUAL(0, result);
-  result = sceKernelMunmap(addr_out, 0x4000);
-  CHECK_EQUAL(0, result);
-
-  // If flags include Stack (0x400) and prot does not include CpuReadWrite or fd is not -1, return EINVAL.
-  addr = 0xfc00000000;
-  result = sceKernelMmap(addr, 0x4000, 0, 0x400, -1, 0, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-  result = sceKernelMmap(addr, 0x4000, 3, 0x400, 0, 0, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-
-  // Seems like stack flag acts as if fixed | no overwrite are both present?
-  addr = 0xfb00000000;
-  result = sceKernelMmap(addr, 0x4000, 3, 0x400, -1, 0, &addr_out);
-  CHECK_EQUAL(0, result);
-  result = sceKernelMunmap(addr_out, 0x4000);
-  CHECK_EQUAL(0, result);
-
-  addr = 0xfc00000000;
-  result = sceKernelMmap(addr, 0x4000, 3, 0x400, -1, 0, &addr_out);
-  CHECK_EQUAL(0, result);
-  result = sceKernelMunmap(addr_out, 0x4000);
-  CHECK_EQUAL(0, result);
-
-  addr = 0x200400000;
-  result = sceKernelMmap(addr, 0x4000, 3, 0x400, -1, 0, &addr_out);
-  CHECK_EQUAL(0, result);
-  result = sceKernelMunmap(addr_out, 0x4000);
-  CHECK_EQUAL(0, result);
-
-  addr = 0x200004000;
-  result = sceKernelMmap(addr, 0x4000, 3, 0x400, -1, 0, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_ENOMEM, result);
-
-  /**
-   * Other notes here:
-   * Stack and Void flags append Anon flag internally.
-   * Stack, Anon, and Void flags skip fget_mmap call (which gets the file object for the fd input)
-   * If Fixed is not specified and address is 0, then it's set to 0x200000000
-   * Length parameter is aligned up to the nearest page.
-   */
-
-  // If flag Fixed (0x10) is specified, address must have the same offset as phys_addr.
-  // This effectively prevents misaligned mappings, unless you manually opened a dmem file yourself.
-  addr = 0x200002000;
-  result = sceKernelMmap(addr, 0x4000, 0, 0x1010, -1, 0, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-
-  /**
-   * Notes:
-   * This is where sys_mmap calls fget_mmap to get a file for mmap.
-   * I still need to decompile everything here, especially the switch case for file type.
-   * Insert error cases here if there are any errors that I can expose through homebrew.
-   */
-
-  // If an unopened file descriptor is specified, then returns EBADF.
-  addr = 0x200000000;
-  result = sceKernelMmap(addr, 0x4000, 1, 0, 100, 0, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EBADF, result);
-
-  int32_t fd = sceKernelOpen("/app0/assets/misc/test_file.txt", 0, 0666);
-  CHECK(fd > 0);
-
-  // This sceKernelMmap should try mapping the file to memory with read-write permissions.
-  // Due to the flags, writing to this memory will likely fail (but that's to test when done with edge cases)
-  int64_t phys_addr = 0;
-  result = sceKernelAllocateMainDirectMemory(0x4000, 0, 0, &phys_addr);
-  CHECK_EQUAL(0, result);
-
-  result = sceKernelMmap(addr, 0x4000, 3, 0, fd, 0, &addr_out);
-  CHECK_EQUAL(0, result);
-  result = sceKernelMunmap(addr_out, 0x4000);
-  CHECK_EQUAL(0, result);
-
-  // mmap with phys addr returns EACCES
-  result = sceKernelMmap(addr, 0x4000, 3, 0, fd, phys_addr, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
-
-  result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x4000);
-  CHECK_EQUAL(0, result);
-
-  result = sceKernelClose(fd);
-  CHECK_EQUAL(result, 0);
-
-  // Try file mmap with read-write file
-  fd = sceKernelOpen("/download0/test_file.txt", 0x600, 0666);
-  CHECK(fd > 0);
-
-  // Files in read-write directories can't be mmapped?
-  result = sceKernelMmap(addr, 0x4000, 3, 0, fd, 0, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
-  result = sceKernelMmap(addr, 0x4000, 3, 2, fd, 0, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
-
-  result = sceKernelClose(fd);
-  CHECK_EQUAL(result, 0);
-
-  fd = sceKernelOpen("/download0/test_file.txt", 0x602, 0666);
-  CHECK(fd > 0);
-
-  // Files in read-write directories can't be mmapped?
-  result = sceKernelMmap(addr, 0x4000, 3, 0, fd, 0, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
-  result = sceKernelMmap(addr, 0x4000, 3, 2, fd, 0, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
-
-  result = sceKernelClose(fd);
-  CHECK_EQUAL(result, 0);
-
-  /**
-   * Notes:
-   * File mmaps to GPU cause the PS4 to crash, this should get investigated.
-   * Somewhere along the line, mapping with flag stack fails. Probably some stack-specific flag check later on?
-   * 
-   * Based on decompilation, Sanitizer flag with a valid address (below a hardcoded 0x800000000000) restricts prot here.
-   * Specifically, if address input > 0xfc00000000, prot is restricted to GpuReadWrite.
-   * If address input is still zero here (Fixed flag with null address input?), then address defaults to 0xfc00000000.
-   */
-
-  /**
-   * Notes for vm_mmap2:
-   * Starts with a check for size == 0, returning EINVAL. This can't be tested because sys_mmap had an earlier return for this case.
-   * Then checks if our mapping will fit in the virtual memory limit? (if not return ENOMEM)
-   * Then checks if phys_addr is aligned, returning EINVAL if it isn't. sys_mmap aligned phys_addr for us though.
-   * If flags Fixed is specified, and address input is misaligned, return EINVAL. Again, sys_mmap checked this for us.
-   * A bunch of checks specific to file mmaps, most of which are un-important for homebrew testing (mostly internal stuff like devices)
-   */
-
-  /**
-   * Notes for sceKernelMapDirectMemory2:
-   * Alignment must be a power of 2, page aligned, and less than 0x100000000
-   * If alignment is less than page size, it's increased to the page size.
-   * Remaining behavior seems to rely on checks in sys_mmap_dmem.
-   */
-  addr = 0x200000000;
-  // Not power of 2
-  result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0, 0, 0xc000);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-  // Not page aligned
-  result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0, 0, 0x100);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-  // Too large.
-  result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0, 0, 0x100000000);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-
-  /**
-   * Notes for sys_mmap_dmem:
-   * Starts with parameter checks.
-   * Address, phys_addr, and length must be page aligned. Length = 0 is not allowed.
-   * Flags must only contain Fixed, NoOverwrite, Sanitizer, NoCoalesce, and the alignment bits.
-   * Prot contains only CpuRead, CpuWrite, GpuRead, or GpuWrite.
-   * mtype must be less than 10
-   * If any of these error checks fail, the function returns EINVAL.
-   * 
-   * sys_mmap_dmem also follows the same address input logic as sys_mmap.
-   * If address is null and map Fixed is specified, returns EINVAL.
-   * 
-   * sys_mmap_dmem has an extra check for physical addresses overlapping.
-   * This check is removed if sceKernelEnableDmemAliasing is called.
-   */
-
-  // To run sys_mmap_dmem without worries from phys addresses, allocate some dmem
-  phys_addr = 0;
-  result = sceKernelAllocateMainDirectMemory(0x4000, 0, 0, &phys_addr);
-  CHECK_EQUAL(0, result);
-
-  // Misaligned addr
-  addr = 0x200002000;
-  result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-
-  // Misaligned phys_addr
-  addr = 0x200000000;
-  result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0, phys_addr - 0x2000, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-
-  // Misaligned length
-  result = sceKernelMapDirectMemory2(&addr, 0x2000, 0, 1, 0, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-
-  // Zero length
-  result = sceKernelMapDirectMemory2(&addr, 0, 0, 1, 0, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-
-  // Invalid flags
-  result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 1, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-
-  // Invalid prot
-  result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 0x7, 0, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-  result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 0x8, 0, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-
-  // Invalid mtype
-  result = sceKernelMapDirectMemory2(&addr, 0x4000, 11, 1, 0, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-
-  // -1 mtype skips assigning type.
-  result = sceKernelMapDirectMemory2(&addr, 0x4000, -1, 1, 0, phys_addr, 0);
-  CHECK_EQUAL(0, result);
-  result = sceKernelMunmap(addr, 0x4000);
-  CHECK_EQUAL(0, result);
-
-  // Lower negatives are invalid.
-  result = sceKernelMapDirectMemory2(&addr, 0x4000, -2, 1, 0, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-
-  // Map Sanitizer
-  result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0x200000, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-
-  // null address with map fixed
-  addr = 0;
-  result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0x10, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-
-  result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x4000);
-  CHECK_EQUAL(0, result);
-
-  // Overlapping phys addr (relying on libSceGnmDriver mapping)
-  result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0, 0, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EBUSY, result);
-
-  // Try enabling dmem aliasing
-  result = sceKernelEnableDmemAliasing();
-  CHECK_EQUAL(0, result);
-
-  // Overlapping phys addr works now.
-  result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0, 0, 0);
-  CHECK_EQUAL(0, result);
-  result = sceKernelMunmap(addr, 0x4000);
-  CHECK_EQUAL(0, result);
-
-  // Might continue down this rabbit hole at some point, but I don't see too much of a point?
-  // I've gleamed the error cases they start with, everything else will just come from testing, as always.
+// We're done with edge cases prior to actually mapping, now for all the edge cases possible while mapping.
+TEST(MemoryUnitTests, MappingTest) {
+  // Anything here will run before the sceKernelEnableDmemAliasing call above.
+  // Keep that in mind when considering how these tests will behave.
 }
