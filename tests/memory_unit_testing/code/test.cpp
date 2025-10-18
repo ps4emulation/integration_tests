@@ -23,7 +23,7 @@ int32_t  sceKernelReleaseFlexibleMemory(uint64_t* addr, uint64_t size);
 
 int32_t  sceKernelReserveVirtualRange(uint64_t* addr, uint64_t size, int32_t flags, uint64_t alignment);
 
-int32_t  sceKernelMmap(uint64_t addr, uint64_t size, int32_t prot, int32_t flags, int32_t fd, int64_t phys_addr, uint64_t* out_addr);
+int32_t  sceKernelMmap(uint64_t addr, uint64_t size, int32_t prot, int32_t flags, int32_t fd, int64_t offset, uint64_t* out_addr);
 int32_t  sceKernelMunmap(uint64_t addr, uint64_t size);
 
 int32_t  sceKernelQueryMemoryProtection(uint64_t addr, uint64_t* start, uint64_t* end, uint32_t* prot);
@@ -393,40 +393,140 @@ TEST(MemoryUnitTests, MapMemoryTest) {
   result = sceKernelMunmap(addr_out, 0x4000);
   CHECK_EQUAL(0, result);
 
-  // mmap with phys addr returns EACCES
+  // Offset is where in the file we want to map.
+  // The file is ~500KB large, so any phys_addr produced by the above sceKernelAllocateMainDirectMemory call should work.
   result = sceKernelMmap(addr, 0x4000, 3, 0, fd, phys_addr, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr_out, 0x4000);
+  CHECK_EQUAL(0, result);
 
   result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x4000);
   CHECK_EQUAL(0, result);
 
   result = sceKernelClose(fd);
-  CHECK_EQUAL(result, 0);
+  CHECK_EQUAL(0, result);
 
   // Try file mmap with read-write file
-  fd = sceKernelOpen("/download0/test_file.txt", 0x600, 0666);
-  CHECK(fd > 0);
-
-  // Files in read-write directories can't be mmapped?
-  result = sceKernelMmap(addr, 0x4000, 3, 0, fd, 0, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
-  result = sceKernelMmap(addr, 0x4000, 3, 2, fd, 0, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
-
-  result = sceKernelClose(fd);
-  CHECK_EQUAL(result, 0);
-
   fd = sceKernelOpen("/download0/test_file.txt", 0x602, 0666);
   CHECK(fd > 0);
 
-  // Files in read-write directories can't be mmapped?
+  // Write empty data to the file
+  char buf[0x10000];
+  memset(buf, 0, sizeof(buf));
+  result = sceKernelWrite(fd, buf, 0x8000);
+  CHECK_EQUAL(0x8000, result);
+
+  // Read only file mmap for read-write file
+  result = sceKernelMmap(addr, 0x4000, 1, 0, fd, 0, &addr_out);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr_out, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  // Read-write file mmap on read-write file
   result = sceKernelMmap(addr, 0x4000, 3, 0, fd, 0, &addr_out);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr_out, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  // Read-write-execute file mmap on read-write file
+  result = sceKernelMmap(addr, 0x4000, 7, 0, fd, 0, &addr_out);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr_out, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  // file mmap with offset == file size.
+  result = sceKernelMmap(addr, 0x4000, 3, 0, fd, 0x8000, &addr_out);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
-  result = sceKernelMmap(addr, 0x4000, 3, 2, fd, 0, &addr_out);
+
+  // file mmap with offset + size greater than file size
+  result = sceKernelMmap(addr, 0x8000, 3, 0, fd, 0x4000, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+
+  // file mmap with offset 0 + size greater than file size
+  result = sceKernelMmap(addr, 0x10000, 3, 0, fd, 0, &addr_out);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
 
   result = sceKernelClose(fd);
-  CHECK_EQUAL(result, 0);
+  CHECK_EQUAL(0, result);
+
+  fd = sceKernelOpen("/download0/test_file.txt", 0x0, 0666);
+  CHECK(fd > 0);
+
+  // Read-only file mmap on read-only file
+  result = sceKernelMmap(addr, 0x4000, 1, 0, fd, 0, &addr_out);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr_out, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  // Read-write file mmap on read-only file
+  result = sceKernelMmap(addr, 0x4000, 3, 0, fd, 0, &addr_out);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr_out, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  // Read-write-execute file mmap on read-only file
+  result = sceKernelMmap(addr, 0x4000, 7, 0, fd, 0, &addr_out);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr_out, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  // file mmap with valid offset.
+  result = sceKernelMmap(addr, 0x4000, 3, 0, fd, 0x4000, &addr_out);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr_out, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  // file mmap with offset == file size.
+  result = sceKernelMmap(addr, 0x4000, 3, 0, fd, 0x8000, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+
+  // file mmap with offset + size greater than file size
+  result = sceKernelMmap(addr, 0x8000, 3, 0, fd, 0x4000, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+
+  // file mmap with offset 0 + size greater than file size
+  result = sceKernelMmap(addr, 0x10000, 3, 0, fd, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+
+  result = sceKernelClose(fd);
+  CHECK_EQUAL(0, result);
+
+  // Try file mmap with read-write file
+  fd = sceKernelOpen("/download0/test_file.txt", 0x602, 0666);
+  CHECK(fd > 0);
+
+  // Write empty data to the file
+  result = sceKernelWrite(fd, buf, 0xf000);
+  CHECK_EQUAL(0xf000, result);
+
+  // Checks for file size in both size and offset parameters are aligned up.
+  // Here, we shouldn't see errors unless I try size + offset > 0x10000
+  // file mmap with offset == file size.
+  result = sceKernelMmap(addr, 0x4000, 3, 0, fd, 0x10000, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+
+  // file mmap with offset + size greater than file size
+  result = sceKernelMmap(addr, 0xc000, 3, 0, fd, 0x8000, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+
+  // file mmap with offset 0 + size greater than file size
+  result = sceKernelMmap(addr, 0x14000, 3, 0, fd, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+
+  // file mmap with size + offset greater than file size, but less than page-aligned file size.
+  result = sceKernelMmap(addr, 0x8000, 3, 0, fd, 0x8000, &addr_out);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr_out, 0x8000);
+  CHECK_EQUAL(0, result);
+
+  // file mmap with size greater than file size, but less than page-aligned file size.
+  result = sceKernelMmap(addr, 0x10000, 3, 0, fd, 0, &addr_out);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr_out, 0x10000);
+  CHECK_EQUAL(0, result);
+  
+  result = sceKernelClose(fd);
+  CHECK_EQUAL(0, result);
 
   /**
    * Notes:
@@ -436,6 +536,7 @@ TEST(MemoryUnitTests, MapMemoryTest) {
    * Based on decompilation, Sanitizer flag with a valid address (below a hardcoded 0x800000000000) restricts prot here.
    * Specifically, if address input > 0xfc00000000, prot is restricted to GpuReadWrite.
    * If address input is still zero here (Fixed flag with null address input?), then address defaults to 0xfc00000000.
+   * sys_mmap calls vm_mmap2 with offset aligned down to the nearest page.
    */
 
   /**
