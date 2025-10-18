@@ -861,6 +861,5 @@ TEST(MemoryUnitTests, ReleaseDirectMemoryTest) {
 
 // We're done with edge cases prior to actually mapping, now for all the edge cases possible while mapping.
 TEST(MemoryUnitTests, MappingTest) {
-  // Anything here will run before the sceKernelEnableDmemAliasing call above.
-  // Keep that in mind when considering how these tests will behave.
+
 }
