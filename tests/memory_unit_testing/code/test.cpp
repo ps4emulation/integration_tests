@@ -625,8 +625,7 @@ TEST(MemoryUnitTests, MapMemoryTest) {
   result = sceKernelMmap(addr, 0x4000, 3, 0x400, 0, 0, &addr_out);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
-  // Stack flag requires a specific address range to function properly.
-  // TODO: Figure out allowed range.
+  // Seems like stack flag acts as if fixed | no overwrite are both present?
   addr = 0xfb00000000;
   result = sceKernelMmap(addr, 0x4000, 3, 0x400, -1, 0, &addr_out);
   CHECK_EQUAL(0, result);
@@ -639,7 +638,13 @@ TEST(MemoryUnitTests, MapMemoryTest) {
   result = sceKernelMunmap(addr_out, 0x4000);
   CHECK_EQUAL(0, result);
 
-  addr = 0x200000000;
+  addr = 0x200400000;
+  result = sceKernelMmap(addr, 0x4000, 3, 0x400, -1, 0, &addr_out);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr_out, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  addr = 0x200004000;
   result = sceKernelMmap(addr, 0x4000, 3, 0x400, -1, 0, &addr_out);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_ENOMEM, result);
 
