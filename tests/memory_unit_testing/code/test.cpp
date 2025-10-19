@@ -4,37 +4,43 @@
 #include <string>
 
 extern "C" {
+// Direct memory functions
 uint64_t sceKernelGetDirectMemorySize();
+int32_t  sceKernelEnableDmemAliasing();
+int32_t  sceKernelAvailableDirectMemorySize(int64_t start, int64_t end, uint64_t alignment, int64_t* phys_addr, uint64_t* size);
+int32_t  sceKernelAllocateDirectMemory(int64_t start, int64_t end, uint64_t size, uint64_t alignment, int32_t type, int64_t* phys_addr);
+int32_t  sceKernelAllocateMainDirectMemory(uint64_t size, uint64_t alignment, int32_t type, int64_t* phys_addr);
+int32_t  sceKernelMapDirectMemory(uint64_t* addr, uint64_t size, int32_t prot, int32_t flags, int64_t phys_addr, uint64_t alignment);
+int32_t  sceKernelMapDirectMemory2(uint64_t* addr, uint64_t size, int32_t type, int32_t prot, int32_t flags, int64_t phys_addr, uint64_t alignment);
+int32_t  sceKernelGetDirectMemoryType(int64_t phys_addr, int32_t* type, int64_t* start, int64_t* end);
+int32_t  sceKernelCheckedReleaseDirectMemory(int64_t phys_addr, uint64_t size);
+int32_t  sceKernelReleaseDirectMemory(int64_t phys_addr, uint64_t size);
 
-int32_t sceKernelEnableDmemAliasing();
-
-int32_t sceKernelAvailableDirectMemorySize(int64_t start, int64_t end, uint64_t alignment, int64_t* phys_addr, uint64_t* size);
-int32_t sceKernelAllocateDirectMemory(int64_t start, int64_t end, uint64_t size, uint64_t alignment, int32_t type, int64_t* phys_addr);
-int32_t sceKernelAllocateMainDirectMemory(uint64_t size, uint64_t alignment, int32_t type, int64_t* phys_addr);
-int32_t sceKernelMapDirectMemory(uint64_t* addr, uint64_t size, int32_t prot, int32_t flags, int64_t phys_addr, uint64_t alignment);
-int32_t sceKernelMapDirectMemory2(uint64_t* addr, uint64_t size, int32_t type, int32_t prot, int32_t flags, int64_t phys_addr, uint64_t alignment);
-int32_t sceKernelGetDirectMemoryType(int64_t phys_addr, int32_t* type, int64_t* start, int64_t* end);
-int32_t sceKernelCheckedReleaseDirectMemory(int64_t phys_addr, uint64_t size);
-int32_t sceKernelReleaseDirectMemory(int64_t phys_addr, uint64_t size);
-
+// Flexible memory functions
 int32_t sceKernelAvailableFlexibleMemorySize(uint64_t* size);
 int32_t sceKernelMapFlexibleMemory(uint64_t* addr, uint64_t size, int32_t prot, int32_t flags);
 int32_t sceKernelReleaseFlexibleMemory(uint64_t* addr, uint64_t size);
 
+// Reserve memory function
 int32_t sceKernelReserveVirtualRange(uint64_t* addr, uint64_t size, int32_t flags, uint64_t alignment);
 
+// Generic memory functions
 int32_t sceKernelMmap(uint64_t addr, uint64_t size, int32_t prot, int32_t flags, int32_t fd, int64_t offset, uint64_t* out_addr);
 int32_t sceKernelMunmap(uint64_t addr, uint64_t size);
+int32_t sceKernelQueryMemoryProtection(uint64_t addr, uint64_t* start, uint64_t* end, int32_t* prot);
+int32_t sceKernelVirtualQuery(uint64_t addr, int32_t flags, void* info, uint64_t info_size);
 
-int32_t sceKernelQueryMemoryProtection(uint64_t addr, uint64_t* start, uint64_t* end, uint32_t* prot);
-
+// Memory pool functions
 int32_t sceKernelMemoryPoolExpand(int64_t start, int64_t end, uint64_t len, uint64_t alignment, int64_t* phys_addr);
 int32_t sceKernelMemoryPoolReserve(uint64_t addr_in, uint64_t len, uint64_t alignment, int32_t flags, uint64_t addr_out);
 int32_t sceKernelMemoryPoolCommit(uint64_t addr, uint64_t len, int32_t type, int32_t prot, int32_t flags);
 int32_t sceKernelMemoryPoolDecommit(uint64_t addr, uint64_t len, int32_t flags);
 
+// Filesystem functions
 int32_t sceKernelOpen(const char* path, int32_t flags, uint16_t mode);
+int64_t sceKernelRead(int32_t fd, void* buf, uint64_t size);
 int64_t sceKernelWrite(int32_t fd, const void* buf, uint64_t size);
+int64_t sceKernelLseek(int32_t fd, int64_t offset, int32_t whence);
 int32_t sceKernelClose(int32_t fd);
 }
 
@@ -955,12 +961,244 @@ TEST(MemoryUnitTests, ReleaseDirectMemoryTest) {
 
   uint64_t start_addr;
   uint64_t end_addr;
-  uint32_t out_prot;
+  int32_t out_prot;
   result = sceKernelQueryMemoryProtection(addr, &start_addr, &end_addr, &out_prot);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
 }
 
-// We're done with edge cases prior to actually mapping, now for all the edge cases possible while mapping.
+// Test for various edge cases related to file mmaps
 TEST(MemoryUnitTests, MappingTest) {
-  
+  // Start with behaviors of read-only mmaps
+  // Open test file
+  int32_t fd = sceKernelOpen("/app0/assets/misc/test_file.txt", 0, 0666);
+  CHECK(fd > 0);
+
+  // Run a sceKernelRead to read from the file directly.
+  char    read_buf[0x40000];
+  int64_t bytes_read = sceKernelRead(fd, read_buf, sizeof(read_buf));
+  CHECK_EQUAL(sizeof(read_buf), bytes_read);
+
+  // mmap file to memory
+  // Using flags 0, prot read-write.
+  uint64_t addr        = 0;
+  uint64_t output_addr = 0;
+  uint64_t offset      = 0;
+  int32_t  result      = sceKernelMmap(addr, 0x10000, 3, 0, fd, offset, &output_addr);
+  CHECK_EQUAL(0, result);
+
+  // With this mmap, we should be able to read from the file.
+  // Run a memcpy to copy from this memory to a buffer.
+  char mem_buf[0x10000];
+  memcpy(mem_buf, reinterpret_cast<void*>(output_addr), sizeof(mem_buf));
+
+  // Compare memory buffer to file contents.
+  result = memcmp(mem_buf, &read_buf[offset], sizeof(mem_buf));
+  CHECK_EQUAL(0, result);
+
+  // Write zeros to the memory area, then read back the new data.
+  memset(reinterpret_cast<void*>(output_addr), 0, sizeof(mem_buf));
+  memcpy(mem_buf, reinterpret_cast<void*>(output_addr), sizeof(mem_buf));
+
+  // Re-read file contents
+  bytes_read = sceKernelLseek(fd, 0, 0);
+  CHECK_EQUAL(0, bytes_read);
+  bytes_read = sceKernelRead(fd, read_buf, sizeof(read_buf));
+  CHECK_EQUAL(sizeof(read_buf), bytes_read);
+
+  // Compare memory buffer to file contents.
+  result = memcmp(mem_buf, &read_buf[offset], sizeof(mem_buf));
+  // File contents should not be modified by the memory write.
+  CHECK(result != 0);
+
+  // Unmap test memory
+  result = sceKernelMunmap(output_addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // mmap with offset
+  offset = 0x4000;
+  result = sceKernelMmap(addr, 0x10000, 3, 0, fd, offset, &output_addr);
+  CHECK_EQUAL(0, result);
+
+  // Run a memcpy to copy from this memory to a buffer.
+  memcpy(mem_buf, reinterpret_cast<void*>(output_addr), sizeof(mem_buf));
+
+  // Compare memory buffer to file contents.
+  result = memcmp(mem_buf, &read_buf[offset], sizeof(mem_buf));
+  CHECK_EQUAL(0, result);
+
+  // Unmap test memory
+  result = sceKernelMunmap(output_addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Check for alignment behavior.
+  offset = 0x6000;
+  result = sceKernelMmap(addr, 0xe000, 3, 0, fd, offset, &output_addr);
+  CHECK_EQUAL(0, result);
+
+  // Size should round up to 0x10000, offset should round down to 0x4000.
+  uint64_t start_addr;
+  uint64_t end_addr;
+  int32_t prot;
+  result = sceKernelQueryMemoryProtection(output_addr, &start_addr, &end_addr, &prot);
+  CHECK_EQUAL(0, result);
+  // mmap's address output is increased by page offset.
+  // This is not reflected in the actual mapping.
+  CHECK_EQUAL(output_addr - 0x2000, start_addr);
+  CHECK_EQUAL(output_addr + 0xe000, end_addr);
+  CHECK_EQUAL(3, prot);
+
+  // Run virtual query to check details
+  // Need to define struct first.
+  struct OrbisKernelVirtualQueryInfo {
+    uint64_t start;
+    uint64_t end;
+    int64_t offset;
+    int32_t prot;
+    int32_t memory_type;
+    uint8_t is_flexible : 1;
+    uint8_t is_direct : 1;
+    uint8_t is_stack : 1;
+    uint8_t is_pooled : 1;
+    uint8_t is_committed : 1;
+    char name[32];
+  };
+
+  OrbisKernelVirtualQueryInfo info;
+  memset(&info, 0, sizeof(info));
+  result = sceKernelVirtualQuery(output_addr, 0, &info, sizeof(info));
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(start_addr, info.start);
+  CHECK_EQUAL(end_addr, info.end);
+  // VirtualQuery does not report file mmap offsets.
+  CHECK_EQUAL(0, info.offset);
+  CHECK_EQUAL(prot, info.prot);
+  CHECK_EQUAL(1, info.is_flexible);
+  CHECK_EQUAL(0, info.is_direct);
+  CHECK_EQUAL(0, info.is_stack);
+  CHECK_EQUAL(0, info.is_pooled);
+  CHECK_EQUAL(1, info.is_committed);
+  fprintf(stdout, "Memory name %s\n", info.name);
+
+  // Run a memcpy to copy from this memory to a buffer.
+  memcpy(mem_buf, reinterpret_cast<void*>(start_addr), sizeof(mem_buf));
+
+  // Compare memory buffer to file contents.
+  result = memcmp(mem_buf, &read_buf[offset - 0x2000], sizeof(mem_buf));
+  CHECK_EQUAL(0, result);
+
+  // Unmap test memory
+  result = sceKernelMunmap(start_addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Close file
+  result = sceKernelClose(fd);
+  CHECK_EQUAL(0, result);
+
+  // Open test file
+  fd = sceKernelOpen("/download0/test_file.txt", 0x602, 0666);
+  CHECK(fd > 0);
+
+  // Run a sceKernelWrite to store a bunch of 1's in the file
+  memset(read_buf, 1, sizeof(read_buf));
+  bytes_read = sceKernelWrite(fd, read_buf, sizeof(read_buf));
+  CHECK_EQUAL(sizeof(read_buf), bytes_read);
+
+  // Seek back to the beginning of the file.
+  bytes_read = sceKernelLseek(fd, 0, 0);
+  CHECK_EQUAL(0, bytes_read);
+
+  // mmap file to memory
+  // Using flags 0, prot read-write.
+  addr        = 0;
+  output_addr = 0;
+  offset      = 0;
+  result      = sceKernelMmap(addr, 0x10000, 3, 0, fd, offset, &output_addr);
+  CHECK_EQUAL(0, result);
+
+  // With this mmap, we should be able to read from the file.
+  // Run a memcpy to copy from this memory to a buffer.
+  memcpy(mem_buf, reinterpret_cast<void*>(output_addr), sizeof(mem_buf));
+
+  // Compare memory buffer to file contents.
+  result = memcmp(mem_buf, &read_buf[offset], sizeof(mem_buf));
+  CHECK_EQUAL(0, result);
+
+  // Write zeros to the memory area, then read back the new data.
+  memset(reinterpret_cast<void*>(output_addr), 0, sizeof(mem_buf));
+  memcpy(mem_buf, reinterpret_cast<void*>(output_addr), sizeof(mem_buf));
+
+  // Re-read file contents
+  bytes_read = sceKernelLseek(fd, 0, 0);
+  CHECK_EQUAL(0, bytes_read);
+  bytes_read = sceKernelRead(fd, read_buf, sizeof(read_buf));
+  CHECK_EQUAL(sizeof(read_buf), bytes_read);
+
+  // Compare memory buffer to file contents.
+  result = memcmp(mem_buf, &read_buf[offset], sizeof(mem_buf));
+  // File contents should not be modified by the memory write.
+  CHECK(result != 0);
+
+  // Unmap test memory
+  result = sceKernelMunmap(output_addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // mmap with offset
+  offset = 0x4000;
+  result = sceKernelMmap(addr, 0x10000, 3, 0, fd, offset, &output_addr);
+  CHECK_EQUAL(0, result);
+
+  // Run a memcpy to copy from this memory to a buffer.
+  memcpy(mem_buf, reinterpret_cast<void*>(output_addr), sizeof(mem_buf));
+
+  // Compare memory buffer to file contents.
+  result = memcmp(mem_buf, &read_buf[offset], sizeof(mem_buf));
+  CHECK_EQUAL(0, result);
+
+  // Unmap test memory
+  result = sceKernelMunmap(output_addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Check for alignment behavior.
+  offset = 0x6000;
+  result = sceKernelMmap(addr, 0xe000, 3, 0, fd, offset, &output_addr);
+  CHECK_EQUAL(0, result);
+
+  // Size should round up to 0x10000, offset should round down to 0x4000.
+  result = sceKernelQueryMemoryProtection(output_addr, &start_addr, &end_addr, &prot);
+  CHECK_EQUAL(0, result);
+  // mmap's address output is increased by page offset.
+  // This is not reflected in the actual mapping.
+  CHECK_EQUAL(output_addr - 0x2000, start_addr);
+  CHECK_EQUAL(output_addr + 0xe000, end_addr);
+  CHECK_EQUAL(3, prot);
+
+  memset(&info, 0, sizeof(info));
+  result = sceKernelVirtualQuery(output_addr, 0, &info, sizeof(info));
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(start_addr, info.start);
+  CHECK_EQUAL(end_addr, info.end);
+  // VirtualQuery does not report file mmap offsets.
+  CHECK_EQUAL(0, info.offset);
+  CHECK_EQUAL(prot, info.prot);
+  CHECK_EQUAL(1, info.is_flexible);
+  CHECK_EQUAL(0, info.is_direct);
+  CHECK_EQUAL(0, info.is_stack);
+  CHECK_EQUAL(0, info.is_pooled);
+  CHECK_EQUAL(1, info.is_committed);
+  fprintf(stdout, "Memory name %s\n", info.name);
+
+  // Run a memcpy to copy from this memory to a buffer.
+  memcpy(mem_buf, reinterpret_cast<void*>(start_addr), sizeof(mem_buf));
+
+  // Compare memory buffer to file contents.
+  result = memcmp(mem_buf, &read_buf[offset - 0x2000], sizeof(mem_buf));
+  CHECK_EQUAL(0, result);
+
+  // Unmap test memory
+  result = sceKernelMunmap(start_addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Close test file
+  result = sceKernelClose(fd);
+  CHECK_EQUAL(0, result);
 }
