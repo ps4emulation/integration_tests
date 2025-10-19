@@ -6,139 +6,139 @@
 extern "C" {
 uint64_t sceKernelGetDirectMemorySize();
 
-int32_t  sceKernelEnableDmemAliasing();
+int32_t sceKernelEnableDmemAliasing();
 
-int32_t  sceKernelAvailableDirectMemorySize(int64_t start, int64_t end, uint64_t alignment, int64_t* phys_addr, uint64_t* size);
-int32_t  sceKernelAllocateDirectMemory(int64_t start, int64_t end, uint64_t size, uint64_t alignment, int32_t type, int64_t* phys_addr);
-int32_t  sceKernelAllocateMainDirectMemory(uint64_t size, uint64_t alignment, int32_t type, int64_t* phys_addr);
-int32_t  sceKernelMapDirectMemory(uint64_t* addr, uint64_t size, int32_t prot, int32_t flags, int64_t phys_addr, uint64_t alignment);
-int32_t  sceKernelMapDirectMemory2(uint64_t* addr, uint64_t size, int32_t type, int32_t prot, int32_t flags, int64_t phys_addr, uint64_t alignment);
-int32_t  sceKernelGetDirectMemoryType(int64_t phys_addr, int32_t* type, int64_t* start, int64_t* end);
-int32_t  sceKernelCheckedReleaseDirectMemory(int64_t phys_addr, uint64_t size);
-int32_t  sceKernelReleaseDirectMemory(int64_t phys_addr, uint64_t size);
+int32_t sceKernelAvailableDirectMemorySize(int64_t start, int64_t end, uint64_t alignment, int64_t* phys_addr, uint64_t* size);
+int32_t sceKernelAllocateDirectMemory(int64_t start, int64_t end, uint64_t size, uint64_t alignment, int32_t type, int64_t* phys_addr);
+int32_t sceKernelAllocateMainDirectMemory(uint64_t size, uint64_t alignment, int32_t type, int64_t* phys_addr);
+int32_t sceKernelMapDirectMemory(uint64_t* addr, uint64_t size, int32_t prot, int32_t flags, int64_t phys_addr, uint64_t alignment);
+int32_t sceKernelMapDirectMemory2(uint64_t* addr, uint64_t size, int32_t type, int32_t prot, int32_t flags, int64_t phys_addr, uint64_t alignment);
+int32_t sceKernelGetDirectMemoryType(int64_t phys_addr, int32_t* type, int64_t* start, int64_t* end);
+int32_t sceKernelCheckedReleaseDirectMemory(int64_t phys_addr, uint64_t size);
+int32_t sceKernelReleaseDirectMemory(int64_t phys_addr, uint64_t size);
 
-int32_t  sceKernelAvailableFlexibleMemorySize(uint64_t* size);
-int32_t  sceKernelMapFlexibleMemory(uint64_t* addr, uint64_t size, int32_t prot, int32_t flags);
-int32_t  sceKernelReleaseFlexibleMemory(uint64_t* addr, uint64_t size);
+int32_t sceKernelAvailableFlexibleMemorySize(uint64_t* size);
+int32_t sceKernelMapFlexibleMemory(uint64_t* addr, uint64_t size, int32_t prot, int32_t flags);
+int32_t sceKernelReleaseFlexibleMemory(uint64_t* addr, uint64_t size);
 
-int32_t  sceKernelReserveVirtualRange(uint64_t* addr, uint64_t size, int32_t flags, uint64_t alignment);
+int32_t sceKernelReserveVirtualRange(uint64_t* addr, uint64_t size, int32_t flags, uint64_t alignment);
 
-int32_t  sceKernelMmap(uint64_t addr, uint64_t size, int32_t prot, int32_t flags, int32_t fd, int64_t offset, uint64_t* out_addr);
-int32_t  sceKernelMunmap(uint64_t addr, uint64_t size);
+int32_t sceKernelMmap(uint64_t addr, uint64_t size, int32_t prot, int32_t flags, int32_t fd, int64_t offset, uint64_t* out_addr);
+int32_t sceKernelMunmap(uint64_t addr, uint64_t size);
 
-int32_t  sceKernelQueryMemoryProtection(uint64_t addr, uint64_t* start, uint64_t* end, uint32_t* prot);
+int32_t sceKernelQueryMemoryProtection(uint64_t addr, uint64_t* start, uint64_t* end, uint32_t* prot);
 
-int32_t  sceKernelMemoryPoolExpand(int64_t start, int64_t end, uint64_t len, uint64_t alignment, int64_t* phys_addr);
-int32_t  sceKernelMemoryPoolReserve(uint64_t addr_in, uint64_t len, uint64_t alignment, int32_t flags, uint64_t addr_out);
-int32_t  sceKernelMemoryPoolCommit(uint64_t addr, uint64_t len, int32_t type, int32_t prot, int32_t flags);
-int32_t  sceKernelMemoryPoolDecommit(uint64_t addr, uint64_t len, int32_t flags);
+int32_t sceKernelMemoryPoolExpand(int64_t start, int64_t end, uint64_t len, uint64_t alignment, int64_t* phys_addr);
+int32_t sceKernelMemoryPoolReserve(uint64_t addr_in, uint64_t len, uint64_t alignment, int32_t flags, uint64_t addr_out);
+int32_t sceKernelMemoryPoolCommit(uint64_t addr, uint64_t len, int32_t type, int32_t prot, int32_t flags);
+int32_t sceKernelMemoryPoolDecommit(uint64_t addr, uint64_t len, int32_t flags);
 
-int32_t  sceKernelOpen(const char* path, int32_t flags, uint16_t mode);
-int64_t  sceKernelWrite(int32_t fd, const void* buf, uint64_t size);
-int32_t  sceKernelClose(int32_t fd);
+int32_t sceKernelOpen(const char* path, int32_t flags, uint16_t mode);
+int64_t sceKernelWrite(int32_t fd, const void* buf, uint64_t size);
+int32_t sceKernelClose(int32_t fd);
 }
 
 // Some error codes
-#define ORBIS_KERNEL_ERROR_UNKNOWN (0x80020000)
-#define ORBIS_KERNEL_ERROR_EPERM (0x80020001)
-#define ORBIS_KERNEL_ERROR_ENOENT (0x80020002)
-#define ORBIS_KERNEL_ERROR_ESRCH (0x80020003)
-#define ORBIS_KERNEL_ERROR_EINTR (0x80020004)
-#define ORBIS_KERNEL_ERROR_EIO (0x80020005)
-#define ORBIS_KERNEL_ERROR_ENXIO (0x80020006)
-#define ORBIS_KERNEL_ERROR_E2BIG (0x80020007)
-#define ORBIS_KERNEL_ERROR_ENOEXEC (0x80020008)
-#define ORBIS_KERNEL_ERROR_EBADF (0x80020009)
-#define ORBIS_KERNEL_ERROR_ECHILD (0x8002000A)
-#define ORBIS_KERNEL_ERROR_EDEADLK (0x8002000B)
-#define ORBIS_KERNEL_ERROR_ENOMEM (0x8002000C)
-#define ORBIS_KERNEL_ERROR_EACCES (0x8002000D)
-#define ORBIS_KERNEL_ERROR_EFAULT (0x8002000E)
-#define ORBIS_KERNEL_ERROR_ENOTBLK (0x8002000F)
-#define ORBIS_KERNEL_ERROR_EBUSY (0x80020010)
-#define ORBIS_KERNEL_ERROR_EEXIST (0x80020011)
-#define ORBIS_KERNEL_ERROR_EXDEV (0x80020012)
-#define ORBIS_KERNEL_ERROR_ENODEV (0x80020013)
-#define ORBIS_KERNEL_ERROR_ENOTDIR (0x80020014)
-#define ORBIS_KERNEL_ERROR_EISDIR (0x80020015)
-#define ORBIS_KERNEL_ERROR_EINVAL (0x80020016)
-#define ORBIS_KERNEL_ERROR_ENFILE (0x80020017)
-#define ORBIS_KERNEL_ERROR_EMFILE (0x80020018)
-#define ORBIS_KERNEL_ERROR_ENOTTY (0x80020019)
-#define ORBIS_KERNEL_ERROR_ETXTBSY (0x8002001A)
-#define ORBIS_KERNEL_ERROR_EFBIG (0x8002001B)
-#define ORBIS_KERNEL_ERROR_ENOSPC (0x8002001C)
-#define ORBIS_KERNEL_ERROR_ESPIPE (0x8002001D)
-#define ORBIS_KERNEL_ERROR_EROFS (0x8002001E)
-#define ORBIS_KERNEL_ERROR_EMLINK (0x8002001F)
-#define ORBIS_KERNEL_ERROR_EPIPE (0x80020020)
-#define ORBIS_KERNEL_ERROR_EDOM (0x80020021)
-#define ORBIS_KERNEL_ERROR_ERANGE (0x80020022)
-#define ORBIS_KERNEL_ERROR_EAGAIN (0x80020023)
-#define ORBIS_KERNEL_ERROR_EWOULDBLOCK (0x80020023)
-#define ORBIS_KERNEL_ERROR_EINPROGRESS (0x80020024)
-#define ORBIS_KERNEL_ERROR_EALREADY (0x80020025)
-#define ORBIS_KERNEL_ERROR_ENOTSOCK (0x80020026)
-#define ORBIS_KERNEL_ERROR_EDESTADDRREQ (0x80020027)
-#define ORBIS_KERNEL_ERROR_EMSGSIZE (0x80020028)
-#define ORBIS_KERNEL_ERROR_EPROTOTYPE (0x80020029)
-#define ORBIS_KERNEL_ERROR_ENOPROTOOPT (0x8002002A)
+#define ORBIS_KERNEL_ERROR_UNKNOWN         (0x80020000)
+#define ORBIS_KERNEL_ERROR_EPERM           (0x80020001)
+#define ORBIS_KERNEL_ERROR_ENOENT          (0x80020002)
+#define ORBIS_KERNEL_ERROR_ESRCH           (0x80020003)
+#define ORBIS_KERNEL_ERROR_EINTR           (0x80020004)
+#define ORBIS_KERNEL_ERROR_EIO             (0x80020005)
+#define ORBIS_KERNEL_ERROR_ENXIO           (0x80020006)
+#define ORBIS_KERNEL_ERROR_E2BIG           (0x80020007)
+#define ORBIS_KERNEL_ERROR_ENOEXEC         (0x80020008)
+#define ORBIS_KERNEL_ERROR_EBADF           (0x80020009)
+#define ORBIS_KERNEL_ERROR_ECHILD          (0x8002000A)
+#define ORBIS_KERNEL_ERROR_EDEADLK         (0x8002000B)
+#define ORBIS_KERNEL_ERROR_ENOMEM          (0x8002000C)
+#define ORBIS_KERNEL_ERROR_EACCES          (0x8002000D)
+#define ORBIS_KERNEL_ERROR_EFAULT          (0x8002000E)
+#define ORBIS_KERNEL_ERROR_ENOTBLK         (0x8002000F)
+#define ORBIS_KERNEL_ERROR_EBUSY           (0x80020010)
+#define ORBIS_KERNEL_ERROR_EEXIST          (0x80020011)
+#define ORBIS_KERNEL_ERROR_EXDEV           (0x80020012)
+#define ORBIS_KERNEL_ERROR_ENODEV          (0x80020013)
+#define ORBIS_KERNEL_ERROR_ENOTDIR         (0x80020014)
+#define ORBIS_KERNEL_ERROR_EISDIR          (0x80020015)
+#define ORBIS_KERNEL_ERROR_EINVAL          (0x80020016)
+#define ORBIS_KERNEL_ERROR_ENFILE          (0x80020017)
+#define ORBIS_KERNEL_ERROR_EMFILE          (0x80020018)
+#define ORBIS_KERNEL_ERROR_ENOTTY          (0x80020019)
+#define ORBIS_KERNEL_ERROR_ETXTBSY         (0x8002001A)
+#define ORBIS_KERNEL_ERROR_EFBIG           (0x8002001B)
+#define ORBIS_KERNEL_ERROR_ENOSPC          (0x8002001C)
+#define ORBIS_KERNEL_ERROR_ESPIPE          (0x8002001D)
+#define ORBIS_KERNEL_ERROR_EROFS           (0x8002001E)
+#define ORBIS_KERNEL_ERROR_EMLINK          (0x8002001F)
+#define ORBIS_KERNEL_ERROR_EPIPE           (0x80020020)
+#define ORBIS_KERNEL_ERROR_EDOM            (0x80020021)
+#define ORBIS_KERNEL_ERROR_ERANGE          (0x80020022)
+#define ORBIS_KERNEL_ERROR_EAGAIN          (0x80020023)
+#define ORBIS_KERNEL_ERROR_EWOULDBLOCK     (0x80020023)
+#define ORBIS_KERNEL_ERROR_EINPROGRESS     (0x80020024)
+#define ORBIS_KERNEL_ERROR_EALREADY        (0x80020025)
+#define ORBIS_KERNEL_ERROR_ENOTSOCK        (0x80020026)
+#define ORBIS_KERNEL_ERROR_EDESTADDRREQ    (0x80020027)
+#define ORBIS_KERNEL_ERROR_EMSGSIZE        (0x80020028)
+#define ORBIS_KERNEL_ERROR_EPROTOTYPE      (0x80020029)
+#define ORBIS_KERNEL_ERROR_ENOPROTOOPT     (0x8002002A)
 #define ORBIS_KERNEL_ERROR_EPROTONOSUPPORT (0x8002002B)
 #define ORBIS_KERNEL_ERROR_ESOCKTNOSUPPORT (0x8002002C)
-#define ORBIS_KERNEL_ERROR_ENOTSUP (0x8002002D)
-#define ORBIS_KERNEL_ERROR_EOPNOTSUPP (0x8002002D)
-#define ORBIS_KERNEL_ERROR_EPFNOSUPPORT (0x8002002E)
-#define ORBIS_KERNEL_ERROR_EAFNOSUPPORT (0x8002002F)
-#define ORBIS_KERNEL_ERROR_EADDRINUSE (0x80020030)
-#define ORBIS_KERNEL_ERROR_EADDRNOTAVAIL (0x80020031)
-#define ORBIS_KERNEL_ERROR_ENETDOWN (0x80020032)
-#define ORBIS_KERNEL_ERROR_ENETUNREACH (0x80020033)
-#define ORBIS_KERNEL_ERROR_ENETRESET (0x80020034)
-#define ORBIS_KERNEL_ERROR_ECONNABORTED (0x80020035)
-#define ORBIS_KERNEL_ERROR_ECONNRESET (0x80020036)
-#define ORBIS_KERNEL_ERROR_ENOBUFS (0x80020037)
-#define ORBIS_KERNEL_ERROR_EISCONN (0x80020038)
-#define ORBIS_KERNEL_ERROR_ENOTCONN (0x80020039)
-#define ORBIS_KERNEL_ERROR_ESHUTDOWN (0x8002003A)
-#define ORBIS_KERNEL_ERROR_ETOOMANYREFS (0x8002003B)
-#define ORBIS_KERNEL_ERROR_ETIMEDOUT (0x8002003C)
-#define ORBIS_KERNEL_ERROR_ECONNREFUSED (0x8002003D)
-#define ORBIS_KERNEL_ERROR_ELOOP (0x8002003E)
-#define ORBIS_KERNEL_ERROR_ENAMETOOLONG (0x8002003F)
-#define ORBIS_KERNEL_ERROR_EHOSTDOWN (0x80020040)
-#define ORBIS_KERNEL_ERROR_EHOSTUNREACH (0x80020041)
-#define ORBIS_KERNEL_ERROR_ENOTEMPTY (0x80020042)
-#define ORBIS_KERNEL_ERROR_EPROCLIM (0x80020043)
-#define ORBIS_KERNEL_ERROR_EUSERS (0x80020044)
-#define ORBIS_KERNEL_ERROR_EDQUOT (0x80020045)
-#define ORBIS_KERNEL_ERROR_ESTALE (0x80020046)
-#define ORBIS_KERNEL_ERROR_EREMOTE (0x80020047)
-#define ORBIS_KERNEL_ERROR_EBADRPC (0x80020048)
-#define ORBIS_KERNEL_ERROR_ERPCMISMATCH (0x80020049)
-#define ORBIS_KERNEL_ERROR_EPROGUNAVAIL (0x8002004A)
-#define ORBIS_KERNEL_ERROR_EPROGMISMATCH (0x8002004B)
-#define ORBIS_KERNEL_ERROR_EPROCUNAVAIL (0x8002004C)
-#define ORBIS_KERNEL_ERROR_ENOLCK (0x8002004D)
-#define ORBIS_KERNEL_ERROR_ENOSYS (0x8002004E)
-#define ORBIS_KERNEL_ERROR_EFTYPE (0x8002004F)
-#define ORBIS_KERNEL_ERROR_EAUTH (0x80020050)
-#define ORBIS_KERNEL_ERROR_ENEEDAUTH (0x80020051)
-#define ORBIS_KERNEL_ERROR_EIDRM (0x80020052)
-#define ORBIS_KERNEL_ERROR_ENOMSG (0x80020053)
-#define ORBIS_KERNEL_ERROR_EOVERFLOW (0x80020054)
-#define ORBIS_KERNEL_ERROR_ECANCELED (0x80020055)
-#define ORBIS_KERNEL_ERROR_EILSEQ (0x80020056)
-#define ORBIS_KERNEL_ERROR_ENOATTR (0x80020057)
-#define ORBIS_KERNEL_ERROR_EDOOFUS (0x80020058)
-#define ORBIS_KERNEL_ERROR_EBADMSG (0x80020059)
-#define ORBIS_KERNEL_ERROR_EMULTIHOP (0x8002005A)
-#define ORBIS_KERNEL_ERROR_ENOLINK (0x8002005B)
-#define ORBIS_KERNEL_ERROR_EPROTO (0x8002005C)
-#define ORBIS_KERNEL_ERROR_ENOTCAPABLE (0x8002005D)
-#define ORBIS_KERNEL_ERROR_ECAPMODE (0x8002005E)
-#define ORBIS_KERNEL_ERROR_ENOBLK (0x8002005F)
-#define ORBIS_KERNEL_ERROR_EICV (0x80020060)
-#define ORBIS_KERNEL_ERROR_ENOPLAYGOENT (0x80020061)
+#define ORBIS_KERNEL_ERROR_ENOTSUP         (0x8002002D)
+#define ORBIS_KERNEL_ERROR_EOPNOTSUPP      (0x8002002D)
+#define ORBIS_KERNEL_ERROR_EPFNOSUPPORT    (0x8002002E)
+#define ORBIS_KERNEL_ERROR_EAFNOSUPPORT    (0x8002002F)
+#define ORBIS_KERNEL_ERROR_EADDRINUSE      (0x80020030)
+#define ORBIS_KERNEL_ERROR_EADDRNOTAVAIL   (0x80020031)
+#define ORBIS_KERNEL_ERROR_ENETDOWN        (0x80020032)
+#define ORBIS_KERNEL_ERROR_ENETUNREACH     (0x80020033)
+#define ORBIS_KERNEL_ERROR_ENETRESET       (0x80020034)
+#define ORBIS_KERNEL_ERROR_ECONNABORTED    (0x80020035)
+#define ORBIS_KERNEL_ERROR_ECONNRESET      (0x80020036)
+#define ORBIS_KERNEL_ERROR_ENOBUFS         (0x80020037)
+#define ORBIS_KERNEL_ERROR_EISCONN         (0x80020038)
+#define ORBIS_KERNEL_ERROR_ENOTCONN        (0x80020039)
+#define ORBIS_KERNEL_ERROR_ESHUTDOWN       (0x8002003A)
+#define ORBIS_KERNEL_ERROR_ETOOMANYREFS    (0x8002003B)
+#define ORBIS_KERNEL_ERROR_ETIMEDOUT       (0x8002003C)
+#define ORBIS_KERNEL_ERROR_ECONNREFUSED    (0x8002003D)
+#define ORBIS_KERNEL_ERROR_ELOOP           (0x8002003E)
+#define ORBIS_KERNEL_ERROR_ENAMETOOLONG    (0x8002003F)
+#define ORBIS_KERNEL_ERROR_EHOSTDOWN       (0x80020040)
+#define ORBIS_KERNEL_ERROR_EHOSTUNREACH    (0x80020041)
+#define ORBIS_KERNEL_ERROR_ENOTEMPTY       (0x80020042)
+#define ORBIS_KERNEL_ERROR_EPROCLIM        (0x80020043)
+#define ORBIS_KERNEL_ERROR_EUSERS          (0x80020044)
+#define ORBIS_KERNEL_ERROR_EDQUOT          (0x80020045)
+#define ORBIS_KERNEL_ERROR_ESTALE          (0x80020046)
+#define ORBIS_KERNEL_ERROR_EREMOTE         (0x80020047)
+#define ORBIS_KERNEL_ERROR_EBADRPC         (0x80020048)
+#define ORBIS_KERNEL_ERROR_ERPCMISMATCH    (0x80020049)
+#define ORBIS_KERNEL_ERROR_EPROGUNAVAIL    (0x8002004A)
+#define ORBIS_KERNEL_ERROR_EPROGMISMATCH   (0x8002004B)
+#define ORBIS_KERNEL_ERROR_EPROCUNAVAIL    (0x8002004C)
+#define ORBIS_KERNEL_ERROR_ENOLCK          (0x8002004D)
+#define ORBIS_KERNEL_ERROR_ENOSYS          (0x8002004E)
+#define ORBIS_KERNEL_ERROR_EFTYPE          (0x8002004F)
+#define ORBIS_KERNEL_ERROR_EAUTH           (0x80020050)
+#define ORBIS_KERNEL_ERROR_ENEEDAUTH       (0x80020051)
+#define ORBIS_KERNEL_ERROR_EIDRM           (0x80020052)
+#define ORBIS_KERNEL_ERROR_ENOMSG          (0x80020053)
+#define ORBIS_KERNEL_ERROR_EOVERFLOW       (0x80020054)
+#define ORBIS_KERNEL_ERROR_ECANCELED       (0x80020055)
+#define ORBIS_KERNEL_ERROR_EILSEQ          (0x80020056)
+#define ORBIS_KERNEL_ERROR_ENOATTR         (0x80020057)
+#define ORBIS_KERNEL_ERROR_EDOOFUS         (0x80020058)
+#define ORBIS_KERNEL_ERROR_EBADMSG         (0x80020059)
+#define ORBIS_KERNEL_ERROR_EMULTIHOP       (0x8002005A)
+#define ORBIS_KERNEL_ERROR_ENOLINK         (0x8002005B)
+#define ORBIS_KERNEL_ERROR_EPROTO          (0x8002005C)
+#define ORBIS_KERNEL_ERROR_ENOTCAPABLE     (0x8002005D)
+#define ORBIS_KERNEL_ERROR_ECAPMODE        (0x8002005E)
+#define ORBIS_KERNEL_ERROR_ENOBLK          (0x8002005F)
+#define ORBIS_KERNEL_ERROR_EICV            (0x80020060)
+#define ORBIS_KERNEL_ERROR_ENOPLAYGOENT    (0x80020061)
 
 TEST_GROUP(MemoryUnitTests) {void setup() {
 
@@ -153,8 +153,8 @@ TEST(MemoryUnitTests, MapMemoryTest) {
   // leading to overlap in some edge cases.
   // Start with testing libkernel's error returns for sceKernelMapFlexibleMemory
   // If size is less than page size, or size is not page aligned, return EINVAL
-  uint64_t addr = 0;
-  int32_t result = sceKernelMapFlexibleMemory(&addr, 0x5000, 0, 0);
+  uint64_t addr   = 0;
+  int32_t  result = sceKernelMapFlexibleMemory(&addr, 0x5000, 0, 0);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
   result = sceKernelMapFlexibleMemory(&addr, 0x2000, 0, 0);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
@@ -210,16 +210,16 @@ TEST(MemoryUnitTests, MapMemoryTest) {
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   /**
-   * Note: 
-   * The execute protection causes sceKernelMapDirectMemory calls to fail. 
+   * Note:
+   * The execute protection causes sceKernelMapDirectMemory calls to fail.
    * This will likely come up in sys_mmap tests.
    */
 
   // Input address, length, phys_addr, and alignment all must be page-aligned.
-  addr = (uint64_t)0x200002000;
+  addr   = (uint64_t)0x200002000;
   result = sceKernelMapDirectMemory(&addr, 0x4000, 0, 0, 0, 0);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-  addr = 0x200000000;
+  addr   = 0x200000000;
   result = sceKernelMapDirectMemory(&addr, 0x2000, 0, 0, 0, 0);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
   result = sceKernelMapDirectMemory(&addr, 0x4000, 0, 0, 0x2000, 0);
@@ -244,7 +244,7 @@ TEST(MemoryUnitTests, MapMemoryTest) {
 
   // Now for sceKernelReserveVirtualRange edge cases.
   // Alignment must be power of two
-  addr = 0x200000000;
+  addr   = 0x200000000;
   result = sceKernelReserveVirtualRange(&addr, 0x4000, 0, 0xc000);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
@@ -253,14 +253,14 @@ TEST(MemoryUnitTests, MapMemoryTest) {
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
   result = sceKernelReserveVirtualRange(&addr, 0x4000, 0x1000, 0);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-  
+
   // Address input must be aligned.
-  addr = 0x200002000;
+  addr   = 0x200002000;
   result = sceKernelReserveVirtualRange(&addr, 0x4000, 0, 0);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // length input must be aligned.
-  addr = 0x200000000;
+  addr   = 0x200000000;
   result = sceKernelReserveVirtualRange(&addr, 0x2000, 0, 0);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
@@ -281,17 +281,17 @@ TEST(MemoryUnitTests, MapMemoryTest) {
   // Now for sys_mmap edge cases.
   // To test each of these, I'll use sceKernelMmap (which is just a wrapper for the syscall that converts errors to ORBIS errors)
   // If sys_mmap is called with the Sanitizer flag, then non-devkit consoles return EINVAL.
-  addr = 0x200000000;
+  addr              = 0x200000000;
   uint64_t addr_out = 0;
 
   // For this test call, use flags Sanitizer (0x200000) | System (0x2000) | Anon (0x1000) | NoOverwrite (0x80) | Fixed (0x10)
   // This combination of flags is what sceKernelMapSanitizerShadowMemory uses.
-  addr = 0x300000000;
+  addr   = 0x300000000;
   result = sceKernelMmap(addr, 0x4000, 0, 0x203090, -1, 0, &addr_out);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // If length == 0, return EINVAL
-  addr = 0x200000000;
+  addr   = 0x200000000;
   result = sceKernelMmap(addr, 0, 0, 0x1000, -1, 0, &addr_out);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
@@ -319,32 +319,32 @@ TEST(MemoryUnitTests, MapMemoryTest) {
   CHECK_EQUAL(0, result);
 
   // If flags include Stack (0x400) and prot does not include CpuReadWrite or fd is not -1, return EINVAL.
-  addr = 0xfc00000000;
+  addr   = 0xfc00000000;
   result = sceKernelMmap(addr, 0x4000, 0, 0x400, -1, 0, &addr_out);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
   result = sceKernelMmap(addr, 0x4000, 3, 0x400, 0, 0, &addr_out);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // Seems like stack flag acts as if fixed | no overwrite are both present?
-  addr = 0xfb00000000;
+  addr   = 0xfb00000000;
   result = sceKernelMmap(addr, 0x4000, 3, 0x400, -1, 0, &addr_out);
   CHECK_EQUAL(0, result);
   result = sceKernelMunmap(addr_out, 0x4000);
   CHECK_EQUAL(0, result);
 
-  addr = 0xfc00000000;
+  addr   = 0xfc00000000;
   result = sceKernelMmap(addr, 0x4000, 3, 0x400, -1, 0, &addr_out);
   CHECK_EQUAL(0, result);
   result = sceKernelMunmap(addr_out, 0x4000);
   CHECK_EQUAL(0, result);
 
-  addr = 0x200400000;
+  addr   = 0x200400000;
   result = sceKernelMmap(addr, 0x4000, 3, 0x400, -1, 0, &addr_out);
   CHECK_EQUAL(0, result);
   result = sceKernelMunmap(addr_out, 0x4000);
   CHECK_EQUAL(0, result);
 
-  addr = 0x200004000;
+  addr   = 0x200004000;
   result = sceKernelMmap(addr, 0x4000, 3, 0x400, -1, 0, &addr_out);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_ENOMEM, result);
 
@@ -358,7 +358,7 @@ TEST(MemoryUnitTests, MapMemoryTest) {
 
   // If flag Fixed (0x10) is specified, address must have the same offset as phys_addr.
   // This effectively prevents misaligned mappings, unless you manually opened a dmem file yourself.
-  addr = 0x200002000;
+  addr   = 0x200002000;
   result = sceKernelMmap(addr, 0x4000, 0, 0x1010, -1, 0, &addr_out);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
@@ -370,7 +370,7 @@ TEST(MemoryUnitTests, MapMemoryTest) {
    */
 
   // If an unopened file descriptor is specified, then returns EBADF.
-  addr = 0x200000000;
+  addr   = 0x200000000;
   result = sceKernelMmap(addr, 0x4000, 1, 0, 100, 0, &addr_out);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EBADF, result);
 
@@ -380,7 +380,7 @@ TEST(MemoryUnitTests, MapMemoryTest) {
   // This sceKernelMmap should try mapping the file to memory with read-write permissions.
   // Due to the flags, writing to this memory will likely fail (but that's to test when done with edge cases)
   int64_t phys_addr = 0;
-  result = sceKernelAllocateMainDirectMemory(0x4000, 0, 0, &phys_addr);
+  result            = sceKernelAllocateMainDirectMemory(0x4000, 0, 0, &phys_addr);
   CHECK_EQUAL(0, result);
 
   result = sceKernelMmap(addr, 0x4000, 3, 0, fd, 0, &addr_out);
@@ -524,7 +524,7 @@ TEST(MemoryUnitTests, MapMemoryTest) {
   CHECK_EQUAL(0, result);
   result = sceKernelMunmap(addr_out, 0x10000);
   CHECK_EQUAL(0, result);
-  
+
   result = sceKernelClose(fd);
   CHECK_EQUAL(0, result);
 
@@ -532,7 +532,7 @@ TEST(MemoryUnitTests, MapMemoryTest) {
    * Notes:
    * File mmaps to GPU cause the PS4 to crash, this should get investigated.
    * Somewhere along the line, mapping with flag stack fails. Probably some stack-specific flag check later on?
-   * 
+   *
    * Based on decompilation, Sanitizer flag with a valid address (below a hardcoded 0x800000000000) restricts prot here.
    * Specifically, if address input > 0xfc00000000, prot is restricted to GpuReadWrite.
    * If address input is still zero here (Fixed flag with null address input?), then address defaults to 0xfc00000000.
@@ -573,26 +573,26 @@ TEST(MemoryUnitTests, MapMemoryTest) {
    * Prot contains only CpuRead, CpuWrite, GpuRead, or GpuWrite.
    * mtype must be less than 10
    * If any of these error checks fail, the function returns EINVAL.
-   * 
+   *
    * sys_mmap_dmem also follows the same address input logic as sys_mmap.
    * If address is null and map Fixed is specified, returns EINVAL.
-   * 
+   *
    * sys_mmap_dmem has an extra check for physical addresses overlapping.
    * This check is removed if sceKernelEnableDmemAliasing is called.
    */
 
   // To run sys_mmap_dmem without worries from phys addresses, allocate some dmem
   phys_addr = 0;
-  result = sceKernelAllocateMainDirectMemory(0x4000, 0, 0, &phys_addr);
+  result    = sceKernelAllocateMainDirectMemory(0x4000, 0, 0, &phys_addr);
   CHECK_EQUAL(0, result);
 
   // Misaligned addr
-  addr = 0x200002000;
+  addr   = 0x200002000;
   result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0, phys_addr, 0);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // Misaligned phys_addr
-  addr = 0x200000000;
+  addr   = 0x200000000;
   result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0, phys_addr - 0x2000, 0);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
@@ -633,7 +633,7 @@ TEST(MemoryUnitTests, MapMemoryTest) {
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // null address with map fixed
-  addr = 0;
+  addr   = 0;
   result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0x10, phys_addr, 0);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
@@ -665,12 +665,12 @@ TEST(MemoryUnitTests, AvailableDirectMemoryTest) {
 
   // Test sceKernelAvailableDirectMemorySize.
   // Typical use case:
-  int64_t phys_addr = 0;
-  uint64_t size = 0;
-  int32_t result = sceKernelAvailableDirectMemorySize(0, dmem_size, 0, &phys_addr, &size);
+  int64_t  phys_addr = 0;
+  uint64_t size      = 0;
+  int32_t  result    = sceKernelAvailableDirectMemorySize(0, dmem_size, 0, &phys_addr, &size);
   // Check for success
   CHECK_EQUAL(0, result);
-  // Check for known quirks on success. 
+  // Check for known quirks on success.
   // Specifically, the dmem map already has a mapping (which comes from libSceGnmDriver).
   // Many games are built with this assumption in mind, though most don't need it emulated.
   // This mapping will be from physical addresses 0 to 0x10000 under these circumstances.
@@ -754,7 +754,7 @@ TEST(MemoryUnitTests, AvailableDirectMemoryTest) {
   // returned statistics are always from the largest area of free space.
   // Do an allocation in the middle of the dmem map to demonstrate this.
   int64_t phys_addr_out = 0;
-  result = sceKernelAllocateDirectMemory(dmem_size / 2, dmem_size, 0x100000, 0, 0, &phys_addr_out);
+  result                = sceKernelAllocateDirectMemory(dmem_size / 2, dmem_size, 0x100000, 0, 0, &phys_addr_out);
   CHECK_EQUAL(0, result);
   // Nothing else in that area of the dmem map, so this should be the returned phys address.
   CHECK_EQUAL(dmem_size / 2, phys_addr_out);
@@ -780,8 +780,8 @@ TEST(MemoryUnitTests, AllocateDirectMemoryTest) {
   // Test sceKernelAllocateDirectMemory
   // Start with the typical working case.
   uint64_t dmem_size = sceKernelGetDirectMemorySize();
-  int64_t phys_addr = 0;
-  int32_t result = sceKernelAllocateDirectMemory(0, dmem_size, 0x10000, 0, 0, &phys_addr);
+  int64_t  phys_addr = 0;
+  int32_t  result    = sceKernelAllocateDirectMemory(0, dmem_size, 0x10000, 0, 0, &phys_addr);
   CHECK_EQUAL(0, result);
   // Due to libSceGnmDriver, the first phys_addr we expect to see from sceKernelAllocateDirectMemory is 0x10000.
   CHECK_EQUAL(0x10000, phys_addr);
@@ -792,7 +792,7 @@ TEST(MemoryUnitTests, AllocateDirectMemoryTest) {
 
   // If either start or end is less than zero, returns EINVAL
   phys_addr = 0;
-  result = sceKernelAllocateDirectMemory(-1, dmem_size, 0x10000, 0, 0, &phys_addr);
+  result    = sceKernelAllocateDirectMemory(-1, dmem_size, 0x10000, 0, 0, &phys_addr);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
   result = sceKernelAllocateDirectMemory(0, -1, 0x10000, 0, 0, &phys_addr);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
@@ -823,7 +823,7 @@ TEST(MemoryUnitTests, AllocateDirectMemoryTest) {
   // If limited end <= start, return EAGAIN
   result = sceKernelAllocateDirectMemory(0x100000, 0x10000, 0x10000, 0, 0, &phys_addr);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EAGAIN, result);
-  
+
   // If limited end < length, return EAGAIN
   result = sceKernelAllocateDirectMemory(0, 0x100000, 0x200000, 0, 0, &phys_addr);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EAGAIN, result);
@@ -898,7 +898,7 @@ TEST(MemoryUnitTests, AllocateDirectMemoryTest) {
 TEST(MemoryUnitTests, ReleaseDirectMemoryTest) {
   // Both checked and unchecked return an error if addr or length aren't aligned to page size.
   int64_t phys_addr = 0x10000;
-  int32_t result = sceKernelReleaseDirectMemory(phys_addr, 0x3000);
+  int32_t result    = sceKernelReleaseDirectMemory(phys_addr, 0x3000);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
   result = sceKernelReleaseDirectMemory(phys_addr + 0x3000, 0x10000);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
@@ -947,7 +947,7 @@ TEST(MemoryUnitTests, ReleaseDirectMemoryTest) {
   CHECK_EQUAL(0x20000, phys_addr);
 
   uint64_t addr = 0;
-  result = sceKernelMapDirectMemory(&addr, 0x10000, 3, 0, phys_addr, 0);
+  result        = sceKernelMapDirectMemory(&addr, 0x10000, 3, 0, phys_addr, 0);
   CHECK_EQUAL(0, result);
 
   result = sceKernelReleaseDirectMemory(0x10000, 0x30000);
@@ -962,5 +962,5 @@ TEST(MemoryUnitTests, ReleaseDirectMemoryTest) {
 
 // We're done with edge cases prior to actually mapping, now for all the edge cases possible while mapping.
 TEST(MemoryUnitTests, MappingTest) {
-
+  
 }
