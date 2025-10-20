@@ -1,5 +1,6 @@
 #include "CppUTest/TestHarness.h"
 
+#include <list>
 #include <stdio.h>
 #include <string>
 
@@ -1229,4 +1230,118 @@ TEST(MemoryUnitTests, FileMappingTest) {
   // Close test file
   result = sceKernelClose(fd);
   CHECK_EQUAL(0, result);
+}
+
+TEST(MemoryUnitTests, FlexibleTest) {
+  // This test is to validate memory behaviors unique to flexible memory mappings.
+  // Start by testing available flexible memory size.
+  std::list<uint64_t> addresses;
+  uint64_t            addr_out = 0;
+  int32_t             result   = 0;
+  while (result == 0) {
+    result = sceKernelMapFlexibleMemory(&addr_out, 0x4000, 3, 0);
+    if (result < 0) {
+      // Out of flex mem
+      CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+    } else {
+      // Mapped flex mem successfully.
+      CHECK_EQUAL(0, result);
+      // Add the mapping address to addresses, need to unmap later to clean up.
+      addresses.emplace_back(addr_out);
+    }
+  }
+
+  // After all these mappings, available flex size should be 0.
+  uint64_t avail_flex_size = 0;
+  result                   = sceKernelAvailableFlexibleMemorySize(&avail_flex_size);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(0, avail_flex_size);
+
+  // While sceKernelMmap doesn't appear to update the flexible memory budget, it does use it.
+  uint64_t test_addr;
+  result = sceKernelMmap(0, 0x4000, 3, 0x1000, -1, 0, &test_addr);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // Even file mmaps appear to rely on this budget.
+  int32_t fd = sceKernelOpen("/app0/assets/misc/test_file.txt", 0, 0666);
+  CHECK(fd > 0);
+  result = sceKernelMmap(0, 0x4000, 3, 0, fd, 0, &test_addr);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  result = sceKernelClose(fd);
+  CHECK_EQUAL(0, result);
+
+  // We can't directly correlate flex size to mapped memory,
+  // since my list of addresses will also cut into the flex mem budget.
+
+  // Unmap all of the flexible memory used here.
+  for (uint64_t addr: addresses) {
+    result = sceKernelMunmap(addr, 0x4000);
+    CHECK_EQUAL(0, result);
+  }
+  addresses.clear();
+
+  // Available flex size should be greater than 0 now
+  result = sceKernelAvailableFlexibleMemorySize(&avail_flex_size);
+  CHECK_EQUAL(0, result);
+  CHECK(avail_flex_size != 0);
+
+  // Flexible memory is not backed in any way, so the contents are garbage before initializing.
+  result = sceKernelMapFlexibleMemory(&addr_out, 0x10000, 3, 0);
+  CHECK_EQUAL(0, result);
+
+  // Write 1's to the full memory range.
+  memset(reinterpret_cast<void*>(addr_out), 1, 0x10000);
+
+  // Ensure the full range has 1's
+  char test_buf[0x10000];
+  memset(test_buf, 1, sizeof(test_buf));
+  result = memcmp(test_buf, reinterpret_cast<void*>(addr_out), 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Unmap the middle of the range
+  result = sceKernelMunmap(addr_out + 0x4000, 0x8000);
+  CHECK_EQUAL(0, result);
+
+  // Ensure the remaining mapped areas are still filled with 1's
+  result = memcmp(test_buf, reinterpret_cast<void*>(addr_out), 0x4000);
+  CHECK_EQUAL(0, result);
+  result = memcmp(&test_buf[0xc000], reinterpret_cast<void*>(addr_out + 0xc000), 0x4000);
+  CHECK_EQUAL(0, result);
+
+  // Remap the unmapped area, use flag fixed to ensure correct placement.
+  uint64_t new_addr = addr_out + 0x4000;
+  result = sceKernelMapFlexibleMemory(&new_addr, 0x8000, 3, 0x10);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(addr_out + 0x4000, new_addr);
+
+  // The new memory area will not have the contents of the old memory.
+  result = memcmp(&test_buf[0x4000], reinterpret_cast<void*>(new_addr), 0x8000);
+  CHECK(result != 0);
+
+  // Re-fill the area with 1's
+  memset(reinterpret_cast<void*>(addr_out), 1, 0x10000);
+  result = memcmp(test_buf, reinterpret_cast<void*>(addr_out), 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Overwrite the whole memory area, this should destroy the contents within.
+  new_addr = addr_out;
+  result = sceKernelMapFlexibleMemory(&new_addr, 0x10000, 3, 0x10);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(new_addr, addr_out);
+
+  result = memcmp(test_buf, reinterpret_cast<void*>(addr_out), 0x10000);
+  CHECK(result != 0);
+
+  result = sceKernelMunmap(new_addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Available flex size should be greater than 0 now
+  uint64_t avail_flex_size_before = 0;
+  result = sceKernelAvailableFlexibleMemorySize(&avail_flex_size_before);
+  CHECK_EQUAL(0, result);
+  CHECK(avail_flex_size_before != 0);
+}
+
+TEST(MemoryUnitTests, DirectTest) {
+  // This test is to validate memory behaviors somewhat unique to direct memory mappings.
 }
