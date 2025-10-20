@@ -1352,7 +1352,7 @@ TEST(MemoryTests, FlexibleTest) {
 
   // mmaps from system folders do not use the flexible budget.
   const char* sys_folder = sceKernelGetFsSandboxRandomWord();
-  char path[128];
+  char        path[128];
   memset(path, 0, sizeof(path));
   snprintf(path, sizeof(path), "/%s/common/lib/libc.sprx", sys_folder);
   fd = sceKernelOpen(path, 0, 0666);
@@ -1404,7 +1404,7 @@ TEST(MemoryTests, FlexibleTest) {
 
   // Remap the unmapped area, use flag fixed to ensure correct placement.
   uint64_t new_addr = addr_out + 0x4000;
-  result = sceKernelMapFlexibleMemory(&new_addr, 0x8000, 3, 0x10);
+  result            = sceKernelMapFlexibleMemory(&new_addr, 0x8000, 3, 0x10);
   CHECK_EQUAL(0, result);
   CHECK_EQUAL(addr_out + 0x4000, new_addr);
 
@@ -1419,7 +1419,7 @@ TEST(MemoryTests, FlexibleTest) {
 
   // Overwrite the whole memory area, this should destroy the contents within.
   new_addr = addr_out;
-  result = sceKernelMapFlexibleMemory(&new_addr, 0x10000, 3, 0x10);
+  result   = sceKernelMapFlexibleMemory(&new_addr, 0x10000, 3, 0x10);
   CHECK_EQUAL(0, result);
   CHECK_EQUAL(new_addr, addr_out);
 
@@ -1431,7 +1431,7 @@ TEST(MemoryTests, FlexibleTest) {
 
   // Get a base budget value to calculate with.
   uint64_t avail_flex_size_before = 0;
-  result = sceKernelAvailableFlexibleMemorySize(&avail_flex_size_before);
+  result                          = sceKernelAvailableFlexibleMemorySize(&avail_flex_size_before);
   CHECK_EQUAL(0, result);
   CHECK(avail_flex_size_before != 0);
 
@@ -1503,7 +1503,6 @@ TEST(MemoryTests, DirectTest) {
   // This test is to validate memory behaviors somewhat unique to direct memory mappings.
 }
 
-
 // These tests are from my old homebrew, I'll probably rewrite some later.
 static void TestMemoryWrite(uint64_t addr, uint64_t size) {
   // This function writes 0's to the requested memory area.
@@ -1541,8 +1540,8 @@ TEST(MemoryTests, ExecutableTests) {
   CHECK_EQUAL(0, result);
 
   // Using the physical addresses, map direct memory to a flexible address.
-  uint64_t   addr = 0;
-  int32_t prot = 0x37;
+  uint64_t addr = 0;
+  int32_t  prot = 0x37;
   // Direct memory mapping functions do not allow for assigning executable permissions. Test this edge case.
   result = sceKernelMapDirectMemory(&addr, size, prot, 0, phys_addr, 0);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
@@ -1614,7 +1613,7 @@ TEST(MemoryTests, AlignmentTests) {
   CHECK_EQUAL(0x4000, alignment);
 
   // Start by testing mmap behavior with misaligned address and size.
-  uint64_t    addr  = 0;
+  uint64_t addr  = 0;
   uint64_t size  = 0x3000;
   int32_t  prot  = 0x3;
   int32_t  flags = 0x1000;
@@ -1639,6 +1638,7 @@ TEST(MemoryTests, AlignmentTests) {
     uint8_t  is_committed : 1;
     char     name[32];
   };
+
   OrbisKernelVirtualQueryInfo info;
   memset(&info, 0, sizeof(info));
   result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
@@ -1657,9 +1657,9 @@ TEST(MemoryTests, AlignmentTests) {
 
   // Misaligned address with flags fixed should fail.
   uint64_t test_addr = addr_value + 0x1000;
-  size            = 0x4000;
-  flags           = 0x1010;
-  result          = sceKernelMmap(test_addr, size, prot, flags, -1, 0, &test_addr);
+  size               = 0x4000;
+  flags              = 0x1010;
+  result             = sceKernelMmap(test_addr, size, prot, flags, -1, 0, &test_addr);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // Without flags fixed, this should both addr and size up.
@@ -1749,7 +1749,7 @@ TEST(MemoryTests, AlignmentTests) {
 
 TEST(MemoryTests, FlagTests) {
   // Make sure no-overlap and fixed flags behave properly, since that's what most games use.
-  uint64_t    addr  = 0;
+  uint64_t addr  = 0;
   uint64_t size  = 0x1000000;
   int32_t  flags = 0x10;
 
@@ -1760,7 +1760,7 @@ TEST(MemoryTests, FlagTests) {
 
   // Regardless of flags or reservations, mmap shouldn't map to the reserved page.
   uint64_t mmap_addr = 0;
-  result          = sceKernelMmap(addr, size, 0x3, 0x1000, -1, 0, &mmap_addr);
+  result             = sceKernelMmap(addr, size, 0x3, 0x1000, -1, 0, &mmap_addr);
   CHECK_EQUAL(0, result);
   CHECK(mmap_addr != addr);
 
@@ -1790,7 +1790,7 @@ TEST(MemoryTests, FlagTests) {
 TEST(MemoryTests, ProtectTests) {
   // This tests potential edge cases involving mprotect.
   // Start by mapping memory with no permissions
-  uint64_t    addr   = 0;
+  uint64_t addr   = 0;
   uint64_t size   = 0x100000;
   int32_t  flags  = 0;
   int32_t  prot   = 0;
@@ -1807,9 +1807,9 @@ TEST(MemoryTests, ProtectTests) {
 
   // Verify permissions and alignment using sceKernelQueryMemoryProtection.
   // Address is expected to align down, while the size should align up.
-  uint64_t   start_addr;
-  uint64_t   end_addr;
-  int32_t out_prot;
+  uint64_t start_addr;
+  uint64_t end_addr;
+  int32_t  out_prot;
   result = sceKernelQueryMemoryProtection(protect_addr, &start_addr, &end_addr, &out_prot);
   CHECK_EQUAL(0, result);
   CHECK_EQUAL(addr + 0x40000, start_addr);
