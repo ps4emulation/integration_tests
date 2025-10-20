@@ -5,7 +5,7 @@ set(PKG_VERSION "1.0")
 set(PKG_TITLE_ID "ITES00001") # Should be unique across all tests in project
 set(PKG_CONTENT_ID "IV0000-${PKG_TITLE_ID}_00-PS4SUBSYS0000000")
 set(PKG_DOWNLOADSIZE 0)
-set(PKG_SYSVER 0)
+set(PKG_SYSVER 16777297)
 set(PKG_ATTRIBS1 0) # Known sfo attributes are stored in template/code/sfoparams.h
 set(PKG_ATTRIBS2 0)
 

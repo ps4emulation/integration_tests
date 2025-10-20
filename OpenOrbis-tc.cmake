@@ -58,11 +58,13 @@ function(OpenOrbisPackage_PostProject)
     set(PKG_SHOULDBUILD "pkg")
   endif()
 
+  math(EXPR OO_FWVER "${PKG_SYSVER} * 65536")
+
 	# Create eboot.bin from generated elf file
 	add_custom_command(TARGET ${PKG_TITLE_ID} POST_BUILD COMMAND
 		${CMAKE_COMMAND} -E env "OO_PS4_TOOLCHAIN=${OO_PS4_TOOLCHAIN}"
 		${ORBIS_BIN_PATH}/create-fself -in "${CMAKE_CURRENT_BINARY_DIR}/eboot.elf"
-		--out "${CMAKE_CURRENT_BINARY_DIR}/eboot.oelf" --eboot "${CMAKE_CURRENT_SOURCE_DIR}/eboot.bin" --paid 0x3800000000000011
+		--out "${CMAKE_CURRENT_BINARY_DIR}/eboot.oelf" --eboot "${CMAKE_CURRENT_SOURCE_DIR}/eboot.bin" --paid 0x3800000000000011 --sdkver "${PKG_SYSVER}" --fwversion "${OO_FWVER}"
 	)
 
 	# Create param.sfo and pkg file
