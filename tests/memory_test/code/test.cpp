@@ -732,6 +732,7 @@ TEST(MemoryTests, MapMemoryTest) {
   /**
    * Run mmap with various remaining valid flags to ensure all are at least usable when they should be.
    * Many of these are either related to multi-process, dmem, or other forms of memory, and won't have a noticeable impact on anon mappings.
+   * MAP_2MB_ALIGN and MAP_OPTIMAL_SPACE are removed during sys_mmap, so they have no impact here.
    */
 
   // Test anon unbacked mmap with shared (1)
@@ -944,7 +945,7 @@ TEST(MemoryTests, MapMemoryTest) {
   CHECK_EQUAL(0, result);
 
   // Test anon mmap with 2mb align (0x10000)
-  addr   = 0x200004000;
+  addr   = 0x300004000;
   result = sceKernelMmap(addr, 0x10000, 3, 0x11000, -1, 0, &addr);
   CHECK_EQUAL(0, result);
 
@@ -962,9 +963,8 @@ TEST(MemoryTests, MapMemoryTest) {
   CHECK_EQUAL(0, info.is_pooled);
   CHECK_EQUAL(1, info.is_committed);
 
-  // 2MB align flag doesn't enforce any 2MB alignment in this scenario.
-  // I'll need to test and see when it would apply.
-  CHECK(addr % 0x100000 != 0);
+  // The 2mb align flag is removed in mmap, so this has no impact on address alignment.
+  CHECK(addr % 0x200000 != 0);
 
   // Test writing data to memory
   memset(buf, 0, sizeof(buf));
