@@ -1955,6 +1955,141 @@ TEST(MemoryTests, DirectTest) {
 
   result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x10000);
   CHECK_EQUAL(0, result);
+
+  // Test dmem coalescing edge cases
+  // We can get two "mergable" direct memory areas by utilizing sceKernelMapDirectMemory2.
+  result = sceKernelAllocateMainDirectMemory(0x10000, 0, 0, &phys_addr);
+  CHECK_EQUAL(0, result);
+
+  // With this call, we have two identical, but separate direct memory areas.
+  addr   = 0;
+  result = sceKernelMapDirectMemory2(&addr, 0x10000, 3, 3, 0, phys_addr, 0);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Verify dmem map state
+  int64_t phys_start;
+  int64_t phys_end;
+  int32_t out_mtype;
+  result = sceKernelGetDirectMemoryType(0, &out_mtype, &phys_start, &phys_end);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(0, phys_start);
+  CHECK_EQUAL(0x10000, phys_end);
+  CHECK_EQUAL(3, out_mtype);
+  result = sceKernelGetDirectMemoryType(phys_addr, &out_mtype, &phys_start, &phys_end);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(phys_addr, phys_start);
+  CHECK_EQUAL(phys_addr + 0x10000, phys_end);
+  CHECK_EQUAL(3, out_mtype);
+
+  // Try to map both areas in one sceKernelMapDirectMemory call.
+  result = sceKernelMapDirectMemory(&addr, 0x20000, 3, 0, 0, 0);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr, 0x20000);
+  CHECK_EQUAL(0, result);
+
+  // That mapping will not coalesce the dmem areas.
+  result = sceKernelGetDirectMemoryType(phys_addr, &out_mtype, &phys_start, &phys_end);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(phys_addr, phys_start);
+  CHECK_EQUAL(phys_addr + 0x10000, phys_end);
+  CHECK_EQUAL(3, out_mtype);
+
+  // Release our allocation, then set the unmerged dmem areas back up.
+  result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x10000);
+  CHECK_EQUAL(0, result);
+  result = sceKernelAllocateMainDirectMemory(0x10000, 0, 0, &phys_addr);
+  CHECK_EQUAL(0, result);
+  addr   = 0;
+  result = sceKernelMapDirectMemory2(&addr, 0x10000, 3, 3, 0, phys_addr, 0);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Will allocating more direct memory merge all three together?
+  int64_t phys_addr2 = 0;
+  result             = sceKernelAllocateMainDirectMemory(0x10000, 0, 3, &phys_addr2);
+  CHECK_EQUAL(0, result);
+
+  // Use sceKernelGetDirectMemoryType to check.
+  result = sceKernelGetDirectMemoryType(phys_addr2, &out_mtype, &phys_start, &phys_end);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(phys_addr, phys_start);
+  CHECK_EQUAL(phys_addr2 + 0x10000, phys_end);
+  CHECK_EQUAL(3, out_mtype);
+
+  // This should release both allocations.
+  result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x20000);
+  CHECK_EQUAL(0, result);
+  
+  // Set up two unmerged and unmapped allocations to test sceKernelMapDirectMemory2 with.
+  // Release our allocation, then set the unmerged dmem areas back up.
+  result = sceKernelAllocateMainDirectMemory(0x10000, 0, 0, &phys_addr);
+  CHECK_EQUAL(0, result);
+  addr   = 0;
+  result = sceKernelMapDirectMemory2(&addr, 0x10000, 3, 3, 0, phys_addr, 0);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr, 0x10000);
+  CHECK_EQUAL(0, result);
+  result = sceKernelAllocateMainDirectMemory(0x10000, 0, 0, &phys_addr2);
+  CHECK_EQUAL(0, result);
+  addr   = 0;
+  result = sceKernelMapDirectMemory2(&addr, 0x10000, 3, 3, 0, phys_addr2, 0);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Now we have two 0x10000 dmem pages with the same type, but unmerged. Validate this.
+  result = sceKernelGetDirectMemoryType(phys_addr, &out_mtype, &phys_start, &phys_end);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(phys_addr, phys_start);
+  CHECK_EQUAL(phys_addr + 0x10000, phys_end);
+  CHECK_EQUAL(3, out_mtype);
+  result = sceKernelGetDirectMemoryType(phys_addr2, &out_mtype, &phys_start, &phys_end);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(phys_addr2, phys_start);
+  CHECK_EQUAL(phys_addr2 + 0x10000, phys_end);
+  CHECK_EQUAL(3, out_mtype);
+
+  // Run sceKernelMapDirectMemory2 to map both unallocated pages. Use -1 for mtype param to skip changing mtype.
+  result = sceKernelMapDirectMemory2(&addr, 0x20000, -1, 3, 0, phys_addr, 0);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr, 0x20000);
+  CHECK_EQUAL(0, result);
+
+  result = sceKernelGetDirectMemoryType(phys_addr, &out_mtype, &phys_start, &phys_end);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(phys_addr, phys_start);
+  CHECK_EQUAL(phys_addr + 0x10000, phys_end);
+  CHECK_EQUAL(3, out_mtype);
+  result = sceKernelGetDirectMemoryType(phys_addr2, &out_mtype, &phys_start, &phys_end);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(phys_addr2, phys_start);
+  CHECK_EQUAL(phys_addr2 + 0x10000, phys_end);
+  CHECK_EQUAL(3, out_mtype);
+
+  // Run sceKernelMapDirectMemory2 to map both unallocated pages. Set their mtype to 0 and see if that causes coalescing.
+  result = sceKernelMapDirectMemory2(&addr, 0x20000, 0, 3, 0, phys_addr, 0);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr, 0x20000);
+  CHECK_EQUAL(0, result);
+
+  result = sceKernelGetDirectMemoryType(phys_addr, &out_mtype, &phys_start, &phys_end);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(phys_addr, phys_start);
+  CHECK_EQUAL(phys_addr + 0x10000, phys_end);
+  CHECK_EQUAL(0, out_mtype);
+  result = sceKernelGetDirectMemoryType(phys_addr2, &out_mtype, &phys_start, &phys_end);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(phys_addr2, phys_start);
+  CHECK_EQUAL(phys_addr2 + 0x10000, phys_end);
+  CHECK_EQUAL(0, out_mtype);
+
+   // This should release both allocations.
+  result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x20000);
+  CHECK_EQUAL(0, result);
+
 }
 
 // These tests are from my old homebrew, I'll probably rewrite some later.
