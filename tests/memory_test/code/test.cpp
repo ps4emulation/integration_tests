@@ -1090,6 +1090,7 @@ TEST(MemoryTests, FileMappingTest) {
   // VirtualQuery does not report file mmap offsets.
   CHECK_EQUAL(0, info.offset);
   CHECK_EQUAL(prot, info.prot);
+  CHECK_EQUAL(0, info.memory_type);
   CHECK_EQUAL(1, info.is_flexible);
   CHECK_EQUAL(0, info.is_direct);
   CHECK_EQUAL(0, info.is_stack);
@@ -1163,6 +1164,7 @@ TEST(MemoryTests, FileMappingTest) {
   CHECK_EQUAL(output_addr + 0x10000, info.end);
   CHECK_EQUAL(0, info.offset);
   CHECK_EQUAL(3, info.prot);
+  CHECK_EQUAL(0, info.memory_type);
   CHECK_EQUAL(1, info.is_flexible);
   CHECK_EQUAL(0, info.is_direct);
   CHECK_EQUAL(0, info.is_stack);
@@ -1198,6 +1200,7 @@ TEST(MemoryTests, FileMappingTest) {
   CHECK_EQUAL(output_addr + 0xf000, info.end);
   CHECK_EQUAL(0, info.offset);
   CHECK_EQUAL(3, info.prot);
+  CHECK_EQUAL(0, info.memory_type);
   CHECK_EQUAL(1, info.is_flexible);
   CHECK_EQUAL(0, info.is_direct);
   CHECK_EQUAL(0, info.is_stack);
@@ -1289,6 +1292,7 @@ TEST(MemoryTests, FileMappingTest) {
   CHECK_EQUAL(output_addr + 0x4000, info.end);
   CHECK_EQUAL(0, info.offset);
   CHECK_EQUAL(3, info.prot);
+  CHECK_EQUAL(0, info.memory_type);
   CHECK_EQUAL(0, info.is_flexible);
   CHECK_EQUAL(0, info.is_direct);
   CHECK_EQUAL(0, info.is_stack);
@@ -1434,8 +1438,38 @@ TEST(MemoryTests, FlexibleTest) {
   CHECK(avail_flex_size != 0);
 
   // Flexible memory is not backed in any way, so the contents are garbage before initializing.
+  addr_out = 0x300000000;
   result = sceKernelMapFlexibleMemory(&addr_out, 0x10000, 3, 0);
   CHECK_EQUAL(0, result);
+
+  // While we're here, make sure stored memory info matches expectations for flexible memory.
+  struct OrbisKernelVirtualQueryInfo {
+    uint64_t start;
+    uint64_t end;
+    int64_t  offset;
+    int32_t  prot;
+    int32_t  memory_type;
+    uint8_t  is_flexible  : 1;
+    uint8_t  is_direct    : 1;
+    uint8_t  is_stack     : 1;
+    uint8_t  is_pooled    : 1;
+    uint8_t  is_committed : 1;
+    char     name[32];
+  };
+  OrbisKernelVirtualQueryInfo info;
+  memset(&info, 0, sizeof(info));
+  result = sceKernelVirtualQuery(addr_out, 0, &info, sizeof(info));
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(addr_out, info.start);
+  CHECK_EQUAL(addr_out + 0x10000, info.end);
+  CHECK_EQUAL(0, info.offset);
+  CHECK_EQUAL(3, info.prot);
+  CHECK_EQUAL(0, info.memory_type);
+  CHECK_EQUAL(1, info.is_flexible);
+  CHECK_EQUAL(0, info.is_direct);
+  CHECK_EQUAL(0, info.is_stack);
+  CHECK_EQUAL(0, info.is_pooled);
+  CHECK_EQUAL(1, info.is_committed);
 
   // Write 1's to the full memory range.
   memset(reinterpret_cast<void*>(addr_out), 1, 0x10000);
