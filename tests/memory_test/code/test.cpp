@@ -575,9 +575,9 @@ TEST(MemoryTests, MapMemoryTest) {
   // Run some behavior tests on mmap here.
   // Start with expected flag behaviors.
   // When fixed is specified, address will match the input address exactly.
-  addr = 0x300000000;
+  addr     = 0x300000000;
   addr_out = 0;
-  result = sceKernelMmap(addr, 0x10000, 3, 0x1010, -1, 0, &addr_out);
+  result   = sceKernelMmap(addr, 0x10000, 3, 0x1010, -1, 0, &addr_out);
   CHECK_EQUAL(0, result);
   CHECK_EQUAL(addr, addr_out);
 
@@ -627,14 +627,14 @@ TEST(MemoryTests, MapMemoryTest) {
   while (result != ORBIS_KERNEL_ERROR_EACCES) {
     // VirtualQuery returns EACCES when failing to find a mapping. Abuse this to find the first free address mmap should use.
     // Since we're only mapping one page, we can safely assume any gap is large enough to map.
-    addr = info.end;
+    addr   = info.end;
     result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
   }
 
   // If VirtualQuery works properly, addr should be our first free address.
   uint64_t expected_addr = addr;
-  addr = 0;
-  result = sceKernelMmap(addr, 0x4000, 0, 0x1000, -1, 0, &addr);
+  addr                   = 0;
+  result                 = sceKernelMmap(addr, 0x4000, 0, 0x1000, -1, 0, &addr);
   CHECK_EQUAL(0, result);
   // If this succeeds, sceKernelMmap is using the correct base address for addr == nullptr.
   CHECK_EQUAL(expected_addr, addr);
@@ -644,16 +644,16 @@ TEST(MemoryTests, MapMemoryTest) {
 
   // If fixed is not specified, but address is free, then the mapping will use the specified address.
   // Use a hardcoded, but presumably free address for this.
-  addr = 0x300000000;
+  addr          = 0x300000000;
   expected_addr = addr;
-  result = sceKernelMmap(addr, 0x4000, 0, 0x1000, -1, 0, &addr);
+  result        = sceKernelMmap(addr, 0x4000, 0, 0x1000, -1, 0, &addr);
   CHECK_EQUAL(0, result);
   CHECK_EQUAL(expected_addr, addr);
 
   // When fixed is not specified, mmap will search to higher addresses, not lower ones.
-  addr = 0x300000000;
+  addr          = 0x300000000;
   expected_addr = 0x300004000;
-  result = sceKernelMmap(addr, 0x4000, 0, 0x1000, -1, 0, &addr);
+  result        = sceKernelMmap(addr, 0x4000, 0, 0x1000, -1, 0, &addr);
   CHECK_EQUAL(0, result);
   CHECK_EQUAL(expected_addr, addr);
 
@@ -1527,7 +1527,7 @@ TEST(MemoryTests, FlexibleTest) {
 
   // Flexible memory is not backed in any way, so the contents are garbage before initializing.
   addr_out = 0x300000000;
-  result = sceKernelMapFlexibleMemory(&addr_out, 0x10000, 3, 0);
+  result   = sceKernelMapFlexibleMemory(&addr_out, 0x10000, 3, 0);
   CHECK_EQUAL(0, result);
 
   // While we're here, make sure stored memory info matches expectations for flexible memory.
@@ -1544,6 +1544,7 @@ TEST(MemoryTests, FlexibleTest) {
     uint8_t  is_committed : 1;
     char     name[32];
   };
+
   OrbisKernelVirtualQueryInfo info;
   memset(&info, 0, sizeof(info));
   result = sceKernelVirtualQuery(addr_out, 0, &info, sizeof(info));
@@ -1680,8 +1681,8 @@ TEST(MemoryTests, DirectTest) {
 
   // First, sceKernelMapDirectMemory on physical addresses that are not mapped.
   // Once again, due to the SceGnmDriver mapping, 0 through 0x10000 is allocated.
-  uint64_t addr = 0;
-  int32_t result = sceKernelMapDirectMemory(&addr, 0x10000, 3, 0, 0x10000, 0);
+  uint64_t addr   = 0;
+  int32_t  result = sceKernelMapDirectMemory(&addr, 0x10000, 3, 0, 0x10000, 0);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
   CHECK_EQUAL(0, addr);
 
@@ -1692,7 +1693,7 @@ TEST(MemoryTests, DirectTest) {
 
   // Ensure backing behavior is correct when two mappings share a physical address.
   int64_t phys_addr = 0;
-  result = sceKernelAllocateMainDirectMemory(0x10000, 0x10000, 0, &phys_addr);
+  result            = sceKernelAllocateMainDirectMemory(0x10000, 0x10000, 0, &phys_addr);
   CHECK_EQUAL(0, result);
   CHECK_EQUAL(0x10000, phys_addr);
 
@@ -1713,6 +1714,7 @@ TEST(MemoryTests, DirectTest) {
     uint8_t  is_committed : 1;
     char     name[32];
   };
+
   OrbisKernelVirtualQueryInfo info;
   memset(&info, 0, sizeof(info));
   result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
@@ -1730,7 +1732,7 @@ TEST(MemoryTests, DirectTest) {
   CHECK_EQUAL(1, info.is_committed);
 
   uint64_t addr2 = 0;
-  result = sceKernelMapDirectMemory(&addr2, 0x10000, 3, 0, phys_addr, 0);
+  result         = sceKernelMapDirectMemory(&addr2, 0x10000, 3, 0, phys_addr, 0);
   CHECK_EQUAL(0, result);
 
   // Both calls should succeed, and writes to the first address will be mirrored in the second.
@@ -1769,7 +1771,7 @@ TEST(MemoryTests, DirectTest) {
   // Use sceKernelQueryMemoryProtection to validate expected addresses.
   uint64_t start_addr;
   uint64_t end_addr;
-  int32_t prot;
+  int32_t  prot;
   result = sceKernelQueryMemoryProtection(addr, &start_addr, &end_addr, &prot);
   CHECK_EQUAL(0, result);
   CHECK_EQUAL(addr, start_addr);
@@ -1806,7 +1808,7 @@ TEST(MemoryTests, DirectTest) {
     CHECK_EQUAL(0, result);
 
     // Map direct memory to this physical address space
-    addr = 0;
+    addr   = 0;
     result = sceKernelMapDirectMemory(&addr, 0x10000, 0x33, 0, phys_addr, 0);
     CHECK_EQUAL(0, result);
 
@@ -1851,7 +1853,7 @@ TEST(MemoryTests, DirectTest) {
       CHECK_EQUAL(mtype, out_mtype);
 
       // Use sceKernelMapDirectMemory2 to change memory type.
-      addr = 0;
+      addr   = 0;
       result = sceKernelMapDirectMemory2(&addr, 0x10000, test_mtype, 0x33, 0, phys_addr, 0);
       CHECK_EQUAL(0, result);
 
@@ -1897,13 +1899,13 @@ TEST(MemoryTests, DirectTest) {
   result = sceKernelAllocateMainDirectMemory(0x10000, 0, 10, &phys_addr);
   CHECK_EQUAL(0, result);
 
-  addr = 0;
+  addr   = 0;
   result = sceKernelMapDirectMemory(&addr, 0x10000, 0, 0, phys_addr, 0);
   CHECK_EQUAL(0, result);
   result = sceKernelMunmap(addr, 0x10000);
   CHECK_EQUAL(0, result);
 
-  addr = 0;
+  addr   = 0;
   result = sceKernelMapDirectMemory(&addr, 0x10000, 1, 0, phys_addr, 0);
   CHECK_EQUAL(0, result);
   result = sceKernelMunmap(addr, 0x10000);
@@ -1912,13 +1914,13 @@ TEST(MemoryTests, DirectTest) {
   result = sceKernelMapDirectMemory(&addr, 0x10000, 2, 0, phys_addr, 0);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
 
-  addr = 0;
+  addr   = 0;
   result = sceKernelMapDirectMemory(&addr, 0x10000, 0x10, 0, phys_addr, 0);
   CHECK_EQUAL(0, result);
   result = sceKernelMunmap(addr, 0x10000);
   CHECK_EQUAL(0, result);
 
-  addr = 0;
+  addr   = 0;
   result = sceKernelMapDirectMemory(&addr, 0x10000, 0x11, 0, phys_addr, 0);
   CHECK_EQUAL(0, result);
   result = sceKernelMunmap(addr, 0x10000);
@@ -1940,7 +1942,7 @@ TEST(MemoryTests, DirectTest) {
   result = sceKernelAllocateMainDirectMemory(0x10000, 0, 0, &phys_addr);
   CHECK_EQUAL(0, result);
 
-  addr = 0;
+  addr   = 0;
   result = sceKernelMapDirectMemory2(&addr, 0x10000, 10, 3, 0, phys_addr, 0);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
   result = sceKernelMapDirectMemory2(&addr, 0x10000, 10, 0x20, 0, phys_addr, 0);
