@@ -33,6 +33,7 @@ int32_t sceKernelMprotect(uint64_t addr, uint64_t size, int32_t prot);
 int32_t sceKernelMtypeprotect(uint64_t addr, uint64_t size, int32_t mtype, int32_t prot);
 int32_t sceKernelQueryMemoryProtection(uint64_t addr, uint64_t* start, uint64_t* end, int32_t* prot);
 int32_t sceKernelVirtualQuery(uint64_t addr, int32_t flags, void* info, uint64_t info_size);
+int32_t sceKernelSetVirtualRangeName(uint64_t addr, uint64_t size, const char* name);
 
 // Memory pool functions
 int32_t sceKernelMemoryPoolExpand(int64_t start, int64_t end, uint64_t len, uint64_t alignment, int64_t* phys_addr);
@@ -557,7 +558,6 @@ TEST(MemoryTests, MapMemoryTest) {
   /**
    * Notes:
    * File mmaps to GPU cause the PS4 to crash, this should get investigated.
-   * Somewhere along the line, mapping with flag stack fails. Probably some stack-specific flag check later on?
    *
    * Based on decompilation, Sanitizer flag with a valid address (below a hardcoded 0x800000000000) restricts prot here.
    * Specifically, if address input > 0xfc00000000, prot is restricted to GpuReadWrite.
@@ -660,6 +660,465 @@ TEST(MemoryTests, MapMemoryTest) {
   CHECK_EQUAL(expected_addr, addr);
 
   result = sceKernelMunmap(addr - 0x4000, 0x8000);
+  CHECK_EQUAL(0, result);
+
+  // Test memory coalescing behaviors.
+  // To avoid issues with memory names, use sceKernelSetVirtualRangeName
+  addr   = 0x300000000;
+  result = sceKernelReserveVirtualRange(&addr, 0x10000, 0x10, 0);
+  CHECK_EQUAL(0, result);
+  // Keep track of this address.
+  uint64_t addr1 = addr;
+  uint64_t addr2 = addr1 + 0x10000;
+  result         = sceKernelReserveVirtualRange(&addr2, 0x10000, 0x10, 0);
+  CHECK_EQUAL(0, result);
+  result = sceKernelSetVirtualRangeName(addr1, 0x20000, "mapping");
+  CHECK_EQUAL(0, result);
+
+  // Memory areas don't seem to coalesce by default.
+  uint64_t start;
+  uint64_t end;
+  int32_t  prot;
+  result = sceKernelQueryMemoryProtection(addr1, &start, &end, &prot);
+  CHECK_EQUAL(0, result);
+  // Start should be addr1
+  CHECK_EQUAL(addr1, start);
+  // End should be addr2 + size.
+  CHECK_EQUAL(addr1 + 0x10000, end);
+  CHECK_EQUAL(0, prot);
+  result = sceKernelQueryMemoryProtection(addr2, &start, &end, &prot);
+  CHECK_EQUAL(0, result);
+  // Start should be addr1
+  CHECK_EQUAL(addr2, start);
+  // End should be addr2 + size.
+  CHECK_EQUAL(addr2 + 0x10000, end);
+  CHECK_EQUAL(0, prot);
+
+  // Unmap testing memory
+  result = sceKernelMunmap(addr1, 0x20000);
+  CHECK_EQUAL(0, result);
+
+  addr   = 0x300000000;
+  result = sceKernelReserveVirtualRange(&addr, 0x10000, 0x400010, 0);
+  CHECK_EQUAL(0, result);
+  // Keep track of this address.
+  addr1  = addr;
+  addr2  = addr1 + 0x10000;
+  result = sceKernelReserveVirtualRange(&addr2, 0x10000, 0x400010, 0);
+  CHECK_EQUAL(0, result);
+  result = sceKernelSetVirtualRangeName(addr1, 0x20000, "mapping");
+  CHECK_EQUAL(0, result);
+
+  // No coalesce prevents coalescing, not that it changes anything in this situation.
+  result = sceKernelQueryMemoryProtection(addr1, &start, &end, &prot);
+  CHECK_EQUAL(0, result);
+  // Start should be addr1
+  CHECK_EQUAL(addr1, start);
+  // End should be addr2 + size.
+  CHECK_EQUAL(addr1 + 0x10000, end);
+  CHECK_EQUAL(0, prot);
+  result = sceKernelQueryMemoryProtection(addr2, &start, &end, &prot);
+  CHECK_EQUAL(0, result);
+  // Start should be addr1
+  CHECK_EQUAL(addr2, start);
+  // End should be addr2 + size.
+  CHECK_EQUAL(addr2 + 0x10000, end);
+  CHECK_EQUAL(0, prot);
+
+  // Unmap testing memory
+  result = sceKernelMunmap(addr1, 0x20000);
+  CHECK_EQUAL(0, result);
+
+  /**
+   * Run mmap with various remaining valid flags to ensure all are at least usable when they should be.
+   * Many of these are either related to multi-process, dmem, or other forms of memory, and won't have a noticeable impact on anon mappings.
+   */
+
+  // Test anon unbacked mmap with shared (1)
+  addr   = 0x200000000;
+  result = sceKernelMmap(addr, 0x10000, 3, 0x1001, -1, 0, &addr);
+  CHECK_EQUAL(0, result);
+
+  // Run VirtualQuery to see if mapping behaved as expected
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(addr, info.start);
+  CHECK_EQUAL(addr + 0x10000, info.end);
+  CHECK_EQUAL(0, info.offset);
+  CHECK_EQUAL(3, info.prot);
+  CHECK_EQUAL(0, info.memory_type);
+  CHECK_EQUAL(1, info.is_flexible);
+  CHECK_EQUAL(0, info.is_direct);
+  CHECK_EQUAL(0, info.is_stack);
+  CHECK_EQUAL(0, info.is_pooled);
+  CHECK_EQUAL(1, info.is_committed);
+
+  // Test writing data to memory
+  memset(buf, 0, sizeof(buf));
+  memcpy(reinterpret_cast<void*>(addr), buf, 0x10000);
+  result = memcmp(reinterpret_cast<void*>(addr), buf, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Unmap after testing.
+  result = sceKernelMunmap(addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // While the shared flag would make the data persist for a file mapping, it does not do anything for anon mappings.
+  addr   = 0x200000000;
+  result = sceKernelMmap(addr, 0x10000, 3, 0x1001, -1, 0, &addr);
+  CHECK_EQUAL(0, result);
+  result = memcmp(reinterpret_cast<void*>(addr), buf, 0x10000);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Test anon unbacked mmap with private (2)
+  addr   = 0x200000000;
+  result = sceKernelMmap(addr, 0x10000, 3, 0x1002, -1, 0, &addr);
+  CHECK_EQUAL(0, result);
+
+  // Run VirtualQuery to see if mapping behaved as expected
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(addr, info.start);
+  CHECK_EQUAL(addr + 0x10000, info.end);
+  CHECK_EQUAL(0, info.offset);
+  CHECK_EQUAL(3, info.prot);
+  CHECK_EQUAL(0, info.memory_type);
+  CHECK_EQUAL(1, info.is_flexible);
+  CHECK_EQUAL(0, info.is_direct);
+  CHECK_EQUAL(0, info.is_stack);
+  CHECK_EQUAL(0, info.is_pooled);
+  CHECK_EQUAL(1, info.is_committed);
+
+  // Test writing data to memory
+  memset(buf, 0, sizeof(buf));
+  memcpy(reinterpret_cast<void*>(addr), buf, 0x10000);
+  result = memcmp(reinterpret_cast<void*>(addr), buf, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Unmap after testing.
+  result = sceKernelMunmap(addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Test anon unbacked mmap with void (0x100)
+  addr   = 0x200000000;
+  result = sceKernelMmap(addr, 0x10000, 3, 0x1100, -1, 0, &addr);
+  CHECK_EQUAL(0, result);
+
+  // Run VirtualQuery to see if mapping behaved as expected
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(addr, info.start);
+  CHECK_EQUAL(addr + 0x10000, info.end);
+  CHECK_EQUAL(0, info.offset);
+  // void flag forces prot = 0
+  CHECK_EQUAL(0, info.prot);
+  CHECK_EQUAL(0, info.memory_type);
+  CHECK_EQUAL(0, info.is_flexible);
+  CHECK_EQUAL(0, info.is_direct);
+  CHECK_EQUAL(0, info.is_stack);
+  CHECK_EQUAL(0, info.is_pooled);
+  CHECK_EQUAL(0, info.is_committed);
+
+  // Unmap after testing.
+  result = sceKernelMunmap(addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Test anon mmap with has semaphore (0x200)
+  addr   = 0x200000000;
+  result = sceKernelMmap(addr, 0x10000, 3, 0x1200, -1, 0, &addr);
+  CHECK_EQUAL(0, result);
+
+  // Run VirtualQuery to see if mapping behaved as expected
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(addr, info.start);
+  CHECK_EQUAL(addr + 0x10000, info.end);
+  CHECK_EQUAL(0, info.offset);
+  CHECK_EQUAL(3, info.prot);
+  CHECK_EQUAL(0, info.memory_type);
+  CHECK_EQUAL(1, info.is_flexible);
+  CHECK_EQUAL(0, info.is_direct);
+  CHECK_EQUAL(0, info.is_stack);
+  CHECK_EQUAL(0, info.is_pooled);
+  CHECK_EQUAL(1, info.is_committed);
+
+  // Test writing data to memory
+  memset(buf, 0, sizeof(buf));
+  memcpy(reinterpret_cast<void*>(addr), buf, 0x10000);
+  result = memcmp(reinterpret_cast<void*>(addr), buf, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Unmap after testing.
+  result = sceKernelMunmap(addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Test anon mmap with no sync (0x800)
+  addr   = 0x200000000;
+  result = sceKernelMmap(addr, 0x10000, 3, 0x1800, -1, 0, &addr);
+  CHECK_EQUAL(0, result);
+
+  // Run VirtualQuery to see if mapping behaved as expected
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(addr, info.start);
+  CHECK_EQUAL(addr + 0x10000, info.end);
+  CHECK_EQUAL(0, info.offset);
+  CHECK_EQUAL(3, info.prot);
+  CHECK_EQUAL(0, info.memory_type);
+  CHECK_EQUAL(1, info.is_flexible);
+  CHECK_EQUAL(0, info.is_direct);
+  CHECK_EQUAL(0, info.is_stack);
+  CHECK_EQUAL(0, info.is_pooled);
+  CHECK_EQUAL(1, info.is_committed);
+
+  // Test writing data to memory
+  memset(buf, 0, sizeof(buf));
+  memcpy(reinterpret_cast<void*>(addr), buf, 0x10000);
+  result = memcmp(reinterpret_cast<void*>(addr), buf, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Unmap after testing.
+  result = sceKernelMunmap(addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Test anon mmap with system (0x2000)
+  addr   = 0x200000000;
+  result = sceKernelMmap(addr, 0x10000, 3, 0x3000, -1, 0, &addr);
+  CHECK_EQUAL(0, result);
+
+  // Run VirtualQuery to see if mapping behaved as expected
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(addr, info.start);
+  CHECK_EQUAL(addr + 0x10000, info.end);
+  CHECK_EQUAL(0, info.offset);
+  CHECK_EQUAL(3, info.prot);
+  CHECK_EQUAL(0, info.memory_type);
+  CHECK_EQUAL(1, info.is_flexible);
+  CHECK_EQUAL(0, info.is_direct);
+  CHECK_EQUAL(0, info.is_stack);
+  CHECK_EQUAL(0, info.is_pooled);
+  CHECK_EQUAL(1, info.is_committed);
+
+  // Test writing data to memory
+  memset(buf, 0, sizeof(buf));
+  memcpy(reinterpret_cast<void*>(addr), buf, 0x10000);
+  result = memcmp(reinterpret_cast<void*>(addr), buf, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // MAP_SYSTEM would normally place this memory under a different budget, test that in FlexibleTest
+
+  // Unmap after testing.
+  result = sceKernelMunmap(addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Test anon mmap with all available (0x4000)
+  addr   = 0x200000000;
+  result = sceKernelMmap(addr, 0x10000, 3, 0x5000, -1, 0, &addr);
+  CHECK_EQUAL(0, result);
+
+  // Run VirtualQuery to see if mapping behaved as expected
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(addr, info.start);
+  CHECK_EQUAL(addr + 0x10000, info.end);
+  CHECK_EQUAL(0, info.offset);
+  CHECK_EQUAL(3, info.prot);
+  CHECK_EQUAL(0, info.memory_type);
+  CHECK_EQUAL(1, info.is_flexible);
+  CHECK_EQUAL(0, info.is_direct);
+  CHECK_EQUAL(0, info.is_stack);
+  CHECK_EQUAL(0, info.is_pooled);
+  CHECK_EQUAL(1, info.is_committed);
+
+  // Test writing data to memory
+  memset(buf, 0, sizeof(buf));
+  memcpy(reinterpret_cast<void*>(addr), buf, 0x10000);
+  result = memcmp(reinterpret_cast<void*>(addr), buf, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Unmap after testing.
+  result = sceKernelMunmap(addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Test anon mmap with 2mb align (0x10000)
+  addr   = 0x200004000;
+  result = sceKernelMmap(addr, 0x10000, 3, 0x11000, -1, 0, &addr);
+  CHECK_EQUAL(0, result);
+
+  // Run VirtualQuery to see if mapping behaved as expected
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(addr, info.start);
+  CHECK_EQUAL(addr + 0x10000, info.end);
+  CHECK_EQUAL(0, info.offset);
+  CHECK_EQUAL(3, info.prot);
+  CHECK_EQUAL(0, info.memory_type);
+  CHECK_EQUAL(1, info.is_flexible);
+  CHECK_EQUAL(0, info.is_direct);
+  CHECK_EQUAL(0, info.is_stack);
+  CHECK_EQUAL(0, info.is_pooled);
+  CHECK_EQUAL(1, info.is_committed);
+
+  // 2MB align flag doesn't enforce any 2MB alignment in this scenario.
+  // I'll need to test and see when it would apply.
+  CHECK(addr % 0x100000 != 0);
+
+  // Test writing data to memory
+  memset(buf, 0, sizeof(buf));
+  memcpy(reinterpret_cast<void*>(addr), buf, 0x10000);
+  result = memcmp(reinterpret_cast<void*>(addr), buf, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Unmap after testing.
+  result = sceKernelMunmap(addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Test anon mmap with no core (0x20000)
+  addr   = 0x200000000;
+  result = sceKernelMmap(addr, 0x10000, 3, 0x21000, -1, 0, &addr);
+  CHECK_EQUAL(0, result);
+
+  // Run VirtualQuery to see if mapping behaved as expected
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(addr, info.start);
+  CHECK_EQUAL(addr + 0x10000, info.end);
+  CHECK_EQUAL(0, info.offset);
+  CHECK_EQUAL(3, info.prot);
+  CHECK_EQUAL(0, info.memory_type);
+  CHECK_EQUAL(1, info.is_flexible);
+  CHECK_EQUAL(0, info.is_direct);
+  CHECK_EQUAL(0, info.is_stack);
+  CHECK_EQUAL(0, info.is_pooled);
+  CHECK_EQUAL(1, info.is_committed);
+
+  // Test writing data to memory
+  memset(buf, 0, sizeof(buf));
+  memcpy(reinterpret_cast<void*>(addr), buf, 0x10000);
+  result = memcmp(reinterpret_cast<void*>(addr), buf, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Unmap after testing.
+  result = sceKernelMunmap(addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Test anon mmap with prefault read (0x40000)
+  addr   = 0x200000000;
+  result = sceKernelMmap(addr, 0x10000, 3, 0x41000, -1, 0, &addr);
+  CHECK_EQUAL(0, result);
+
+  // Run VirtualQuery to see if mapping behaved as expected
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(addr, info.start);
+  CHECK_EQUAL(addr + 0x10000, info.end);
+  CHECK_EQUAL(0, info.offset);
+  CHECK_EQUAL(3, info.prot);
+  CHECK_EQUAL(0, info.memory_type);
+  CHECK_EQUAL(1, info.is_flexible);
+  CHECK_EQUAL(0, info.is_direct);
+  CHECK_EQUAL(0, info.is_stack);
+  CHECK_EQUAL(0, info.is_pooled);
+  CHECK_EQUAL(1, info.is_committed);
+
+  // Test writing data to memory
+  memset(buf, 0, sizeof(buf));
+  memcpy(reinterpret_cast<void*>(addr), buf, 0x10000);
+  result = memcmp(reinterpret_cast<void*>(addr), buf, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Unmap after testing.
+  result = sceKernelMunmap(addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Test anon mmap with self (0x80000)
+  addr   = 0x200000000;
+  result = sceKernelMmap(addr, 0x10000, 3, 0x81000, -1, 0, &addr);
+  CHECK_EQUAL(0, result);
+
+  // Run VirtualQuery to see if mapping behaved as expected
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(addr, info.start);
+  CHECK_EQUAL(addr + 0x10000, info.end);
+  CHECK_EQUAL(0, info.offset);
+  CHECK_EQUAL(3, info.prot);
+  CHECK_EQUAL(0, info.memory_type);
+  CHECK_EQUAL(1, info.is_flexible);
+  CHECK_EQUAL(0, info.is_direct);
+  CHECK_EQUAL(0, info.is_stack);
+  CHECK_EQUAL(0, info.is_pooled);
+  CHECK_EQUAL(1, info.is_committed);
+
+  // Test writing data to memory
+  memset(buf, 0, sizeof(buf));
+  memcpy(reinterpret_cast<void*>(addr), buf, 0x10000);
+  result = memcmp(reinterpret_cast<void*>(addr), buf, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Unmap after testing.
+  result = sceKernelMunmap(addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Test anon mmap with optimal space (0x100000)
+  addr   = 0x200000000;
+  result = sceKernelMmap(addr, 0x10000, 3, 0x101000, -1, 0, &addr);
+  CHECK_EQUAL(0, result);
+
+  // Run VirtualQuery to see if mapping behaved as expected
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(addr, info.start);
+  CHECK_EQUAL(addr + 0x10000, info.end);
+  CHECK_EQUAL(0, info.offset);
+  CHECK_EQUAL(3, info.prot);
+  CHECK_EQUAL(0, info.memory_type);
+  CHECK_EQUAL(1, info.is_flexible);
+  CHECK_EQUAL(0, info.is_direct);
+  CHECK_EQUAL(0, info.is_stack);
+  CHECK_EQUAL(0, info.is_pooled);
+  CHECK_EQUAL(1, info.is_committed);
+
+  // Test writing data to memory
+  memset(buf, 0, sizeof(buf));
+  memcpy(reinterpret_cast<void*>(addr), buf, 0x10000);
+  result = memcmp(reinterpret_cast<void*>(addr), buf, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Unmap after testing.
+  result = sceKernelMunmap(addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Test anon mmap with writable wb garlic (0x800000)
+  addr   = 0x200000000;
+  result = sceKernelMmap(addr, 0x10000, 3, 0x801000, -1, 0, &addr);
+  CHECK_EQUAL(0, result);
+
+  // Run VirtualQuery to see if mapping behaved as expected
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(addr, info.start);
+  CHECK_EQUAL(addr + 0x10000, info.end);
+  CHECK_EQUAL(0, info.offset);
+  CHECK_EQUAL(3, info.prot);
+  CHECK_EQUAL(0, info.memory_type);
+  CHECK_EQUAL(1, info.is_flexible);
+  CHECK_EQUAL(0, info.is_direct);
+  CHECK_EQUAL(0, info.is_stack);
+  CHECK_EQUAL(0, info.is_pooled);
+  CHECK_EQUAL(1, info.is_committed);
+
+  // Test writing data to memory
+  memset(buf, 0, sizeof(buf));
+  memcpy(reinterpret_cast<void*>(addr), buf, 0x10000);
+  result = memcmp(reinterpret_cast<void*>(addr), buf, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Unmap after testing.
+  result = sceKernelMunmap(addr, 0x10000);
   CHECK_EQUAL(0, result);
 
   /**
