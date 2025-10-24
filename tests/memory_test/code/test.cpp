@@ -2022,7 +2022,7 @@ TEST(MemoryTests, DirectTest) {
   // This should release both allocations.
   result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x20000);
   CHECK_EQUAL(0, result);
-  
+
   // Set up two unmerged and unmapped allocations to test sceKernelMapDirectMemory2 with.
   // Release our allocation, then set the unmerged dmem areas back up.
   result = sceKernelAllocateMainDirectMemory(0x10000, 0, 0, &phys_addr);
@@ -2086,10 +2086,9 @@ TEST(MemoryTests, DirectTest) {
   CHECK_EQUAL(phys_addr2 + 0x10000, phys_end);
   CHECK_EQUAL(0, out_mtype);
 
-   // This should release both allocations.
+  // This should release both allocations.
   result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x20000);
   CHECK_EQUAL(0, result);
-
 }
 
 // These tests are from my old homebrew, I'll probably rewrite some later.
