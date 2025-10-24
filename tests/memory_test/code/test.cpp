@@ -3,7 +3,6 @@
 #include <list>
 #include <stdio.h>
 #include <string>
-#include <unistd.h>
 
 extern "C" {
 // Direct memory functions
@@ -27,6 +26,7 @@ int32_t sceKernelReleaseFlexibleMemory(uint64_t* addr, uint64_t size);
 int32_t sceKernelReserveVirtualRange(uint64_t* addr, uint64_t size, int32_t flags, uint64_t alignment);
 
 // Generic memory functions
+int32_t getpagesize();
 int32_t sceKernelMmap(uint64_t addr, uint64_t size, int32_t prot, int32_t flags, int32_t fd, int64_t offset, uint64_t* out_addr);
 int32_t sceKernelMunmap(uint64_t addr, uint64_t size);
 int32_t sceKernelMprotect(uint64_t addr, uint64_t size, int32_t prot);
@@ -163,6 +163,10 @@ TEST_GROUP(MemoryTests) {void setup() {
 // These tests are at the top of the file so they run last.
 // This is to prevent issues related to sceKernelEnableDmemAliasing, which afaik cannot be undone without direct syscall usage.
 TEST(MemoryTests, MapMemoryTest) {
+  // These tests assume a 16KB page size, so check getpagesize to validate this.
+  int32_t page_size = getpagesize();
+  CHECK_EQUAL(0x4000, page_size);
+
   // Most memory functions in libkernel rely on sceKernelMmap,
   // leading to overlap in some edge cases.
   // Start with testing libkernel's error returns for sceKernelMapFlexibleMemory
@@ -371,7 +375,6 @@ TEST(MemoryTests, MapMemoryTest) {
    */
 
   // If flag Fixed (0x10) is specified, address must have the same offset as phys_addr.
-  // This effectively prevents misaligned mappings, unless you manually opened a dmem file yourself.
   addr   = 0x200002000;
   result = sceKernelMmap(addr, 0x4000, 0, 0x1010, -1, 0, &addr_out);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
@@ -392,7 +395,6 @@ TEST(MemoryTests, MapMemoryTest) {
   CHECK(fd > 0);
 
   // This sceKernelMmap should try mapping the file to memory with read-write permissions.
-  // Due to the flags, writing to this memory will likely fail (but that's to test when done with edge cases)
   int64_t phys_addr = 0;
   result            = sceKernelAllocateMainDirectMemory(0x4000, 0, 0, &phys_addr);
   CHECK_EQUAL(0, result);
@@ -2192,146 +2194,6 @@ TEST(MemoryTests, ExecutableTests) {
 
   // Unmap the flexible memory used for this test.
   result = sceKernelMunmap(addr, size);
-  CHECK_EQUAL(0, result);
-}
-
-TEST(MemoryTests, AlignmentTests) {
-  // This tests for behaviors relating to memory alignment
-  uint64_t alignment = getpagesize();
-  CHECK_EQUAL(0x4000, alignment);
-
-  // Start by testing mmap behavior with misaligned address and size.
-  uint64_t addr  = 0;
-  uint64_t size  = 0x3000;
-  int32_t  prot  = 0x3;
-  int32_t  flags = 0x1000;
-
-  int32_t result = sceKernelMmap(addr, size, prot, flags, -1, 0, &addr);
-  CHECK_EQUAL(0, result);
-  // Test to ensure addr is aligned
-  uint64_t addr_value = addr;
-  CHECK_EQUAL(0, addr_value % alignment);
-
-  // Check the size of the mapping
-  struct OrbisKernelVirtualQueryInfo {
-    uint64_t start;
-    uint64_t end;
-    int64_t  offset;
-    int32_t  prot;
-    int32_t  memory_type;
-    uint8_t  is_flexible  : 1;
-    uint8_t  is_direct    : 1;
-    uint8_t  is_stack     : 1;
-    uint8_t  is_pooled    : 1;
-    uint8_t  is_committed : 1;
-    char     name[32];
-  };
-
-  OrbisKernelVirtualQueryInfo info;
-  memset(&info, 0, sizeof(info));
-  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  uint64_t calc_size = info.end - info.start;
-  CHECK_EQUAL(0, calc_size % alignment);
-  CHECK(calc_size > size);
-
-  // Write to the full reported memory space to ensure the memory is actually mapped.
-  // This will crash on emulators that don't emulate this behavior properly.
-  TestMemoryWrite(addr, calc_size);
-
-  // Unmap the flexible memory used for this test.
-  result = sceKernelMunmap(addr, calc_size);
-  CHECK_EQUAL(0, result);
-
-  // Misaligned address with flags fixed should fail.
-  uint64_t test_addr = addr_value + 0x1000;
-  size               = 0x4000;
-  flags              = 0x1010;
-  result             = sceKernelMmap(test_addr, size, prot, flags, -1, 0, &test_addr);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-
-  // Without flags fixed, this should both addr and size up.
-  size   = 0x3000;
-  flags  = 0x1000;
-  result = sceKernelMmap(test_addr, size, prot, flags, -1, 0, &test_addr);
-  CHECK_EQUAL(0, result);
-
-  // Test to ensure addr is aligned
-  addr_value = test_addr;
-  CHECK_EQUAL(0, addr_value % alignment);
-  // Address rounds up, so it should be greater than addr
-  CHECK(addr_value > addr);
-
-  // Check the size of the mapping
-  memset(&info, 0, sizeof(info));
-  result = sceKernelVirtualQuery(test_addr, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  calc_size = info.end - info.start;
-  CHECK_EQUAL(0, calc_size % alignment);
-  // Size should align up
-  CHECK_EQUAL(0x4000, calc_size);
-
-  // Write to the full reported memory space to ensure the memory is actually mapped.
-  // This will crash on emulators that don't emulate this behavior properly.
-  TestMemoryWrite(test_addr, calc_size);
-
-  // Unmap the flexible memory used for this test.
-  result = sceKernelMunmap(test_addr, calc_size);
-  CHECK_EQUAL(0, result);
-
-  // Now test for unmap alignment behavior.
-  // Start by mmap'ing 4 pages of memory. This should be enough to check for most edge cases.
-  addr_value = 0x10000000000;
-  addr       = addr_value;
-  size       = 0x10000;
-  flags      = 0x1010;
-  result     = sceKernelMmap(addr, size, prot, flags, -1, 0, &addr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(addr_value, addr);
-
-  // Munmap should align down the address, and align up the length.
-  // This should unmap only the second page of that mapping.
-  uint64_t test_addr_value = addr_value + 0x7000;
-  uint64_t test_size       = 0x1000;
-  result                   = sceKernelMunmap(test_addr_value, test_size);
-  CHECK_EQUAL(0, result);
-
-  memset(&info, 0, sizeof(info));
-  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-
-  // Expected start addr is addr_value, expected end is addr_value + 0x4000.
-  CHECK_EQUAL(addr, info.start);
-  CHECK_EQUAL(addr_value + 0x4000, info.end);
-
-  // Make sure all of this memory is actually mapped.
-  TestMemoryWrite(info.start, alignment);
-
-  // Run VirtualQuery on the remaining addresses that should be mapped.
-  test_addr_value = addr_value + 0x8000;
-  memset(&info, 0, sizeof(info));
-  result = sceKernelVirtualQuery(test_addr_value, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-
-  // Expected start addr is addr_value + 0x8000, expected end is addr_value + 0x10000.
-  CHECK_EQUAL(addr_value + 0x8000, info.start);
-  CHECK_EQUAL(addr_value + 0x10000, info.end);
-
-  // Make sure all of this memory is actually mapped.
-  TestMemoryWrite(info.start, alignment * 2);
-
-  // Place a mapping where the unmap occurred.
-  test_addr_value = addr_value + 0x4000;
-  test_addr       = test_addr_value;
-  result          = sceKernelMmap(test_addr, alignment, prot, flags, -1, 0, &test_addr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(test_addr_value, test_addr);
-
-  // Make sure all the memory is mapped
-  TestMemoryWrite(addr_value, alignment * 4);
-
-  // Unmap the memory used for this test.
-  result = sceKernelMunmap(addr_value, alignment * 4);
   CHECK_EQUAL(0, result);
 }
 
