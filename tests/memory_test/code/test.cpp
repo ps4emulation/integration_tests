@@ -1554,6 +1554,283 @@ TEST(MemoryTests, FlexibleTest) {
 
 TEST(MemoryTests, DirectTest) {
   // This test is to validate memory behaviors somewhat unique to direct memory mappings.
+  // This will focus on behavioral edge cases, since all the error checks involved are checked in MapMemoryTest.
+
+  // First, sceKernelMapDirectMemory on physical addresses that are not mapped.
+  // Once again, due to the SceGnmDriver mapping, 0 through 0x10000 is allocated.
+  uint64_t addr = 0;
+  int32_t result = sceKernelMapDirectMemory(&addr, 0x10000, 3, 0, 0x10000, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  CHECK_EQUAL(0, addr);
+
+  // Since it's a different syscall, check sceKernelMapDirectMemory2 as well.
+  result = sceKernelMapDirectMemory2(&addr, 0x10000, 0, 3, 0, 0x10000, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  CHECK_EQUAL(0, addr);
+
+  // Ensure backing behavior is correct when two mappings share a physical address.
+  int64_t phys_addr = 0;
+  result = sceKernelAllocateMainDirectMemory(0x10000, 0x10000, 0, &phys_addr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(0x10000, phys_addr);
+
+  result = sceKernelMapDirectMemory(&addr, 0x10000, 3, 0, phys_addr, 0);
+  CHECK_EQUAL(0, result);
+
+  // While we're here, make sure stored memory info matches expectations for direct memory.
+  struct OrbisKernelVirtualQueryInfo {
+    uint64_t start;
+    uint64_t end;
+    int64_t  offset;
+    int32_t  prot;
+    int32_t  memory_type;
+    uint8_t  is_flexible  : 1;
+    uint8_t  is_direct    : 1;
+    uint8_t  is_stack     : 1;
+    uint8_t  is_pooled    : 1;
+    uint8_t  is_committed : 1;
+    char     name[32];
+  };
+  OrbisKernelVirtualQueryInfo info;
+  memset(&info, 0, sizeof(info));
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(addr, info.start);
+  CHECK_EQUAL(addr + 0x10000, info.end);
+  // Offset is set to physical address.
+  CHECK_EQUAL(phys_addr, info.offset);
+  CHECK_EQUAL(3, info.prot);
+  CHECK_EQUAL(0, info.memory_type);
+  CHECK_EQUAL(0, info.is_flexible);
+  CHECK_EQUAL(1, info.is_direct);
+  CHECK_EQUAL(0, info.is_stack);
+  CHECK_EQUAL(0, info.is_pooled);
+  CHECK_EQUAL(1, info.is_committed);
+
+  uint64_t addr2 = 0;
+  result = sceKernelMapDirectMemory(&addr2, 0x10000, 3, 0, phys_addr, 0);
+  CHECK_EQUAL(0, result);
+
+  // Both calls should succeed, and writes to the first address will be mirrored in the second.
+  memset(reinterpret_cast<void*>(addr), 1, 0x10000);
+  result = memcmp(reinterpret_cast<void*>(addr), reinterpret_cast<void*>(addr2), 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Store the current state of this memory
+  char test_buf[0x10000];
+  memcpy(test_buf, reinterpret_cast<void*>(addr2), 0x10000);
+
+  // Both addresses should be unmapped by sceKernelCheckedReleaseDirectMemory
+  result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Ensure physical memory is properly released
+  result = sceKernelMapDirectMemory(&addr, 0x10000, 3, 0, phys_addr, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+
+  // Reallocate memory
+  result = sceKernelAllocateMainDirectMemory(0x10000, 0x10000, 0, &phys_addr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(0x10000, phys_addr);
+
+  result = sceKernelMapDirectMemory(&addr, 0x10000, 3, 0, phys_addr, 0);
+  CHECK_EQUAL(0, result);
+
+  // Backing contents should remain the same despite the direct memory release.
+  result = memcmp(reinterpret_cast<void*>(addr), test_buf, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Partially release page. In theory, this should only unmap the part of mapped to these physical addresses.
+  result = sceKernelCheckedReleaseDirectMemory(phys_addr + 0x4000, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  // Use sceKernelQueryMemoryProtection to validate expected addresses.
+  uint64_t start_addr;
+  uint64_t end_addr;
+  int32_t prot;
+  result = sceKernelQueryMemoryProtection(addr, &start_addr, &end_addr, &prot);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(addr, start_addr);
+  CHECK_EQUAL(addr + 0x4000, end_addr);
+  CHECK_EQUAL(3, prot);
+
+  // We unmapped from 0x4000 to 0x8000 in the mapping. Query past that gap
+  result = sceKernelQueryMemoryProtection(end_addr + 0x4000, &start_addr, &end_addr, &prot);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(addr + 0x8000, start_addr);
+  CHECK_EQUAL(addr + 0x10000, end_addr);
+  CHECK_EQUAL(3, prot);
+
+  // Unmap the full direct memory area.
+  result = sceKernelMunmap(addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Remap the area, this should fail due to the missing physical address chunk.
+  result = sceKernelMapDirectMemory(&addr, 0x10000, 3, 0, phys_addr, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+
+  // Since it's a different syscall, check sceKernelMapDirectMemory2 as well.
+  result = sceKernelMapDirectMemory2(&addr, 0x10000, 0, 3, 0, phys_addr, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+
+  // Loop through all possible mtypes, ensure all are backed appropriately
+  // Start by releasing any remaining physical memory from before. Use sceKernelReleaseDirectMemory to skip the unallocated addresses.
+  result = sceKernelReleaseDirectMemory(phys_addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  for (int32_t mtype = 0; mtype < 10; ++mtype) {
+    // Allocate direct memory using specified mtype
+    result = sceKernelAllocateMainDirectMemory(0x10000, 0x10000, mtype, &phys_addr);
+    CHECK_EQUAL(0, result);
+
+    // Map direct memory to this physical address space
+    addr = 0;
+    result = sceKernelMapDirectMemory(&addr, 0x10000, 0x33, 0, phys_addr, 0);
+    CHECK_EQUAL(0, result);
+
+    // Check for proper backing behavior. As per usual, copy bytes, unmap, remap, then check for bytes.
+    memset(reinterpret_cast<void*>(addr), 1, 0x10000);
+    memcpy(test_buf, reinterpret_cast<void*>(addr), 0x10000);
+
+    result = sceKernelMunmap(addr, 0x10000);
+    CHECK_EQUAL(0, result);
+
+    result = sceKernelMapDirectMemory(&addr, 0x10000, 0x33, 0, phys_addr, 0);
+    CHECK_EQUAL(0, result);
+
+    // If this succeeds, this memory is backed.
+    result = memcmp(reinterpret_cast<void*>(addr), test_buf, 0x10000);
+    CHECK_EQUAL(0, result);
+
+    // Release direct memory used for this test.
+    result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x10000);
+    CHECK_EQUAL(0, result);
+
+    // While we're here, we can test sceKernelMapDirectMemory2's type-setting.
+    for (int32_t test_mtype = 0; test_mtype < 10; ++test_mtype) {
+      // Allocate direct memory with mtype
+      result = sceKernelAllocateMainDirectMemory(0x10000, 0x10000, mtype, &phys_addr);
+      CHECK_EQUAL(0, result);
+
+      // Use sceKernelGetDirectMemoryType to ensure type is stored correctly
+      int64_t phys_start;
+      int64_t phys_end;
+      int32_t out_mtype;
+      result = sceKernelGetDirectMemoryType(phys_addr, &out_mtype, &phys_start, &phys_end);
+      CHECK_EQUAL(0, result);
+      if (out_mtype == 3) {
+        // This is the mtype of SceGnmDriver's dmem allocation.
+        // Allocations with this type will coalesce with it.
+        CHECK_EQUAL(0, phys_start);
+      } else {
+        CHECK_EQUAL(phys_addr, phys_start);
+      }
+      CHECK_EQUAL(phys_addr + 0x10000, phys_end);
+      CHECK_EQUAL(mtype, out_mtype);
+
+      // Use sceKernelMapDirectMemory2 to change memory type.
+      addr = 0;
+      result = sceKernelMapDirectMemory2(&addr, 0x10000, test_mtype, 0x33, 0, phys_addr, 0);
+      CHECK_EQUAL(0, result);
+
+      // Use sceKernelGetDirectMemoryType to ensure type is updated correctly
+      result = sceKernelGetDirectMemoryType(phys_addr, &out_mtype, &phys_start, &phys_end);
+      CHECK_EQUAL(0, result);
+      // sceKernelMapDirectMemory2 doesn't coalesce dmem areas after changing type.
+      if (out_mtype == 3 && mtype == 3) {
+        // This is the mtype of SceGnmDriver's dmem allocation.
+        // Allocations with this type will coalesce with it.
+        CHECK_EQUAL(0, phys_start);
+      } else {
+        CHECK_EQUAL(phys_addr, phys_start);
+      }
+      CHECK_EQUAL(phys_addr + 0x10000, phys_end);
+      CHECK_EQUAL(test_mtype, out_mtype);
+
+      // Use sceKernelMunmap to unmap memory
+      result = sceKernelMunmap(addr, 0x10000);
+      CHECK_EQUAL(0, result);
+
+      // Use sceKernelGetDirectMemoryType to ensure type remains the same
+      result = sceKernelGetDirectMemoryType(phys_addr, &out_mtype, &phys_start, &phys_end);
+      CHECK_EQUAL(0, result);
+      // sceKernelMapDirectMemory2 doesn't coalesce dmem areas after changing type.
+      if (out_mtype == 3 && mtype == 3) {
+        // This is the mtype of SceGnmDriver's dmem allocation.
+        // Allocations with this type will coalesce with it.
+        CHECK_EQUAL(0, phys_start);
+      } else {
+        CHECK_EQUAL(phys_addr, phys_start);
+      }
+      CHECK_EQUAL(phys_addr + 0x10000, phys_end);
+      CHECK_EQUAL(test_mtype, out_mtype);
+
+      // Use sceKernelCheckedReleaseDirectMemory to erase direct memory
+      result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x10000);
+      CHECK_EQUAL(0, result);
+    }
+  }
+
+  // memory type 10 does not allow write permissions of any form.
+  result = sceKernelAllocateMainDirectMemory(0x10000, 0, 10, &phys_addr);
+  CHECK_EQUAL(0, result);
+
+  addr = 0;
+  result = sceKernelMapDirectMemory(&addr, 0x10000, 0, 0, phys_addr, 0);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  addr = 0;
+  result = sceKernelMapDirectMemory(&addr, 0x10000, 1, 0, phys_addr, 0);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  result = sceKernelMapDirectMemory(&addr, 0x10000, 2, 0, phys_addr, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+
+  addr = 0;
+  result = sceKernelMapDirectMemory(&addr, 0x10000, 0x10, 0, phys_addr, 0);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  addr = 0;
+  result = sceKernelMapDirectMemory(&addr, 0x10000, 0x11, 0, phys_addr, 0);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  result = sceKernelMapDirectMemory(&addr, 0x10000, 0x20, 0, phys_addr, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  result = sceKernelMapDirectMemory(&addr, 0x10000, 0x22, 0, phys_addr, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  result = sceKernelMapDirectMemory(&addr, 0x10000, 0x30, 0, phys_addr, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  result = sceKernelMapDirectMemory(&addr, 0x10000, 0x33, 0, phys_addr, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+
+  result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Make sure permissions are checked appropriately when changing type through sceKernelMapDirectMemory2
+  result = sceKernelAllocateMainDirectMemory(0x10000, 0, 0, &phys_addr);
+  CHECK_EQUAL(0, result);
+
+  addr = 0;
+  result = sceKernelMapDirectMemory2(&addr, 0x10000, 10, 3, 0, phys_addr, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  result = sceKernelMapDirectMemory2(&addr, 0x10000, 10, 0x20, 0, phys_addr, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  result = sceKernelMapDirectMemory2(&addr, 0x10000, 10, 0x11, 0, phys_addr, 0);
+  CHECK_EQUAL(0, result);
+
+  result = sceKernelMunmap(addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x10000);
+  CHECK_EQUAL(0, result);
 }
 
 // These tests are from my old homebrew, I'll probably rewrite some later.
