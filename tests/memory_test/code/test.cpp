@@ -572,6 +572,94 @@ TEST(MemoryTests, MapMemoryTest) {
    * A bunch of checks specific to file mmaps, most of which are un-important for homebrew testing (mostly internal stuff like devices)
    */
 
+  // Run some behavior tests on mmap here.
+  // Start with expected flag behaviors.
+  // When fixed is specified, address will match the input address exactly.
+  addr = 0x300000000;
+  addr_out = 0;
+  result = sceKernelMmap(addr, 0x10000, 3, 0x1010, -1, 0, &addr_out);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(addr, addr_out);
+
+  // If a mapping already exists at the address, and no overwrite is not specified, then it will overwrite the mapping.
+  // This is tested more thoroughly in the flexible memory tests.
+  result = sceKernelMmap(addr, 0x10000, 3, 0x110, -1, 0, &addr_out);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(addr, addr_out);
+
+  // If no overwrite is specified and the area contains a mapping, mmap returns an error.
+  result = sceKernelMmap(addr, 0x10000, 3, 0x1090, -1, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_ENOMEM, result);
+
+  // Make sure this check is properly applied if the range is partially mapped.
+  result = sceKernelMmap(addr - 0x4000, 0x10000, 3, 0x1090, -1, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_ENOMEM, result);
+
+  // Make sure this check is properly applied if the range is partially mapped.
+  result = sceKernelMmap(addr + 0x4000, 0x10000, 3, 0x1090, -1, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_ENOMEM, result);
+
+  result = sceKernelMunmap(addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // When fixed is not specified, address will search for a free area, starting at a base of 0x200000000.
+  // libc mappings follow this behavior, so we can't hardcode an address here, instead search manually for a free address to check against.
+  struct OrbisKernelVirtualQueryInfo {
+    uint64_t start;
+    uint64_t end;
+    int64_t  offset;
+    int32_t  prot;
+    int32_t  memory_type;
+    uint8_t  is_flexible  : 1;
+    uint8_t  is_direct    : 1;
+    uint8_t  is_stack     : 1;
+    uint8_t  is_pooled    : 1;
+    uint8_t  is_committed : 1;
+    char     name[32];
+  };
+
+  OrbisKernelVirtualQueryInfo info;
+  memset(&info, 0, sizeof(info));
+
+  addr = 0x200000000;
+  // VirtualQuery with flags 0 means there must be a mapping here.
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  while (result != ORBIS_KERNEL_ERROR_EACCES) {
+    // VirtualQuery returns EACCES when failing to find a mapping. Abuse this to find the first free address mmap should use.
+    // Since we're only mapping one page, we can safely assume any gap is large enough to map.
+    addr = info.end;
+    result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  }
+
+  // If VirtualQuery works properly, addr should be our first free address.
+  uint64_t expected_addr = addr;
+  addr = 0;
+  result = sceKernelMmap(addr, 0x4000, 0, 0x1000, -1, 0, &addr);
+  CHECK_EQUAL(0, result);
+  // If this succeeds, sceKernelMmap is using the correct base address for addr == nullptr.
+  CHECK_EQUAL(expected_addr, addr);
+
+  result = sceKernelMunmap(addr, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  // If fixed is not specified, but address is free, then the mapping will use the specified address.
+  // Use a hardcoded, but presumably free address for this.
+  addr = 0x300000000;
+  expected_addr = addr;
+  result = sceKernelMmap(addr, 0x4000, 0, 0x1000, -1, 0, &addr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(expected_addr, addr);
+
+  // When fixed is not specified, mmap will search to higher addresses, not lower ones.
+  addr = 0x300000000;
+  expected_addr = 0x300004000;
+  result = sceKernelMmap(addr, 0x4000, 0, 0x1000, -1, 0, &addr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(expected_addr, addr);
+
+  result = sceKernelMunmap(addr - 0x4000, 0x8000);
+  CHECK_EQUAL(0, result);
+
   /**
    * Notes for sceKernelMapDirectMemory2:
    * Alignment must be a power of 2, page aligned, and less than 0x100000000
@@ -2108,46 +2196,6 @@ TEST(MemoryTests, AlignmentTests) {
 
   // Unmap the memory used for this test.
   result = sceKernelMunmap(addr_value, alignment * 4);
-  CHECK_EQUAL(0, result);
-}
-
-TEST(MemoryTests, FlagTests) {
-  // Make sure no-overlap and fixed flags behave properly, since that's what most games use.
-  uint64_t addr  = 0;
-  uint64_t size  = 0x1000000;
-  int32_t  flags = 0x10;
-
-  // Fixed with addr nullptr should ignore fixed flags.
-  int32_t result = sceKernelReserveVirtualRange(&addr, size, flags, 0);
-  CHECK_EQUAL(0, result);
-  CHECK(addr != 0);
-
-  // Regardless of flags or reservations, mmap shouldn't map to the reserved page.
-  uint64_t mmap_addr = 0;
-  result             = sceKernelMmap(addr, size, 0x3, 0x1000, -1, 0, &mmap_addr);
-  CHECK_EQUAL(0, result);
-  CHECK(mmap_addr != addr);
-
-  // Unmap the mmap
-  result = sceKernelMunmap(mmap_addr, size);
-  CHECK_EQUAL(0, result);
-
-  // Perform a mapping with fixed | no-overwrite. This should fail.
-  result = sceKernelMmap(addr, size, 0x3, 0x1090, -1, 0, &mmap_addr);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_ENOMEM, result);
-
-  // Perform a fixed mapping, this should overwrite the reserved page with usable memory.
-  result = sceKernelMmap(addr, size, 0x3, 0x1010, -1, 0, &mmap_addr);
-  CHECK_EQUAL(0, result);
-  CHECK(mmap_addr == addr);
-
-  // Perform another fixed mapping, this should overwrite the newly mapped page.
-  result = sceKernelMmap(addr, size, 0x3, 0x1010, -1, 0, &mmap_addr);
-  CHECK_EQUAL(0, result);
-  CHECK(mmap_addr == addr);
-
-  // Unmap the mmap
-  result = sceKernelMunmap(mmap_addr, size);
   CHECK_EQUAL(0, result);
 }
 
