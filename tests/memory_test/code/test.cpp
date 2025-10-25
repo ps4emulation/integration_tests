@@ -1242,13 +1242,13 @@ TEST(MemoryTests, DeviceFileTest) {
 
   // Allocate some direct memory for direct memory mapping.
   int64_t phys_addr = 0;
-  int32_t result = sceKernelAllocateMainDirectMemory(0x10000, 0x10000, 10, &phys_addr);
+  int32_t result    = sceKernelAllocateMainDirectMemory(0x10000, 0x10000, 10, &phys_addr);
   CHECK_EQUAL(0, result);
 
   // Start with a typical mmap to verify we're mapping to the dmem file.
   // Like libkernel, specify MAP_SHARED flag, though this is theoretically not required.
-  uint64_t addr   = 0;
-  result = sceKernelMmap(addr, 0x10000, 1, 0x1, dmem1_fd, phys_addr, &addr);
+  uint64_t addr = 0;
+  result        = sceKernelMmap(addr, 0x10000, 1, 0x1, dmem1_fd, phys_addr, &addr);
   CHECK_EQUAL(0, result);
 
   // To confirm this actually mapped the expected direct memory, check if sceKernelReleaseDirectMemory can unmap it.
@@ -1282,14 +1282,14 @@ TEST(MemoryTests, DeviceFileTest) {
   CHECK_EQUAL(0, result);
 
   // Read-only CPU mapping normally works.
-  addr = 0;
+  addr   = 0;
   result = sceKernelMmap(addr, 0x10000, 1, 0x800001, dmem1_fd, phys_addr, &addr);
   CHECK_EQUAL(0, result);
   result = sceKernelMunmap(addr, 0x10000);
   CHECK_EQUAL(0, result);
 
   // Despite the flag, write prot on CPU still returns EACCESS for this mtype.
-  addr = 0;
+  addr   = 0;
   result = sceKernelMmap(addr, 0x10000, 2, 0x800001, dmem1_fd, phys_addr, &addr);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
   result = sceKernelMmap(addr, 0x10000, 3, 0x800001, dmem1_fd, phys_addr, &addr);
