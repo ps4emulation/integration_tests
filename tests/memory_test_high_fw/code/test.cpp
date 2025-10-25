@@ -195,6 +195,11 @@ TEST(MemoryTests, MapMemoryTest) {
   result = sceKernelMapFlexibleMemory(&addr, 0x4000, 0, 0x2000);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
+  // If address is null and Fixed is specified, return EINVAL.
+  addr = 0;
+  result = sceKernelMapFlexibleMemory(&addr, 0x4000, 0, 0x10);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
   /**
    * Other sceKernelMapFlexibleMemory Notes:
    * If address is not specified, it defaults to 0x200000000
@@ -226,6 +231,11 @@ TEST(MemoryTests, MapMemoryTest) {
   result = sceKernelMapDirectMemory(&addr, 0x4000, 8, 0, 0, 0);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
   result = sceKernelMapDirectMemory(&addr, 0x4000, 64, 0, 0, 0);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // If address is null and Fixed is specified, return EINVAL.
+  addr = 0;
+  result = sceKernelMapDirectMemory(&addr, 0x4000, 0, 0x10, 0, 0);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   /**
@@ -675,7 +685,7 @@ TEST(MemoryTests, MapMemoryTest) {
   result = sceKernelSetVirtualRangeName(addr1, 0x20000, "mapping");
   CHECK_EQUAL(0, result);
 
-  // Memory areas don't seem to coalesce by default.
+  // Both mappings will be combined
   uint64_t start;
   uint64_t end;
   int32_t  prot;
@@ -684,14 +694,7 @@ TEST(MemoryTests, MapMemoryTest) {
   // Start should be addr1
   CHECK_EQUAL(addr1, start);
   // End should be addr2 + size.
-  CHECK_EQUAL(addr1 + 0x10000, end);
-  CHECK_EQUAL(0, prot);
-  result = sceKernelQueryMemoryProtection(addr2, &start, &end, &prot);
-  CHECK_EQUAL(0, result);
-  // Start should be addr1
-  CHECK_EQUAL(addr2, start);
-  // End should be addr2 + size.
-  CHECK_EQUAL(addr2 + 0x10000, end);
+  CHECK_EQUAL(addr1 + 0x20000, end);
   CHECK_EQUAL(0, prot);
 
   // Unmap testing memory
@@ -709,7 +712,7 @@ TEST(MemoryTests, MapMemoryTest) {
   result = sceKernelSetVirtualRangeName(addr1, 0x20000, "mapping");
   CHECK_EQUAL(0, result);
 
-  // No coalesce prevents coalescing, not that it changes anything in this situation.
+  // No coalesce prevents coalescing
   result = sceKernelQueryMemoryProtection(addr1, &start, &end, &prot);
   CHECK_EQUAL(0, result);
   // Start should be addr1
@@ -1999,7 +2002,7 @@ TEST(MemoryTests, FlexibleTest) {
     result = sceKernelMapFlexibleMemory(&addr_out, 0x4000, 3, 0);
     if (result < 0) {
       // Out of flex mem
-      CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+      CHECK_EQUAL(ORBIS_KERNEL_ERROR_ENOMEM, result);
     } else {
       // Mapped flex mem successfully.
       CHECK_EQUAL(0, result);
@@ -2017,13 +2020,13 @@ TEST(MemoryTests, FlexibleTest) {
   // sceKernelMmap with MAP_ANON uses the flexible budget.
   uint64_t test_addr;
   result = sceKernelMmap(0, 0x4000, 3, 0x1000, -1, 0, &test_addr);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_ENOMEM, result);
 
   // sceKernelMmap with files also uses the flexible budget.
   int32_t fd = sceKernelOpen("/app0/assets/misc/test_file.txt", 0, 0666);
   CHECK(fd > 0);
   result = sceKernelMmap(0, 0x4000, 3, 0, fd, 0, &test_addr);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_ENOMEM, result);
   result = sceKernelClose(fd);
   CHECK_EQUAL(0, result);
 
@@ -2037,7 +2040,7 @@ TEST(MemoryTests, FlexibleTest) {
 
   // mmap download dir file.
   result = sceKernelMmap(0, 0x4000, 3, 0, fd, 0, &test_addr);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_ENOMEM, result);
   result = sceKernelClose(fd);
   CHECK_EQUAL(0, result);
 
@@ -2302,38 +2305,10 @@ TEST(MemoryTests, DirectTest) {
   CHECK_EQUAL(0, info.is_pooled);
   CHECK_EQUAL(1, info.is_committed);
 
+  // On higher firmwares, sceKernelMapDirectMemory will redirect to sceKernelMapDirectMemory2.
   uint64_t addr2 = 0;
   result         = sceKernelMapDirectMemory(&addr2, 0x10000, 3, 0, phys_addr, 0);
-  CHECK_EQUAL(0, result);
-
-  // Both calls should succeed, and writes to the first address will be mirrored in the second.
-  memset(reinterpret_cast<void*>(addr), 1, 0x10000);
-  result = memcmp(reinterpret_cast<void*>(addr), reinterpret_cast<void*>(addr2), 0x10000);
-  CHECK_EQUAL(0, result);
-
-  // Store the current state of this memory
-  char test_buf[0x10000];
-  memcpy(test_buf, reinterpret_cast<void*>(addr2), 0x10000);
-
-  // Both addresses should be unmapped by sceKernelCheckedReleaseDirectMemory
-  result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x10000);
-  CHECK_EQUAL(0, result);
-
-  // Ensure physical memory is properly released
-  result = sceKernelMapDirectMemory(&addr, 0x10000, 3, 0, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
-
-  // Reallocate memory
-  result = sceKernelAllocateMainDirectMemory(0x10000, 0x10000, 0, &phys_addr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(0x10000, phys_addr);
-
-  result = sceKernelMapDirectMemory(&addr, 0x10000, 3, 0, phys_addr, 0);
-  CHECK_EQUAL(0, result);
-
-  // Backing contents should remain the same despite the direct memory release.
-  result = memcmp(reinterpret_cast<void*>(addr), test_buf, 0x10000);
-  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EBUSY, result);
 
   // Partially release page. In theory, this should only unmap the part of mapped to these physical addresses.
   result = sceKernelCheckedReleaseDirectMemory(phys_addr + 0x4000, 0x4000);
@@ -2373,6 +2348,7 @@ TEST(MemoryTests, DirectTest) {
   result = sceKernelReleaseDirectMemory(phys_addr, 0x10000);
   CHECK_EQUAL(0, result);
 
+  char test_buf[0x10000];
   for (int32_t mtype = 0; mtype < 10; ++mtype) {
     // Allocate direct memory using specified mtype
     result = sceKernelAllocateMainDirectMemory(0x10000, 0x10000, mtype, &phys_addr);
@@ -2554,19 +2530,6 @@ TEST(MemoryTests, DirectTest) {
   CHECK_EQUAL(phys_addr + 0x10000, phys_end);
   CHECK_EQUAL(3, out_mtype);
 
-  // Try to map both areas in one sceKernelMapDirectMemory call.
-  result = sceKernelMapDirectMemory(&addr, 0x20000, 3, 0, 0, 0);
-  CHECK_EQUAL(0, result);
-  result = sceKernelMunmap(addr, 0x20000);
-  CHECK_EQUAL(0, result);
-
-  // That mapping will not coalesce the dmem areas.
-  result = sceKernelGetDirectMemoryType(phys_addr, &out_mtype, &phys_start, &phys_end);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(phys_addr, phys_start);
-  CHECK_EQUAL(phys_addr + 0x10000, phys_end);
-  CHECK_EQUAL(3, out_mtype);
-
   // Release our allocation, then set the unmerged dmem areas back up.
   result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x10000);
   CHECK_EQUAL(0, result);
@@ -2703,7 +2666,7 @@ TEST(MemoryTests, ExecutableTests) {
   int32_t  prot = 0x37;
   // Direct memory mapping functions do not allow for assigning executable permissions. Test this edge case.
   result = sceKernelMapDirectMemory(&addr, size, prot, 0, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // Perform a successful direct memory mapping.
   prot   = 0x33;
@@ -2833,5 +2796,57 @@ TEST(MemoryTests, ProtectTests) {
 
   // Unmap memory used for test.
   result = sceKernelMunmap(addr, size);
+  CHECK_EQUAL(0, result);
+}
+
+TEST(MemoryTests, TLOU2Test) {
+  // Check for something that came up in fpPS4.
+  int64_t first_phys_addr = 0;
+  int32_t result = sceKernelAllocateMainDirectMemory(0x100000000, 0x10000, 0, &first_phys_addr);
+  CHECK_EQUAL(0, result);
+
+  uint64_t first_addr = 0x1600000000;
+  result = sceKernelMapDirectMemory(&first_addr, 0x1D200000, 3, 0, first_phys_addr, 0x200000);
+  CHECK_EQUAL(0, result);
+
+  uint64_t second_addr = 0x3700000000;
+  for (int32_t i = 0; i < 48; ++i) {
+    uint64_t unmap_addr = first_addr + (i * 0x100000);
+    if (i % 2 == 0) {
+      result = sceKernelMtypeprotect(unmap_addr, 0x200000, 3, 3);
+      CHECK_EQUAL(0, result);
+      result = sceKernelSetVirtualRangeName(unmap_addr, 0x200000, "ND Mem");
+      CHECK_EQUAL(0, result);
+    }
+    result = sceKernelMunmap(unmap_addr, 0x100000);
+    CHECK_EQUAL(0, result);
+
+    uint64_t map_addr = second_addr + (i * 0x100000);
+    result = sceKernelMapDirectMemory(&map_addr, 0x100000, 3, 0x90, first_phys_addr + (i * 0x100000), 0x100000);
+    CHECK_EQUAL(0, result);
+  }
+
+  first_addr = 0x1603600000;
+  second_addr = 0x4100000000;
+
+  for (int32_t i = 0; i < 10; ++i) {
+    uint64_t unmap_addr = first_addr + (i * 0x100000);
+    result = sceKernelMunmap(unmap_addr, 0x100000);
+
+    uint64_t map_addr = second_addr + (i * 0x100000);
+    result = sceKernelMapDirectMemory(&map_addr, 0x100000, 3, 0x90, first_phys_addr + 0x3600000 + (i * 0x100000), 0x100000);
+    CHECK_EQUAL(0, result);
+  }
+
+  result = sceKernelMunmap(second_addr, 0xa00000);
+  CHECK_EQUAL(0, result);
+
+  for (int32_t i = 0; i < 10; ++i) {
+    uint64_t map_addr = first_addr + (i * 0x100000);
+    result = sceKernelMapDirectMemory(&map_addr, 0x100000, 3, 0x90, first_phys_addr + 0x3600000 + (i * 0x100000), 0x100000);
+    CHECK_EQUAL(0, result);
+  }
+
+  result = sceKernelCheckedReleaseDirectMemory(first_phys_addr, 0x100000000);
   CHECK_EQUAL(0, result);
 }
