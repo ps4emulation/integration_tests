@@ -1285,6 +1285,21 @@ TEST(MemoryTests, DeviceFileTest) {
   addr   = 0;
   result = sceKernelMmap(addr, 0x10000, 1, 0x800001, dmem1_fd, phys_addr, &addr);
   CHECK_EQUAL(0, result);
+
+  // Run VirtualQuery on this mapping to make sure it has the correct types.
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(addr, info.start);
+  CHECK_EQUAL(addr + 0x10000, info.end);
+  CHECK_EQUAL(0x10000, info.offset);
+  CHECK_EQUAL(1, info.prot);
+  CHECK_EQUAL(10, info.memory_type);
+  CHECK_EQUAL(0, info.is_flexible);
+  CHECK_EQUAL(1, info.is_direct);
+  CHECK_EQUAL(0, info.is_stack);
+  CHECK_EQUAL(0, info.is_pooled);
+  CHECK_EQUAL(1, info.is_committed);
+
   result = sceKernelMunmap(addr, 0x10000);
   CHECK_EQUAL(0, result);
 
@@ -1319,6 +1334,60 @@ TEST(MemoryTests, DeviceFileTest) {
 
   // Close dmem1 file
   result = sceKernelClose(dmem1_fd);
+  CHECK_EQUAL(0, result);
+
+  // Some devices can be mmapped, these can follow different rules.
+  int32_t fd = sceKernelOpen("/dev/gc", 0x602, 0666);
+  CHECK(fd > 0);
+
+  // Perform device file mmap.
+  uint64_t output_addr = 0;
+  result               = sceKernelMmap(0, 0x4000, 3, 0, fd, 0, &output_addr);
+  CHECK_EQUAL(0, result);
+
+  // Run sceKernelVirtualQuery to make sure memory area is as expected.
+  memset(&info, 0, sizeof(info));
+  result = sceKernelVirtualQuery(output_addr, 0, &info, sizeof(info));
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(output_addr, info.start);
+  CHECK_EQUAL(output_addr + 0x4000, info.end);
+  CHECK_EQUAL(0, info.offset);
+  CHECK_EQUAL(3, info.prot);
+  CHECK_EQUAL(0, info.memory_type);
+  CHECK_EQUAL(0, info.is_flexible);
+  CHECK_EQUAL(0, info.is_direct);
+  CHECK_EQUAL(0, info.is_stack);
+  CHECK_EQUAL(0, info.is_pooled);
+  CHECK_EQUAL(0, info.is_committed);
+
+  // Device file mmaps are supposed to automatically append MAP_SHARED.
+  memset(reinterpret_cast<void*>(output_addr), 1, 0x1000);
+
+  // Read contents of memory into a buffer.
+  char dev_buf[0x4000];
+  memcpy(dev_buf, reinterpret_cast<void*>(output_addr), 0x4000);
+
+  // Since we can't sceKernelRead our way through this, we can instead check for MAP_SHARED by unmapping, then remapping the file.
+  // If changes persist, this memory is likely backed in some form. If not, we can assume MAP_SHARED was not appended.
+  result = sceKernelMunmap(output_addr, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  // Perform device file mmap.
+  result = sceKernelMmap(0, 0x4000, 3, 0, fd, 0, &output_addr);
+  CHECK_EQUAL(0, result);
+
+  // Compare the device memory before and after. If the changes from before are still present, the mapping must have MAP_SHARED.
+  result = memcmp(reinterpret_cast<void*>(output_addr), dev_buf, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  result = sceKernelMunmap(output_addr, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  // Device file mmaps fail with EINVAL if you map with flags Private (2)
+  result = sceKernelMmap(0, 0x4000, 3, 2, fd, 0, &output_addr);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  result = sceKernelClose(fd);
   CHECK_EQUAL(0, result);
 }
 
@@ -1913,60 +1982,6 @@ TEST(MemoryTests, FileMappingTest) {
 
   // Unmap test memory
   result = sceKernelMunmap(output_addr, 0x8000);
-  CHECK_EQUAL(0, result);
-
-  // Some devices can be mmapped, these can follow different rules.
-  // The easiest device I've found to mmap is /dev/gc.
-  fd = sceKernelOpen("/dev/gc", 0x602, 0666);
-  CHECK(fd > 0);
-
-  // Perform device file mmap.
-  result = sceKernelMmap(0, 0x4000, 3, 0, fd, 0, &output_addr);
-  CHECK_EQUAL(0, result);
-
-  // Run sceKernelVirtualQuery to make sure memory area is as expected.
-  memset(&info, 0, sizeof(info));
-  result = sceKernelVirtualQuery(output_addr, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(output_addr, info.start);
-  CHECK_EQUAL(output_addr + 0x4000, info.end);
-  CHECK_EQUAL(0, info.offset);
-  CHECK_EQUAL(3, info.prot);
-  CHECK_EQUAL(0, info.memory_type);
-  CHECK_EQUAL(0, info.is_flexible);
-  CHECK_EQUAL(0, info.is_direct);
-  CHECK_EQUAL(0, info.is_stack);
-  CHECK_EQUAL(0, info.is_pooled);
-  CHECK_EQUAL(0, info.is_committed);
-
-  // Device file mmaps are supposed to automatically append MAP_SHARED.
-  memset(reinterpret_cast<void*>(output_addr), 1, 0x1000);
-
-  // Read contents of memory into a buffer.
-  char dev_buf[0x4000];
-  memcpy(dev_buf, reinterpret_cast<void*>(output_addr), 0x4000);
-
-  // Since we can't sceKernelRead our way through this, we can instead check for MAP_SHARED by unmapping, then remapping the file.
-  // If changes persist, this memory is likely backed in some form. If not, we can assume MAP_SHARED was not appended.
-  result = sceKernelMunmap(output_addr, 0x4000);
-  CHECK_EQUAL(0, result);
-
-  // Perform device file mmap.
-  result = sceKernelMmap(0, 0x4000, 3, 0, fd, 0, &output_addr);
-  CHECK_EQUAL(0, result);
-
-  // Compare the device memory before and after. If the changes from before are still present, the mapping must have MAP_SHARED.
-  result = memcmp(reinterpret_cast<void*>(output_addr), dev_buf, 0x4000);
-  CHECK_EQUAL(0, result);
-
-  result = sceKernelMunmap(output_addr, 0x4000);
-  CHECK_EQUAL(0, result);
-
-  // Device file mmaps fail with EINVAL if you map with flags Private (2)
-  result = sceKernelMmap(0, 0x4000, 3, 2, fd, 0, &output_addr);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
-
-  result = sceKernelClose(fd);
   CHECK_EQUAL(0, result);
 }
 
