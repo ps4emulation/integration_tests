@@ -1121,35 +1121,6 @@ TEST(MemoryTests, MapMemoryTest) {
   result = sceKernelMunmap(addr, 0x10000);
   CHECK_EQUAL(0, result);
 
-  // Test for the writable wb garlic flag (0x800000), this flag is technically only testable with a libkernel export that OpenOrbis doesn't have.
-  // To get around this, we can instead open /dev/dmem1 ourselves to get a file descriptor for mmap.
-  int32_t dmem1_fd = sceKernelOpen("/dev/dmem1", 0x2, 0777);
-  CHECK(dmem1_fd > 0);
-
-  // Allocate some direct memory for direct memory mapping.
-  result = sceKernelAllocateMainDirectMemory(0x10000, 0x10000, 10, &phys_addr);
-  CHECK_EQUAL(0, result);
-
-  // Perform dmem file mmap directly, applying typical flags | 0x800000
-  // mmap ignores the flag?
-  addr   = 0;
-  result = sceKernelMmap(addr, 0x10000, 3, 0x800001, dmem1_fd, phys_addr, &addr);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
-  result = sceKernelMmap(addr, 0x10000, 1, 0x800001, dmem1_fd, phys_addr, &addr);
-  CHECK_EQUAL(0, result);
-
-  // To confirm this actually mapped the expected direct memory, check if sceKernelReleaseDirectMemory can unmap it.
-  result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x10000);
-  CHECK_EQUAL(0, result);
-
-  // If the memory unmapped properly, VirtualQuery will return EACCES.
-  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
-
-  // Close dmem1 file
-  result = sceKernelClose(dmem1_fd);
-  CHECK_EQUAL(0, result);
-
   /**
    * Notes for sceKernelMapDirectMemory2:
    * Alignment must be a power of 2, page aligned, and less than 0x100000000
@@ -1258,6 +1229,97 @@ TEST(MemoryTests, MapMemoryTest) {
 
   // Might continue down this rabbit hole at some point, but I don't see too much of a point?
   // I've gleamed the error cases they start with, everything else will just come from testing, as always.
+}
+
+TEST(MemoryTests, DeviceFileTest) {
+  // This function is for testing any lower-level behavior through directly opening device files.
+  // This is kept as a separate test since, no matter how messy a game is, it generally wont be manipulating low level hardware behavior.
+
+  // Test for the writable wb garlic flag (0x800000), this flag is used by a libkernel function that OpenOrbis doesn't have.
+  // To get around this, we can instead open /dev/dmem1 ourselves to get a file descriptor for mmap.
+  int32_t dmem1_fd = sceKernelOpen("/dev/dmem1", 0x2, 0777);
+  CHECK(dmem1_fd > 0);
+
+  // Allocate some direct memory for direct memory mapping.
+  int64_t phys_addr = 0;
+  int32_t result = sceKernelAllocateMainDirectMemory(0x10000, 0x10000, 10, &phys_addr);
+  CHECK_EQUAL(0, result);
+
+  // Start with a typical mmap to verify we're mapping to the dmem file.
+  // Like libkernel, specify MAP_SHARED flag, though this is theoretically not required.
+  uint64_t addr   = 0;
+  result = sceKernelMmap(addr, 0x10000, 1, 0x1, dmem1_fd, phys_addr, &addr);
+  CHECK_EQUAL(0, result);
+
+  // To confirm this actually mapped the expected direct memory, check if sceKernelReleaseDirectMemory can unmap it.
+  result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Define OrbisKernelVirtualQueryInfo struct
+  struct OrbisKernelVirtualQueryInfo {
+    uint64_t start;
+    uint64_t end;
+    int64_t  offset;
+    int32_t  prot;
+    int32_t  memory_type;
+    uint8_t  is_flexible  : 1;
+    uint8_t  is_direct    : 1;
+    uint8_t  is_stack     : 1;
+    uint8_t  is_pooled    : 1;
+    uint8_t  is_committed : 1;
+    char     name[32];
+  };
+
+  OrbisKernelVirtualQueryInfo info;
+  memset(&info, 0, sizeof(info));
+
+  // If the memory unmapped properly, VirtualQuery will return EACCES.
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+
+  // Now test the MAP_WRITABLE_WB_GARLIC flag.
+  result = sceKernelAllocateMainDirectMemory(0x10000, 0x10000, 10, &phys_addr);
+  CHECK_EQUAL(0, result);
+
+  // Read-only CPU mapping normally works.
+  addr = 0;
+  result = sceKernelMmap(addr, 0x10000, 1, 0x800001, dmem1_fd, phys_addr, &addr);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Despite the flag, write prot on CPU still returns EACCESS for this mtype.
+  addr = 0;
+  result = sceKernelMmap(addr, 0x10000, 2, 0x800001, dmem1_fd, phys_addr, &addr);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  result = sceKernelMmap(addr, 0x10000, 3, 0x800001, dmem1_fd, phys_addr, &addr);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+
+  // Read-only GPU mapping normally works.
+  result = sceKernelMmap(addr, 0x10000, 0x10, 0x800001, dmem1_fd, phys_addr, &addr);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // write-only GPU should work due to the flag, normally this fails.
+  result = sceKernelMmap(addr, 0x10000, 0x20, 0x800001, dmem1_fd, phys_addr, &addr);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // read-write GPU should work due to the flag, normally this fails.
+  result = sceKernelMmap(addr, 0x10000, 0x30, 0x800001, dmem1_fd, phys_addr, &addr);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Release direct memory.
+  result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // Close dmem1 file
+  result = sceKernelClose(dmem1_fd);
+  CHECK_EQUAL(0, result);
 }
 
 TEST(MemoryTests, AvailableDirectMemoryTest) {
