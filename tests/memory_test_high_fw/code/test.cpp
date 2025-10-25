@@ -196,7 +196,7 @@ TEST(MemoryTests, MapMemoryTest) {
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // If address is null and Fixed is specified, return EINVAL.
-  addr = 0;
+  addr   = 0;
   result = sceKernelMapFlexibleMemory(&addr, 0x4000, 0, 0x10);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
@@ -234,7 +234,7 @@ TEST(MemoryTests, MapMemoryTest) {
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // If address is null and Fixed is specified, return EINVAL.
-  addr = 0;
+  addr   = 0;
   result = sceKernelMapDirectMemory(&addr, 0x4000, 0, 0x10, 0, 0);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
@@ -2802,11 +2802,11 @@ TEST(MemoryTests, ProtectTests) {
 TEST(MemoryTests, TLOU2Test) {
   // Check for something that came up in fpPS4.
   int64_t first_phys_addr = 0;
-  int32_t result = sceKernelAllocateMainDirectMemory(0x100000000, 0x10000, 0, &first_phys_addr);
+  int32_t result          = sceKernelAllocateMainDirectMemory(0x100000000, 0x10000, 0, &first_phys_addr);
   CHECK_EQUAL(0, result);
 
   uint64_t first_addr = 0x1600000000;
-  result = sceKernelMapDirectMemory(&first_addr, 0x1D200000, 3, 0, first_phys_addr, 0x200000);
+  result              = sceKernelMapDirectMemory(&first_addr, 0x1D200000, 3, 0, first_phys_addr, 0x200000);
   CHECK_EQUAL(0, result);
 
   uint64_t second_addr = 0x3700000000;
@@ -2822,19 +2822,19 @@ TEST(MemoryTests, TLOU2Test) {
     CHECK_EQUAL(0, result);
 
     uint64_t map_addr = second_addr + (i * 0x100000);
-    result = sceKernelMapDirectMemory(&map_addr, 0x100000, 3, 0x90, first_phys_addr + (i * 0x100000), 0x100000);
+    result            = sceKernelMapDirectMemory(&map_addr, 0x100000, 3, 0x90, first_phys_addr + (i * 0x100000), 0x100000);
     CHECK_EQUAL(0, result);
   }
 
-  first_addr = 0x1603600000;
+  first_addr  = 0x1603600000;
   second_addr = 0x4100000000;
 
   for (int32_t i = 0; i < 10; ++i) {
     uint64_t unmap_addr = first_addr + (i * 0x100000);
-    result = sceKernelMunmap(unmap_addr, 0x100000);
+    result              = sceKernelMunmap(unmap_addr, 0x100000);
 
     uint64_t map_addr = second_addr + (i * 0x100000);
-    result = sceKernelMapDirectMemory(&map_addr, 0x100000, 3, 0x90, first_phys_addr + 0x3600000 + (i * 0x100000), 0x100000);
+    result            = sceKernelMapDirectMemory(&map_addr, 0x100000, 3, 0x90, first_phys_addr + 0x3600000 + (i * 0x100000), 0x100000);
     CHECK_EQUAL(0, result);
   }
 
@@ -2843,7 +2843,7 @@ TEST(MemoryTests, TLOU2Test) {
 
   for (int32_t i = 0; i < 10; ++i) {
     uint64_t map_addr = first_addr + (i * 0x100000);
-    result = sceKernelMapDirectMemory(&map_addr, 0x100000, 3, 0x90, first_phys_addr + 0x3600000 + (i * 0x100000), 0x100000);
+    result            = sceKernelMapDirectMemory(&map_addr, 0x100000, 3, 0x90, first_phys_addr + 0x3600000 + (i * 0x100000), 0x100000);
     CHECK_EQUAL(0, result);
   }
 
