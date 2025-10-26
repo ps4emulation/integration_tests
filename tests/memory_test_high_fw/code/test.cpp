@@ -161,9 +161,68 @@ TEST_GROUP(MemoryTests) {void setup() {
 
 }};
 
+// Helper method for printing out memory map information.
+const char* _F = "_F";
+const char* _D = "_D";
+const char* _S = "_S";
+const char* _P = "_P";
+const char* _C = "_C";
+const char* _R = "_R";
+const char* _W = "_W";
+const char* _X = "_X";
+
+void mem_scan() {
+  struct OrbisKernelVirtualQueryInfo {
+    unsigned long long start_addr;
+    unsigned long long end_addr;
+    unsigned long long offset;
+    int32_t            prot;
+    int32_t            mtype;
+    uint8_t            isFlexibleMemory : 1;
+    uint8_t            isDirectMemory   : 1;
+    uint8_t            isStack          : 1;
+    uint8_t            isPooledMemory   : 1;
+    uint8_t            isCommitted      : 1;
+    char               name[32];
+  };
+
+  uint64_t addr = {};
+  int      ret  = {};
+
+  while (true) {
+
+    OrbisKernelVirtualQueryInfo info = {};
+    ret                              = sceKernelVirtualQuery(addr, 1, &info, sizeof(info));
+
+    if (ret != 0) break;
+
+    addr = static_cast<uint64_t>(info.end_addr);
+
+    printf("0x%012llX" // start_addr
+           "-"
+           "0x%012llX" // end_addr
+           "|"
+           "0x%016llX" // offset
+           "|"
+           "%c%c%c%c%c%c" // RWXCRW
+           "|"
+           "0x%01X" // mtype
+           "|"
+           "%c%c%c%c%c" // FDSPC
+           "|"
+           "%s" // name
+           "\n",
+           info.start_addr, info.end_addr, info.offset, _R[(info.prot >> 0) & 1], _W[(info.prot >> 1) & 1], _X[(info.prot >> 2) & 1], _C[(info.prot >> 3) & 1],
+           _R[(info.prot >> 4) & 1], _W[(info.prot >> 5) & 1], info.mtype, _F[info.isFlexibleMemory], _D[info.isDirectMemory], _S[info.isStack],
+           _P[info.isPooledMemory], _C[info.isCommitted], info.name);
+  }
+}
+
 // These tests are at the top of the file so they run last.
 // This is to prevent issues related to sceKernelEnableDmemAliasing, which afaik cannot be undone without direct syscall usage.
 TEST(MemoryTests, MapMemoryTest) {
+  mem_scan();
+
   // These tests assume a 16KB page size, so check getpagesize to validate this.
   int32_t page_size = getpagesize();
   CHECK_EQUAL(0x4000, page_size);
