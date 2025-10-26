@@ -69,10 +69,25 @@ function(OpenOrbisPackage_PostProject)
 
 	# Create param.sfo and pkg file
 	if(CMAKE_HOST_WIN32)
+    string(REPLACE "^" "^^" ESCAPED_PKG_TITLE "${PKG_TITLE}")
+    string(REPLACE "&" "^&" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
+    string(REPLACE "|" "^|" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
+    string(REPLACE "<" "^<" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
+    string(REPLACE ">" "^>" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
+    string(REPLACE "(" "^(" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
+    string(REPLACE ")" "^)" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
+    string(REPLACE "%" "%%" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
+    string(REPLACE "\"" "^\"" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
+    string(REPLACE "!" "^!" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
+    string(REPLACE ";" "^;" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
+    string(REPLACE "=" "^=" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
+    string(REPLACE "\n" "^n" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
+    string(REPLACE " " "^ " ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
+
 		add_custom_command(TARGET ${PKG_TITLE_ID} POST_BUILD
 			COMMAND ${CMAKE_COMMAND} -E env "OO_PS4_TOOLCHAIN=${OO_PS4_TOOLCHAIN}"
 			cmd /c ${INTEST_SOURCE_ROOT}/package.bat
-			"${PKG_TITLE}"
+			"${ESCAPED_PKG_TITLE}"
 			"${PKG_VERSION}"
 			"${PKG_TITLE_ID}"
 			"${PKG_CONTENT_ID}"
@@ -85,10 +100,34 @@ function(OpenOrbisPackage_PostProject)
 			COMMENT "Running package.bat..."
 		)
 	elseif(CMAKE_HOST_LINUX)
+    string(REPLACE "\t" "\\t" ESCAPED_PKG_TITLE "${PKG_TITLE}")
+    string(REPLACE "\"" "\\\"" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
+    string(REPLACE "'" "\\'" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
+    string(REPLACE "\\" "\\\\" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
+    string(REPLACE "|" "\\|" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
+    string(REPLACE "&" "\\&" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
+    string(REPLACE ";" "\\;" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
+    string(REPLACE "(" "\\(" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
+    string(REPLACE ")" "\\)" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
+    string(REPLACE "<" "\\<" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
+    string(REPLACE ">" "\\>" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
+    string(REPLACE "*" "\\*" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
+    string(REPLACE "?" "\\?" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
+    string(REPLACE "[" "\\[" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
+    string(REPLACE "]" "\\]" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
+    string(REPLACE "{" "\\{" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
+    string(REPLACE "}" "\\}" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
+    string(REPLACE "#" "\\#" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
+    string(REPLACE "!" "\\!" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
+    string(REPLACE "$" "\\$" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
+    string(REPLACE "`" "\\`" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
+    string(REPLACE "~" "\\~" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
+    string(REPLACE "\n" "\\n" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
+
 		add_custom_command(TARGET ${PKG_TITLE_ID} POST_BUILD
 			COMMAND ${CMAKE_COMMAND} -E env "OO_PS4_TOOLCHAIN=${OO_PS4_TOOLCHAIN}"
 			"${INTEST_SOURCE_ROOT}/package.sh"
-			"${PKG_TITLE}"
+			"${ESCAPED_PKG_TITLE}"
 			"${PKG_VERSION}"
 			"${PKG_TITLE_ID}"
 			"${PKG_CONTENT_ID}"
