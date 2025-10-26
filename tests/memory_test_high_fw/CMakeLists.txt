@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-set(PKG_TITLE "PS4 Unit Test [FW 7.50]")
+set(PKG_TITLE "PS4 Unit Test (FW 7.50)")
 set(PKG_VERSION "1.0")
 set(PKG_TITLE_ID "MEMT00002")
 set(PKG_CONTENT_ID "IV0000-${PKG_TITLE_ID}_00-PS4SUBSYS0000000")
