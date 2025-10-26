@@ -344,7 +344,7 @@ TEST(MemoryTests, MapMemoryTest) {
   result = sceKernelMmap(addr, 0x4000, 3, 0x400, 0, 0, &addr_out);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
-  // Seems like stack flag acts as if fixed | no overwrite are both present?
+  // Successful stack mappings.
   addr   = 0xfb00000000;
   result = sceKernelMmap(addr, 0x4000, 3, 0x400, -1, 0, &addr_out);
   CHECK_EQUAL(0, result);
@@ -363,9 +363,14 @@ TEST(MemoryTests, MapMemoryTest) {
   result = sceKernelMunmap(addr_out, 0x4000);
   CHECK_EQUAL(0, result);
 
-  addr   = 0x200004000;
+  // Stack flag does not allow memory overwriting.
+  addr   = 0xfb00000000;
+  result = sceKernelMmap(addr, 0x4000, 3, 0x400, -1, 0, &addr_out);
+  CHECK_EQUAL(0, result);
   result = sceKernelMmap(addr, 0x4000, 3, 0x400, -1, 0, &addr_out);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_ENOMEM, result);
+  result = sceKernelMunmap(addr_out, 0x4000);
+  CHECK_EQUAL(0, result);
 
   /**
    * Other notes here:
