@@ -88,7 +88,7 @@ function(OpenOrbisPackage_PostProject)
 		add_custom_command(TARGET ${PKG_TITLE_ID} POST_BUILD
 			COMMAND ${CMAKE_COMMAND} -E env "OO_PS4_TOOLCHAIN=${OO_PS4_TOOLCHAIN}"
 			"${INTEST_SOURCE_ROOT}/package.sh"
-			"${PKG_TITLE}"
+			"\"${PKG_TITLE}\""
 			"${PKG_VERSION}"
 			"${PKG_TITLE_ID}"
 			"${PKG_CONTENT_ID}"
