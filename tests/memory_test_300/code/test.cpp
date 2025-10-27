@@ -117,7 +117,6 @@ TEST(MemoryTests, FW300Test) {
 
   // mmap calls with MAP_FIXED have a similar error condition,
   // if addr + size > 0xfc00000000 and SDK version is at or above 3.00, then return EINVAL.
-  // Since this homebrew is compiled with SDK version set to 2.50, these should all succeed.
   // Note: MAP_SANITIZER does not hit these error returns, that behavior cannot be tested on retail hardware.
 
   addr   = 0xfb00000000;
