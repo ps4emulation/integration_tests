@@ -6,9 +6,9 @@
 
 extern "C" {
 // Direct memory functions
-int32_t  sceKernelAllocateMainDirectMemory(uint64_t size, uint64_t alignment, int32_t type, int64_t* phys_addr);
-int32_t  sceKernelMapDirectMemory(uint64_t* addr, uint64_t size, int32_t prot, int32_t flags, int64_t phys_addr, uint64_t alignment);
-int32_t  sceKernelCheckedReleaseDirectMemory(int64_t phys_addr, uint64_t size);
+int32_t sceKernelAllocateMainDirectMemory(uint64_t size, uint64_t alignment, int32_t type, int64_t* phys_addr);
+int32_t sceKernelMapDirectMemory(uint64_t* addr, uint64_t size, int32_t prot, int32_t flags, int64_t phys_addr, uint64_t alignment);
+int32_t sceKernelCheckedReleaseDirectMemory(int64_t phys_addr, uint64_t size);
 
 // Reserve memory function
 int32_t sceKernelReserveVirtualRange(uint64_t* addr, uint64_t size, int32_t flags, uint64_t alignment);
@@ -165,7 +165,7 @@ TEST(MemoryTests, TLOU2Test) {
   uint64_t second_addr = 0x3700000000;
   for (int32_t i = 0; i < 48; ++i) {
     uint64_t unmap_addr = first_addr + (i * 0x100000);
-    result = sceKernelMunmap(unmap_addr, 0x100000);
+    result              = sceKernelMunmap(unmap_addr, 0x100000);
     CHECK_EQUAL(0, result);
 
     uint64_t map_addr = second_addr + (i * 0x100000);
