@@ -221,7 +221,7 @@ TEST(MemoryTests, FW300Test) {
   // sys_mmap_dmem also has an equivalent check.
   // To test this, we need to allocate some direct memory.
   int64_t phys_addr = 0;
-  result = sceKernelAllocateMainDirectMemory(0x4000, 0x4000, 0, &phys_addr);
+  result            = sceKernelAllocateMainDirectMemory(0x4000, 0x4000, 0, &phys_addr);
   CHECK_EQUAL(0, result);
 
   addr   = 0xfb00000000;
