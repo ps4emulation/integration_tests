@@ -111,7 +111,34 @@ TEST(MemoryTests, FW300Test) {
   result = sceKernelMmap(addr, 0x4000, 3, 0x400, -1, 0, &addr_out);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_ENOMEM, result);
 
-  // TODO: I know there is at least one other place firmware 3.00 is checked in, investigate further.
+  // mmap calls with MAP_FIXED have a similar error condition,
+  // if addr + size > 0xfc00000000 and SDK version is at or above 3.00, then return EINVAL.
+  // Since this homebrew is compiled with SDK version set to 2.50, these should all succeed.
+  // Note: MAP_SANITIZER does not hit these error returns, that behavior cannot be tested on retail hardware.
+
+  addr   = 0xfb00000000;
+  result = sceKernelMmap(addr, 0x4000, 3, 0x1010, -1, 0, &addr_out);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr_out, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  addr   = 0xfbffffc000;
+  result = sceKernelMmap(addr, 0x4000, 3, 0x1010, -1, 0, &addr_out);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr_out, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  addr   = 0xfc00000000;
+  result = sceKernelMmap(addr, 0x4000, 3, 0x1010, -1, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  addr   = 0xfc00004000;
+  result = sceKernelMmap(addr, 0x4000, 3, 0x1010, -1, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  addr   = 0xff00000000;
+  result = sceKernelMmap(addr, 0x4000, 3, 0x1010, -1, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 }
 
 // Test behavior that changed in firmware 3.50
