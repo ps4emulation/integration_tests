@@ -155,11 +155,68 @@ const char* sceKernelGetFsSandboxRandomWord();
 #define ORBIS_KERNEL_ERROR_EICV            (0x80020060)
 #define ORBIS_KERNEL_ERROR_ENOPLAYGOENT    (0x80020061)
 
-TEST_GROUP(MemoryTests) {void setup() {
+void mem_scan() {
+  // Helper method from red_prig for printing out memory map information.
+  const char* _F = "_F";
+  const char* _D = "_D";
+  const char* _S = "_S";
+  const char* _P = "_P";
+  const char* _C = "_C";
+  const char* _R = "_R";
+  const char* _W = "_W";
+  const char* _X = "_X";
 
-} void teardown() {
+  struct OrbisKernelVirtualQueryInfo {
+    unsigned long long start_addr;
+    unsigned long long end_addr;
+    unsigned long long offset;
+    int32_t            prot;
+    int32_t            mtype;
+    uint8_t            isFlexibleMemory : 1;
+    uint8_t            isDirectMemory   : 1;
+    uint8_t            isStack          : 1;
+    uint8_t            isPooledMemory   : 1;
+    uint8_t            isCommitted      : 1;
+    char               name[32];
+  };
 
-}};
+  uint64_t addr = {};
+  int      ret  = {};
+  while (true) {
+    OrbisKernelVirtualQueryInfo info = {};
+    ret                              = sceKernelVirtualQuery(addr, 1, &info, sizeof(info));
+    if (ret != 0) break;
+    addr = static_cast<uint64_t>(info.end_addr);
+    printf("0x%012llX" // start_addr
+           "-"
+           "0x%012llX" // end_addr
+           "|"
+           "0x%016llX" // offset
+           "|"
+           "%c%c%c%c%c%c" // RWXCRW
+           "|"
+           "0x%01X" // mtype
+           "|"
+           "%c%c%c%c%c" // FDSPC
+           "|"
+           "%s" // name
+           "\n",
+           info.start_addr, info.end_addr, info.offset, _R[(info.prot >> 0) & 1], _W[(info.prot >> 1) & 1], _X[(info.prot >> 2) & 1], _C[(info.prot >> 3) & 1],
+           _R[(info.prot >> 4) & 1], _W[(info.prot >> 5) & 1], info.mtype, _F[info.isFlexibleMemory], _D[info.isDirectMemory], _S[info.isStack],
+           _P[info.isPooledMemory], _C[info.isCommitted], info.name);
+  }
+}
+
+TEST_GROUP(MemoryTests) {
+    void setup() {// Before each test, call mem_scan to print out memory map information.
+                  // This will provide an indicator of how the memory map looks, which can help with debugging strange behavior during tests.
+                  printf("Before test:\n");
+mem_scan();
+}
+
+void teardown() {}
+}
+;
 
 // These tests are at the top of the file so they run last.
 // This is to prevent issues related to sceKernelEnableDmemAliasing, which afaik cannot be undone without direct syscall usage.
@@ -352,6 +409,14 @@ TEST(MemoryTests, MapMemoryTest) {
   CHECK_EQUAL(0, result);
 
   addr   = 0xfc00000000;
+  result = sceKernelMmap(addr, 0x4000, 3, 0x400, -1, 0, &addr_out);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr_out, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  // Compiled SDK version 3.00 or above prohibit stack mappings above 0xfc00000000.
+  // Since this test homebrew has SDK version 1.00, this should succeed.
+  addr   = 0xff00000000;
   result = sceKernelMmap(addr, 0x4000, 3, 0x400, -1, 0, &addr_out);
   CHECK_EQUAL(0, result);
   result = sceKernelMunmap(addr_out, 0x4000);
@@ -581,6 +646,12 @@ TEST(MemoryTests, MapMemoryTest) {
 
   // Run some behavior tests on mmap here.
   // Start with expected flag behaviors.
+  // If address is null and fixed is specified, returns EINVAL.
+  addr     = 0;
+  addr_out = 0;
+  result   = sceKernelMmap(addr, 0x10000, 3, 0x1010, -1, 0, &addr_out);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
   // When fixed is specified, address will match the input address exactly.
   addr     = 0x300000000;
   addr_out = 0;
