@@ -6,11 +6,14 @@
 
 extern "C" {
 // Direct memory functions
+int32_t sceKernelAllocateMainDirectMemory(uint64_t size, uint64_t alignment, int32_t type, int64_t* phys_addr);
 int32_t sceKernelMapDirectMemory(uint64_t* addr, uint64_t size, int32_t prot, int32_t flags, int64_t phys_addr, uint64_t alignment);
+int32_t sceKernelMapDirectMemory2(uint64_t* addr, uint64_t size, int32_t type, int32_t prot, int32_t flags, int64_t phys_addr, uint64_t alignment);
 int32_t sceKernelMapNamedDirectMemory(uint64_t* addr, uint64_t size, int32_t prot, int32_t flags, int64_t phys_addr, uint64_t alignment, const char* name);
 int32_t sceKernelInternalMapDirectMemory(int32_t pool, uint64_t* addr, uint64_t size, int32_t prot, int32_t flags, int64_t phys_addr, uint64_t alignment);
 int32_t sceKernelInternalMapNamedDirectMemory(int32_t pool, uint64_t* addr, uint64_t size, int32_t prot, int32_t flags, int64_t phys_addr, uint64_t alignment,
                                               const char* name);
+int32_t sceKernelCheckedReleaseDirectMemory(int64_t phys_addr, uint64_t size);
 
 // Generic memory functions
 int32_t sceKernelMmap(uint64_t addr, uint64_t size, int32_t prot, int32_t flags, int32_t fd, int64_t offset, uint64_t* out_addr);
@@ -213,5 +216,44 @@ TEST(MemoryTests, FW300Test) {
   result = sceKernelMmap(addr, 0x4000, 3, 0x1000, -1, 0, &addr_out);
   CHECK_EQUAL(0, result);
   result = sceKernelMunmap(addr_out, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  // sys_mmap_dmem also has an equivalent check.
+  // To test this, we need to allocate some direct memory.
+  int64_t phys_addr = 0;
+  result = sceKernelAllocateMainDirectMemory(0x4000, 0x4000, 0, &phys_addr);
+  CHECK_EQUAL(0, result);
+
+  addr   = 0xfb00000000;
+  result = sceKernelMapDirectMemory2(&addr, 0x4000, -1, 3, 0, phys_addr, 0);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  addr   = 0xfbffffc000;
+  result = sceKernelMapDirectMemory2(&addr, 0x4000, -1, 3, 0, phys_addr, 0);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  addr   = 0xfc00000000;
+  result = sceKernelMapDirectMemory2(&addr, 0x4000, -1, 3, 0, phys_addr, 0);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  addr   = 0xfc00004000;
+  result = sceKernelMapDirectMemory2(&addr, 0x4000, -1, 3, 0, phys_addr, 0);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  addr   = 0xff00000000;
+  result = sceKernelMapDirectMemory2(&addr, 0x4000, -1, 3, 0, phys_addr, 0);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x4000);
   CHECK_EQUAL(0, result);
 }
