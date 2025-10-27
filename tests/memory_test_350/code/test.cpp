@@ -93,8 +93,7 @@ TEST_GROUP (MemoryTests) {
 // Test behavior that changed in firmware 3.50
 TEST(MemoryTests, FW350Test) {
   // Starting with firmware 3.50, out of memory errors return ORBIS_KERNEL_ERROR_ENOMEM instead of ORBIS_KERNEL_ERROR_EINVAL.
-  // This test is to validate memory behaviors unique to flexible memory mappings.
-  // Start by testing available flexible memory size.
+  // Start by using the full flexible budget.
   std::list<uint64_t> addresses;
   uint64_t            addr_out = 0;
   int32_t             result   = 0;
