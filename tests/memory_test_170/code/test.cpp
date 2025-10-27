@@ -84,16 +84,15 @@ void mem_scan() {
   }
 }
 
-TEST_GROUP(MemoryTests) {
-    void setup() {// Before each test, call mem_scan to print out memory map information.
-                  // This will provide an indicator of how the memory map looks, which can help with debugging strange behavior during tests.
-                  printf("Before test:\n");
-mem_scan();
-}
+TEST_GROUP (MemoryTests) {
+  void setup() { // Before each test, call mem_scan to print out memory map information.
+    // This will provide an indicator of how the memory map looks, which can help with debugging strange behavior during tests.
+    printf("Before test:\n");
+    mem_scan();
+  }
 
-void teardown() {}
-}
-;
+  void teardown() {}
+};
 
 // Test behavior that changed in firmware 1.70
 TEST(MemoryTests, FW170Test) {
