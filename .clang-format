@@ -44,8 +44,8 @@ BraceWrapping:
   SplitEmptyFunction: true
   SplitEmptyRecord: true
   SplitEmptyNamespace: true
-AttributeMacros:
-  - PACKED_STRUCT_END
+IfMacros:
+  - TEST_GROUP
 BreakBeforeBinaryOperators: None
 BreakBeforeConceptDeclarations: true
 BreakBeforeBraces: Attach
