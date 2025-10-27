@@ -183,4 +183,35 @@ TEST(MemoryTests, FW300Test) {
   CHECK_EQUAL(0, result);
   result = sceKernelMunmap(addr_out, 0x4000);
   CHECK_EQUAL(0, result);
+
+  // mmap calls without MAP_FIXED also have a similar edge case, but with ENOMEM returns.
+  addr   = 0xfb00000000;
+  result = sceKernelMmap(addr, 0x4000, 3, 0x1000, -1, 0, &addr_out);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr_out, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  addr   = 0xfbffffc000;
+  result = sceKernelMmap(addr, 0x4000, 3, 0x1000, -1, 0, &addr_out);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr_out, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  addr   = 0xfc00000000;
+  result = sceKernelMmap(addr, 0x4000, 3, 0x1000, -1, 0, &addr_out);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr_out, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  addr   = 0xfc00004000;
+  result = sceKernelMmap(addr, 0x4000, 3, 0x1000, -1, 0, &addr_out);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr_out, 0x4000);
+  CHECK_EQUAL(0, result);
+
+  addr   = 0xff00000000;
+  result = sceKernelMmap(addr, 0x4000, 3, 0x1000, -1, 0, &addr_out);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(addr_out, 0x4000);
+  CHECK_EQUAL(0, result);
 }
