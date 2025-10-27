@@ -1,10 +1,9 @@
 #include "CppUTest/TestHarness.h"
 
-TEST_GROUP(ClassName) {void setup() {
-
-} void teardown() {
-
-}};
+TEST_GROUP (ClassName) {
+  void setup() {}
+  void teardown() {}
+};
 
 TEST(ClassName, Create) {
   CHECK(true);
