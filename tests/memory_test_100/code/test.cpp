@@ -1474,7 +1474,7 @@ TEST(MemoryTests, DeviceFileTest) {
 
   result = sceKernelClose(fd);
   CHECK_EQUAL(0, result);
-  
+
   // Test budget behaviors that wouldn't come up in normal games.
   std::list<uint64_t> addresses;
   uint64_t            addr_out = 0;
