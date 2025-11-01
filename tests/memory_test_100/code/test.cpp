@@ -1201,6 +1201,12 @@ TEST(MemoryTests, MapMemoryTest) {
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   /**
+   * Continued notes:
+   * vm_map_find causes ENOMEM return if there are no valid memory areas to map.
+   * If vm_map_find returns any address between 0x80000000 and 0x200000000, ENOMEM is returned.
+   */
+
+  /**
    * Notes for sceKernelMapDirectMemory2:
    * Alignment must be a power of 2, page aligned, and less than 0x100000000
    * If alignment is less than page size, it's increased to the page size.
@@ -1468,6 +1474,60 @@ TEST(MemoryTests, DeviceFileTest) {
 
   result = sceKernelClose(fd);
   CHECK_EQUAL(0, result);
+  
+  // Test budget behaviors that wouldn't come up in normal games.
+  std::list<uint64_t> addresses;
+  uint64_t            addr_out = 0;
+  while (result == 0) {
+    result = sceKernelMapFlexibleMemory(&addr_out, 0x4000, 3, 0);
+    if (result < 0) {
+      // Out of flex mem
+      CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+    } else {
+      // Mapped flex mem successfully.
+      CHECK_EQUAL(0, result);
+      // Add the mapping address to addresses, need to unmap later to clean up.
+      addresses.emplace_back(addr_out);
+    }
+  }
+
+  // After all these mappings, available flex size should be 0.
+  uint64_t avail_flex_size = 0;
+  result                   = sceKernelAvailableFlexibleMemorySize(&avail_flex_size);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(0, avail_flex_size);
+
+  // Device mmaps do not use the flexible budget.
+  fd = sceKernelOpen("/dev/gc", 0x602, 0666);
+  CHECK(fd > 0);
+  result = sceKernelMmap(0, 0x4000, 3, 0, fd, 0, &output_addr);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(output_addr, 0x4000);
+  CHECK_EQUAL(0, result);
+  result = sceKernelClose(fd);
+  CHECK_EQUAL(0, result);
+
+  // mmaps from system folders do not use the flexible budget.
+  const char* sys_folder = sceKernelGetFsSandboxRandomWord();
+  char        path[128];
+  memset(path, 0, sizeof(path));
+  snprintf(path, sizeof(path), "/%s/common/lib/libc.sprx", sys_folder);
+  fd = sceKernelOpen(path, 0, 0666);
+  CHECK(fd > 0);
+
+  result = sceKernelMmap(0, 0x4000, 3, 0, fd, 0, &output_addr);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(output_addr, 0x4000);
+  CHECK_EQUAL(0, result);
+  result = sceKernelClose(fd);
+  CHECK_EQUAL(0, result);
+
+  // Unmap all of the flexible memory used here.
+  for (uint64_t addr: addresses) {
+    result = sceKernelMunmap(addr, 0x4000);
+    CHECK_EQUAL(0, result);
+  }
+  addresses.clear();
 }
 
 TEST(MemoryTests, AvailableDirectMemoryTest) {
@@ -2124,31 +2184,6 @@ TEST(MemoryTests, FlexibleTest) {
   CHECK_EQUAL(sizeof(test_buf), bytes);
 
   // mmap data dir file.
-  result = sceKernelMmap(0, 0x4000, 3, 0, fd, 0, &test_addr);
-  CHECK_EQUAL(0, result);
-  result = sceKernelMunmap(test_addr, 0x4000);
-  CHECK_EQUAL(0, result);
-  result = sceKernelClose(fd);
-  CHECK_EQUAL(0, result);
-
-  // Device mmaps do not use the flexible budget.
-  fd = sceKernelOpen("/dev/gc", 0x602, 0666);
-  CHECK(fd > 0);
-  result = sceKernelMmap(0, 0x4000, 3, 0, fd, 0, &test_addr);
-  CHECK_EQUAL(0, result);
-  result = sceKernelMunmap(test_addr, 0x4000);
-  CHECK_EQUAL(0, result);
-  result = sceKernelClose(fd);
-  CHECK_EQUAL(0, result);
-
-  // mmaps from system folders do not use the flexible budget.
-  const char* sys_folder = sceKernelGetFsSandboxRandomWord();
-  char        path[128];
-  memset(path, 0, sizeof(path));
-  snprintf(path, sizeof(path), "/%s/common/lib/libc.sprx", sys_folder);
-  fd = sceKernelOpen(path, 0, 0666);
-  CHECK(fd > 0);
-
   result = sceKernelMmap(0, 0x4000, 3, 0, fd, 0, &test_addr);
   CHECK_EQUAL(0, result);
   result = sceKernelMunmap(test_addr, 0x4000);
