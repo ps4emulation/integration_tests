@@ -2154,6 +2154,17 @@ TEST(MemoryTests, FlexibleTest) {
   result = sceKernelMmap(0, 0x4000, 3, 0x1000, -1, 0, &test_addr);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
+  // Test budget behavior with MAP_STACK
+  test_addr = 0xfb00000000;
+  result    = sceKernelMmap(test_addr, 0x4000, 3, 0x400, -1, 0, &test_addr);
+  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // sceKernelMmap with MAP_VOID
+  result = sceKernelMmap(test_addr, 0x4000, 3, 0x100, -1, 0, &test_addr);
+  CHECK_EQUAL(0, result);
+  result = sceKernelMunmap(test_addr, 0x4000);
+  CHECK_EQUAL(0, result);
+
   // sceKernelMmap with files also uses the flexible budget.
   int32_t fd = sceKernelOpen("/app0/assets/misc/test_file.txt", 0, 0666);
   CHECK(fd > 0);
