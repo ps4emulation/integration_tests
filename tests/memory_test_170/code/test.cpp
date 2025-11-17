@@ -6,11 +6,13 @@
 
 extern "C" {
 // Direct memory functions
+int32_t sceKernelAllocateMainDirectMemory(uint64_t size, uint64_t alignment, int32_t type, int64_t* phys_addr);
 int32_t sceKernelMapDirectMemory(uint64_t* addr, uint64_t size, int32_t prot, int32_t flags, int64_t phys_addr, uint64_t alignment);
 int32_t sceKernelMapNamedDirectMemory(uint64_t* addr, uint64_t size, int32_t prot, int32_t flags, int64_t phys_addr, uint64_t alignment, const char* name);
 int32_t sceKernelInternalMapDirectMemory(int32_t pool, uint64_t* addr, uint64_t size, int32_t prot, int32_t flags, int64_t phys_addr, uint64_t alignment);
 int32_t sceKernelInternalMapNamedDirectMemory(int32_t pool, uint64_t* addr, uint64_t size, int32_t prot, int32_t flags, int64_t phys_addr, uint64_t alignment,
                                               const char* name);
+int32_t sceKernelReleaseDirectMemory(int64_t phys_addr, uint64_t size);
 
 // Flexible memory functions
 int32_t sceKernelMapFlexibleMemory(uint64_t* addr, uint64_t size, int32_t prot, int32_t flags);
@@ -96,12 +98,15 @@ TEST_GROUP (MemoryTests) {
 
 // Test behavior that changed in firmware 1.70
 TEST(MemoryTests, FW170Test) {
+  int64_t phys_addr = 0;
+  int32_t result    = sceKernelAllocateMainDirectMemory(0x4000, 0, 0, &phys_addr);
+
   // Null address with MAP_FIXED is now prohibited from the libkernel side.
-  uint64_t addr   = 0;
-  int32_t  result = sceKernelMapDirectMemory(&addr, 0x4000, 3, 0x10, 0, 0);
+  uint64_t addr = 0;
+  result        = sceKernelMapDirectMemory(&addr, 0x4000, 3, 0x10, phys_addr, 0);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
-  result = sceKernelMapNamedDirectMemory(&addr, 0x4000, 3, 0x10, 0, 0, "name");
+  result = sceKernelMapNamedDirectMemory(&addr, 0x4000, 3, 0x10, phys_addr, 0, "name");
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   result = sceKernelMapFlexibleMemory(&addr, 0x4000, 3, 0x10);
@@ -117,10 +122,10 @@ TEST(MemoryTests, FW170Test) {
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // Note: Pool 1 should match sceKernelMapDirectMemory behavior.
-  result = sceKernelInternalMapDirectMemory(1, &addr, 0x4000, 3, 0x10, 0, 0);
+  result = sceKernelInternalMapDirectMemory(1, &addr, 0x4000, 3, 0x10, phys_addr, 0);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
-  result = sceKernelInternalMapNamedDirectMemory(1, &addr, 0x4000, 3, 0x10, 0, 0, "name");
+  result = sceKernelInternalMapNamedDirectMemory(1, &addr, 0x4000, 3, 0x10, phys_addr, 0, "name");
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // mmap and sceKernelMemoryPoolReserve both still reach the mmap syscall, but error there like fw 1.00 does.
@@ -129,29 +134,41 @@ TEST(MemoryTests, FW170Test) {
 
   result = sceKernelMemoryPoolReserve(addr, 0x4000, 0, 0x10, &addr);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  result = sceKernelReleaseDirectMemory(phys_addr, 0x4000);
+  CHECK_EQUAL(0, result);
 }
 
 // Test behavior that changed in firmware 2.50, to verify the changes aren't visible here.
 TEST(MemoryTests, FW250Test) {
+  int64_t phys_addr = 0;
+  int32_t result    = sceKernelAllocateMainDirectMemory(0x10000, 0, 0, &phys_addr);
+  CHECK_EQUAL(0, result);
+  uint64_t addr = 0;
+  result        = sceKernelMapDirectMemory(&addr, 0x10000, 3, 0, phys_addr, 0);
+  CHECK_EQUAL(0, result);
   // Starting with firmware 2.50, several direct memory functions that previously called sys_mmap will now use sceKernelMapDirectMemory2 instead.
   // This behavior will not be present here, which can be identified through overlapping dmem use.
 
   // All of these mappings would fail on firmware 2.50, but succeed on anything below that.
-  uint64_t addr   = 0;
-  int32_t  result = sceKernelMapDirectMemory(&addr, 0x10000, 3, 0, 0, 0);
+  result = sceKernelMapDirectMemory(&addr, 0x10000, 3, 0, phys_addr, 0);
   CHECK_EQUAL(0, result);
   result = sceKernelMunmap(addr, 0x10000);
   CHECK_EQUAL(0, result);
-  result = sceKernelMapNamedDirectMemory(&addr, 0x10000, 3, 0, 0, 0, "name");
+  result = sceKernelMapNamedDirectMemory(&addr, 0x10000, 3, 0, phys_addr, 0, "name");
   CHECK_EQUAL(0, result);
   result = sceKernelMunmap(addr, 0x10000);
   CHECK_EQUAL(0, result);
-  result = sceKernelInternalMapDirectMemory(1, &addr, 0x10000, 3, 0, 0, 0);
+  result = sceKernelInternalMapDirectMemory(1, &addr, 0x10000, 3, 0, phys_addr, 0);
   CHECK_EQUAL(0, result);
   result = sceKernelMunmap(addr, 0x10000);
   CHECK_EQUAL(0, result);
-  result = sceKernelInternalMapNamedDirectMemory(1, &addr, 0x10000, 3, 0, 0, 0, "name");
+  result = sceKernelInternalMapNamedDirectMemory(1, &addr, 0x10000, 3, 0, phys_addr, 0, "name");
   CHECK_EQUAL(0, result);
   result = sceKernelMunmap(addr, 0x10000);
+  CHECK_EQUAL(0, result);
+
+  // This will unmap all memory tied to this physical area.
+  result = sceKernelReleaseDirectMemory(phys_addr, 0x10000);
   CHECK_EQUAL(0, result);
 }
