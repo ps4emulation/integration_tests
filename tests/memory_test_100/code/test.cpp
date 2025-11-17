@@ -488,7 +488,7 @@ TEST(MemoryTests, MapMemoryTest) {
   CHECK_EQUAL(0, result);
 
   // Offset is where in the file we want to map.
-  // The file is ~500KB large, so any phys_addr produced by the above sceKernelAllocateMainDirectMemory call should work.
+  // The file is ~500KB large, so offset 0x10000 should be valid.
   result = sceKernelMmap(addr, 0x4000, 3, 0, fd, 0x10000, &addr_out);
   CHECK_EQUAL(0, result);
   result = sceKernelMunmap(addr_out, 0x4000);
@@ -1717,9 +1717,13 @@ TEST(MemoryTests, AllocateDirectMemoryTest) {
   // result = sceKernelAllocateDirectMemory(0, dmem_size, 0x20000, 0, 0, nullptr);
 
   // Now on to edge cases that don't cause immediate returns.
-  // This call fails with EAGAIN, since there's no direct memory in that area (libSceGnmDriver took it)
-  result = sceKernelAllocateDirectMemory(0, 0x10000, 0x10000, 0, 0, &phys_addr);
+  result = sceKernelAllocateDirectMemory(dmem_start, dmem_start + 0x10000, 0x10000, 0, 0, &phys_addr);
+  // This call fails with EAGAIN, since there's no direct memory in that area.
+  result = sceKernelAllocateDirectMemory(dmem_start, dmem_start + 0x10000, 0x10000, 0, 0, &phys_addr);
   CHECK_EQUAL(ORBIS_KERNEL_ERROR_EAGAIN, result);
+
+  result = sceKernelReleaseDirectMemory(dmem_start, 0x10000);
+  CHECK_EQUAL(0, result);
 
   // phys_addr will be aligned up to alignment.
   dmem_start = 0x110000;
