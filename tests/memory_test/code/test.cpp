@@ -6,11 +6,10 @@
 #include <string>
 #include <unistd.h>
 
-TEST_GROUP(MemoryTests) {void setup() {
-
-} void teardown() {
-
-}};
+TEST_GROUP (MemoryTests) {
+  void setup() {}
+  void teardown() {}
+};
 
 static void TestMemoryWrite(void* addr, uint64_t size) {
   // This function writes 0's to the requested memory area.
