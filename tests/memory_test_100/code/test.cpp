@@ -34,6 +34,7 @@ int32_t sceKernelMtypeprotect(uint64_t addr, uint64_t size, int32_t mtype, int32
 int32_t sceKernelQueryMemoryProtection(uint64_t addr, uint64_t* start, uint64_t* end, int32_t* prot);
 int32_t sceKernelVirtualQuery(uint64_t addr, int32_t flags, void* info, uint64_t info_size);
 int32_t sceKernelSetVirtualRangeName(uint64_t addr, uint64_t size, const char* name);
+int32_t sceKernelMlock(uint64_t addr, uint64_t size);
 
 // Memory pool functions
 int32_t sceKernelMemoryPoolExpand(int64_t start, int64_t end, uint64_t len, uint64_t alignment, int64_t* phys_addr);
@@ -205,6 +206,7 @@ void mem_scan() {
            _R[(info.prot >> 4) & 1], _W[(info.prot >> 5) & 1], info.mtype, _F[info.isFlexibleMemory], _D[info.isDirectMemory], _S[info.isStack],
            _P[info.isPooledMemory], _C[info.isCommitted], info.name);
   }
+  printf("\n");
 }
 
 TEST_GROUP (MemoryTests) {
@@ -742,71 +744,650 @@ TEST(MemoryTests, MapMemoryTest) {
   result = sceKernelMunmap(addr - 0x4000, 0x8000);
   CHECK_EQUAL(0, result);
 
+  /*
+  Notes about coalescing logic:
+    Coalescing is skipped entirely for memory pools.
+    Coalescing is checked for both the previous and next entries.
+    Only coalesce when protections, max_protections, inheritance, wired_count, vm_container, budget_type, cred, ext_flags, obj_entry_id, name all match.
+    Additionally, address and offset must be sequential.
+    Firmwares 5.50 and above also require the same calling address (anon_addr).
+  */
+
+  // To ensure the calling address (and thus, the name) properly match, define function lambdas which will perform memory behavior for this test.
+  auto reserve_func = [](uint64_t* addr, uint64_t size, int32_t flags) { return sceKernelReserveVirtualRange(addr, size, flags, 0); };
+
+  auto map_func = [](uint64_t* addr, uint64_t size, uint64_t offset, int32_t flags) {
+    int32_t result = 0;
+    if (offset != -1) {
+      // Assume offset is a physical address, allocate the requested physical space.
+      int64_t phys_addr = 0;
+      result            = sceKernelAllocateDirectMemory(offset, offset + size, size, 0, 0, &phys_addr);
+      // To be a helpful function, return errors.
+      if (result < 0) {
+        return result;
+      }
+      result = sceKernelMapDirectMemory(addr, size, 0x33, flags, phys_addr, 0);
+      if (result < 0) {
+        // Clean up allocated dmem before returning error.
+        sceKernelReleaseDirectMemory(phys_addr, size);
+      }
+    } else {
+      // Assume flex mapping.
+      result = sceKernelMapFlexibleMemory(addr, size, 0x33, flags);
+    }
+
+    return result;
+  };
+
+  auto unmap_func = [](uint64_t addr, uint64_t size) {
+    // We can use a VirtualQuery to see if this is flexible or direct
+    struct OrbisKernelVirtualQueryInfo {
+      uint64_t start;
+      uint64_t end;
+      int64_t  offset;
+      int32_t  prot;
+      int32_t  memory_type;
+      uint8_t  is_flexible  : 1;
+      uint8_t  is_direct    : 1;
+      uint8_t  is_stack     : 1;
+      uint8_t  is_pooled    : 1;
+      uint8_t  is_committed : 1;
+      char     name[32];
+    };
+    OrbisKernelVirtualQueryInfo info;
+    memset(&info, 0, sizeof(info));
+    int32_t result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+    if (info.is_direct == 1) {
+      // Just release the direct memory, which will unmap for us.
+      int64_t offset = (addr - info.start) + info.offset;
+      result         = sceKernelReleaseDirectMemory(offset, size);
+    } else {
+      result = sceKernelMunmap(addr, size);
+    }
+    return result;
+  };
+
   // Test memory coalescing behaviors.
-  // To avoid issues with memory names, use sceKernelSetVirtualRangeName
-  addr   = 0x300000000;
-  result = sceKernelReserveVirtualRange(&addr, 0x10000, 0x10, 0);
-  CHECK_EQUAL(0, result);
-  // Keep track of this address.
-  uint64_t addr1 = addr;
-  uint64_t addr2 = addr1 + 0x10000;
-  result         = sceKernelReserveVirtualRange(&addr2, 0x10000, 0x10, 0);
-  CHECK_EQUAL(0, result);
-  result = sceKernelSetVirtualRangeName(addr1, 0x20000, "mapping");
+  // For safety, start by reserving a 0xa0000 sized chunk of virtual memory
+  addr   = 0x2000000000;
+  result = sceKernelReserveVirtualRange(&addr, 0xa0000, 0, 0);
   CHECK_EQUAL(0, result);
 
-  // Memory areas don't seem to coalesce by default.
-  uint64_t start;
-  uint64_t end;
-  int32_t  prot;
-  result = sceKernelQueryMemoryProtection(addr1, &start, &end, &prot);
-  CHECK_EQUAL(0, result);
-  // Start should be addr1
-  CHECK_EQUAL(addr1, start);
-  // End should be addr2 + size.
-  CHECK_EQUAL(addr1 + 0x10000, end);
-  CHECK_EQUAL(0, prot);
-  result = sceKernelQueryMemoryProtection(addr2, &start, &end, &prot);
-  CHECK_EQUAL(0, result);
-  // Start should be addr1
-  CHECK_EQUAL(addr2, start);
-  // End should be addr2 + size.
-  CHECK_EQUAL(addr2 + 0x10000, end);
-  CHECK_EQUAL(0, prot);
-
-  // Unmap testing memory
-  result = sceKernelMunmap(addr1, 0x20000);
+  // To test coalescing in it's fullest, we'll map outside-in
+  uint64_t base_addr = addr;
+  result             = map_func(&addr, 0x20000, -1, 0x10);
   CHECK_EQUAL(0, result);
 
-  addr   = 0x300000000;
-  result = sceKernelReserveVirtualRange(&addr, 0x10000, 0x400010, 0);
-  CHECK_EQUAL(0, result);
-  // Keep track of this address.
-  addr1  = addr;
-  addr2  = addr1 + 0x10000;
-  result = sceKernelReserveVirtualRange(&addr2, 0x10000, 0x400010, 0);
-  CHECK_EQUAL(0, result);
-  result = sceKernelSetVirtualRangeName(addr1, 0x20000, "mapping");
+  addr   = base_addr + 0x80000;
+  result = map_func(&addr, 0x20000, -1, 0x10);
   CHECK_EQUAL(0, result);
 
-  // No coalesce prevents coalescing, not that it changes anything in this situation.
-  result = sceKernelQueryMemoryProtection(addr1, &start, &end, &prot);
+  addr   = base_addr + 0x20000;
+  result = map_func(&addr, 0x20000, -1, 0x10);
   CHECK_EQUAL(0, result);
-  // Start should be addr1
-  CHECK_EQUAL(addr1, start);
-  // End should be addr2 + size.
-  CHECK_EQUAL(addr1 + 0x10000, end);
-  CHECK_EQUAL(0, prot);
-  result = sceKernelQueryMemoryProtection(addr2, &start, &end, &prot);
-  CHECK_EQUAL(0, result);
-  // Start should be addr1
-  CHECK_EQUAL(addr2, start);
-  // End should be addr2 + size.
-  CHECK_EQUAL(addr2 + 0x10000, end);
-  CHECK_EQUAL(0, prot);
 
-  // Unmap testing memory
-  result = sceKernelMunmap(addr1, 0x20000);
+  addr   = base_addr + 0x60000;
+  result = map_func(&addr, 0x20000, -1, 0x10);
+  CHECK_EQUAL(0, result);
+
+  mem_scan();
+
+  // Check the state of the vmem areas.
+  // Due to old firmware behavior, none of these mappings should ever coalesce.
+  uint64_t start_addr;
+  uint64_t end_addr;
+  result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr, start_addr);
+  CHECK_EQUAL(base_addr + 0x20000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x20000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x20000, start_addr);
+  CHECK_EQUAL(base_addr + 0x40000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x60000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x60000, start_addr);
+  CHECK_EQUAL(base_addr + 0x80000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x80000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x80000, start_addr);
+  CHECK_EQUAL(base_addr + 0xa0000, end_addr);
+
+  // Test making a mapping in between these other mappings.
+  addr   = base_addr + 0x40000;
+  result = map_func(&addr, 0x20000, -1, 0x10);
+  CHECK_EQUAL(0, result);
+
+  mem_scan();
+
+  // Even there, mappings shouldn't coalesce.
+  result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr, start_addr);
+  CHECK_EQUAL(base_addr + 0x20000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x20000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x20000, start_addr);
+  CHECK_EQUAL(base_addr + 0x40000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x40000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x40000, start_addr);
+  CHECK_EQUAL(base_addr + 0x60000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x60000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x60000, start_addr);
+  CHECK_EQUAL(base_addr + 0x80000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x80000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x80000, start_addr);
+  CHECK_EQUAL(base_addr + 0xa0000, end_addr);
+
+  // Test using sceKernelSetVirtualRangeName, see if that merges anything.
+  result = sceKernelSetVirtualRangeName(base_addr, 0xa0000, "Mapping");
+  CHECK_EQUAL(0, result);
+
+  mem_scan();
+
+  // Even there, mappings shouldn't coalesce.
+  result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr, start_addr);
+  CHECK_EQUAL(base_addr + 0x20000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x20000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x20000, start_addr);
+  CHECK_EQUAL(base_addr + 0x40000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x40000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x40000, start_addr);
+  CHECK_EQUAL(base_addr + 0x60000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x60000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x60000, start_addr);
+  CHECK_EQUAL(base_addr + 0x80000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x80000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x80000, start_addr);
+  CHECK_EQUAL(base_addr + 0xa0000, end_addr);
+
+  // Test using sceKernelMprotect, see if anything merges.
+  result = sceKernelMprotect(base_addr, 0xa0000, 0x3);
+  CHECK_EQUAL(0, result);
+
+  mem_scan();
+
+  // Even there, mappings shouldn't coalesce.
+  result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr, start_addr);
+  CHECK_EQUAL(base_addr + 0x20000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x20000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x20000, start_addr);
+  CHECK_EQUAL(base_addr + 0x40000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x40000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x40000, start_addr);
+  CHECK_EQUAL(base_addr + 0x60000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x60000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x60000, start_addr);
+  CHECK_EQUAL(base_addr + 0x80000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x80000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x80000, start_addr);
+  CHECK_EQUAL(base_addr + 0xa0000, end_addr);
+
+  // Test using sceKernelMlock, see if anything merges.
+  result = sceKernelMlock(base_addr, 0xa0000);
+  CHECK_EQUAL(0, result);
+
+  mem_scan();
+
+  // Even there, mappings shouldn't coalesce.
+  result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr, start_addr);
+  CHECK_EQUAL(base_addr + 0x20000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x20000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x20000, start_addr);
+  CHECK_EQUAL(base_addr + 0x40000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x40000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x40000, start_addr);
+  CHECK_EQUAL(base_addr + 0x60000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x60000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x60000, start_addr);
+  CHECK_EQUAL(base_addr + 0x80000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x80000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x80000, start_addr);
+  CHECK_EQUAL(base_addr + 0xa0000, end_addr);
+
+  // Unmap testing memory.
+  result = unmap_func(base_addr, 0xa0000);
+  CHECK_EQUAL(0, result);
+
+  // Since that fails to be any form of help, try reserving memory instead.
+  addr   = base_addr;
+  result = reserve_func(&addr, 0x20000, 0x10);
+  CHECK_EQUAL(0, result);
+
+  addr   = base_addr + 0x80000;
+  result = reserve_func(&addr, 0x20000, 0x10);
+  CHECK_EQUAL(0, result);
+
+  addr   = base_addr + 0x20000;
+  result = reserve_func(&addr, 0x20000, 0x10);
+  CHECK_EQUAL(0, result);
+
+  addr   = base_addr + 0x60000;
+  result = reserve_func(&addr, 0x20000, 0x10);
+  CHECK_EQUAL(0, result);
+
+  mem_scan();
+
+  // Check the state of the vmem areas.
+  // Reserved areas coalesce fine.
+  // Since these are reserved memory areas, we need to use virtual query to validate them.
+  memset(&info, 0, sizeof(info));
+  result = sceKernelVirtualQuery(base_addr, 0, &info, sizeof(info));
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr, info.start);
+  CHECK_EQUAL(base_addr + 0x40000, info.end);
+
+  memset(&info, 0, sizeof(info));
+  result = sceKernelVirtualQuery(base_addr + 0x80000, 0, &info, sizeof(info));
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x60000, info.start);
+  CHECK_EQUAL(base_addr + 0xa0000, info.end);
+
+  // Test making a mapping in between these other mappings.
+  addr   = base_addr + 0x40000;
+  result = reserve_func(&addr, 0x20000, 0x10);
+  CHECK_EQUAL(0, result);
+
+  mem_scan();
+
+  // All reserved areas should coalesce together here.
+  memset(&info, 0, sizeof(info));
+  result = sceKernelVirtualQuery(base_addr, 0, &info, sizeof(info));
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr, info.start);
+  CHECK_EQUAL(base_addr + 0xa0000, info.end);
+
+  mem_scan();
+
+  // Unmap testing memory.
+  result = unmap_func(base_addr, 0xa0000);
+  CHECK_EQUAL(0, result);
+
+  // Now test with direct memory.
+  // With SDK version 1.00, this will not coalesce.
+  addr   = base_addr;
+  result = map_func(&addr, 0x20000, 0x100000, 0x10);
+  CHECK_EQUAL(0, result);
+
+  addr   = base_addr + 0x80000;
+  result = map_func(&addr, 0x20000, 0x180000, 0x10);
+  CHECK_EQUAL(0, result);
+
+  addr   = base_addr + 0x20000;
+  result = map_func(&addr, 0x20000, 0x120000, 0x10);
+  CHECK_EQUAL(0, result);
+
+  addr   = base_addr + 0x60000;
+  result = map_func(&addr, 0x20000, 0x160000, 0x10);
+  CHECK_EQUAL(0, result);
+
+  mem_scan();
+
+  result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr, start_addr);
+  CHECK_EQUAL(base_addr + 0x20000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x20000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x20000, start_addr);
+  CHECK_EQUAL(base_addr + 0x40000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x60000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x60000, start_addr);
+  CHECK_EQUAL(base_addr + 0x80000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x80000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x80000, start_addr);
+  CHECK_EQUAL(base_addr + 0xa0000, end_addr);
+
+  // Test making a mapping in between these other mappings.
+  addr   = base_addr + 0x40000;
+  result = map_func(&addr, 0x20000, 0x140000, 0x10);
+  CHECK_EQUAL(0, result);
+
+  mem_scan();
+
+  // Even there, mappings shouldn't coalesce.
+  result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr, start_addr);
+  CHECK_EQUAL(base_addr + 0x20000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x20000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x20000, start_addr);
+  CHECK_EQUAL(base_addr + 0x40000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x40000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x40000, start_addr);
+  CHECK_EQUAL(base_addr + 0x60000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x60000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x60000, start_addr);
+  CHECK_EQUAL(base_addr + 0x80000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x80000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x80000, start_addr);
+  CHECK_EQUAL(base_addr + 0xa0000, end_addr);
+
+  // Test using sceKernelSetVirtualRangeName, see if that merges anything.
+  result = sceKernelSetVirtualRangeName(base_addr, 0xa0000, "Mapping");
+  CHECK_EQUAL(0, result);
+
+  mem_scan();
+
+  // Even there, mappings shouldn't coalesce.
+  result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr, start_addr);
+  CHECK_EQUAL(base_addr + 0x20000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x20000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x20000, start_addr);
+  CHECK_EQUAL(base_addr + 0x40000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x40000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x40000, start_addr);
+  CHECK_EQUAL(base_addr + 0x60000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x60000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x60000, start_addr);
+  CHECK_EQUAL(base_addr + 0x80000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x80000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x80000, start_addr);
+  CHECK_EQUAL(base_addr + 0xa0000, end_addr);
+
+  // Test using sceKernelMprotect, see if anything merges.
+  result = sceKernelMprotect(base_addr, 0xa0000, 0x3);
+  CHECK_EQUAL(0, result);
+
+  mem_scan();
+
+  // Even there, mappings shouldn't coalesce.
+  result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr, start_addr);
+  CHECK_EQUAL(base_addr + 0x20000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x20000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x20000, start_addr);
+  CHECK_EQUAL(base_addr + 0x40000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x40000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x40000, start_addr);
+  CHECK_EQUAL(base_addr + 0x60000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x60000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x60000, start_addr);
+  CHECK_EQUAL(base_addr + 0x80000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x80000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x80000, start_addr);
+  CHECK_EQUAL(base_addr + 0xa0000, end_addr);
+
+  // Test using sceKernelMlock, see if anything merges.
+  result = sceKernelMlock(base_addr, 0xa0000);
+  CHECK_EQUAL(0, result);
+
+  mem_scan();
+
+  // Even there, mappings shouldn't coalesce.
+  result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr, start_addr);
+  CHECK_EQUAL(base_addr + 0x20000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x20000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x20000, start_addr);
+  CHECK_EQUAL(base_addr + 0x40000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x40000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x40000, start_addr);
+  CHECK_EQUAL(base_addr + 0x60000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x60000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x60000, start_addr);
+  CHECK_EQUAL(base_addr + 0x80000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x80000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x80000, start_addr);
+  CHECK_EQUAL(base_addr + 0xa0000, end_addr);
+
+  // Unmap testing memory.
+  result = unmap_func(base_addr, 0xa0000);
+  CHECK_EQUAL(0, result);
+
+  // Now test the NoCoalesce (0x400000) flag
+  base_addr = addr;
+  result    = map_func(&addr, 0x20000, -1, 0x400010);
+  CHECK_EQUAL(0, result);
+
+  addr   = base_addr + 0x80000;
+  result = map_func(&addr, 0x20000, -1, 0x400010);
+  CHECK_EQUAL(0, result);
+
+  addr   = base_addr + 0x20000;
+  result = map_func(&addr, 0x20000, -1, 0x400010);
+  CHECK_EQUAL(0, result);
+
+  addr   = base_addr + 0x60000;
+  result = map_func(&addr, 0x20000, -1, 0x400010);
+  CHECK_EQUAL(0, result);
+
+  mem_scan();
+
+  // Check the state of the vmem areas.
+  // Due to the NoCoalesce flag, these won't combine
+  result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr, start_addr);
+  CHECK_EQUAL(base_addr + 0x20000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x20000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x20000, start_addr);
+  CHECK_EQUAL(base_addr + 0x40000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x60000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x60000, start_addr);
+  CHECK_EQUAL(base_addr + 0x80000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x80000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x80000, start_addr);
+  CHECK_EQUAL(base_addr + 0xa0000, end_addr);
+
+  // Test making a mapping in between these other mappings.
+  addr   = base_addr + 0x40000;
+  result = map_func(&addr, 0x20000, -1, 0x400010);
+  CHECK_EQUAL(0, result);
+
+  mem_scan();
+
+  // Even there, mappings shouldn't coalesce.
+  result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr, start_addr);
+  CHECK_EQUAL(base_addr + 0x20000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x20000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x20000, start_addr);
+  CHECK_EQUAL(base_addr + 0x40000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x40000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x40000, start_addr);
+  CHECK_EQUAL(base_addr + 0x60000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x60000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x60000, start_addr);
+  CHECK_EQUAL(base_addr + 0x80000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x80000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x80000, start_addr);
+  CHECK_EQUAL(base_addr + 0xa0000, end_addr);
+
+  // Test using sceKernelSetVirtualRangeName, see if that merges anything.
+  result = sceKernelSetVirtualRangeName(base_addr, 0xa0000, "Mapping");
+  CHECK_EQUAL(0, result);
+
+  mem_scan();
+
+  // Even there, mappings shouldn't coalesce.
+  result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr, start_addr);
+  CHECK_EQUAL(base_addr + 0x20000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x20000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x20000, start_addr);
+  CHECK_EQUAL(base_addr + 0x40000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x40000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x40000, start_addr);
+  CHECK_EQUAL(base_addr + 0x60000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x60000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x60000, start_addr);
+  CHECK_EQUAL(base_addr + 0x80000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x80000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x80000, start_addr);
+  CHECK_EQUAL(base_addr + 0xa0000, end_addr);
+
+  // Test using sceKernelMprotect, see if anything merges.
+  result = sceKernelMprotect(base_addr, 0xa0000, 0x3);
+  CHECK_EQUAL(0, result);
+
+  mem_scan();
+
+  // Even there, mappings shouldn't coalesce.
+  result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr, start_addr);
+  CHECK_EQUAL(base_addr + 0x20000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x20000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x20000, start_addr);
+  CHECK_EQUAL(base_addr + 0x40000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x40000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x40000, start_addr);
+  CHECK_EQUAL(base_addr + 0x60000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x60000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x60000, start_addr);
+  CHECK_EQUAL(base_addr + 0x80000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x80000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x80000, start_addr);
+  CHECK_EQUAL(base_addr + 0xa0000, end_addr);
+
+  // Test using sceKernelMlock, see if anything merges.
+  result = sceKernelMlock(base_addr, 0xa0000);
+  CHECK_EQUAL(0, result);
+
+  mem_scan();
+
+  // Even there, mappings shouldn't coalesce.
+  result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr, start_addr);
+  CHECK_EQUAL(base_addr + 0x20000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x20000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x20000, start_addr);
+  CHECK_EQUAL(base_addr + 0x40000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x40000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x40000, start_addr);
+  CHECK_EQUAL(base_addr + 0x60000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x60000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x60000, start_addr);
+  CHECK_EQUAL(base_addr + 0x80000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x80000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x80000, start_addr);
+  CHECK_EQUAL(base_addr + 0xa0000, end_addr);
+
+  // Unmap testing memory.
+  result = unmap_func(base_addr, 0xa0000);
   CHECK_EQUAL(0, result);
 
   /**
@@ -1295,8 +1876,8 @@ TEST(MemoryTests, MapMemoryTest) {
   CHECK_EQUAL(0, result);
 
   // Overlapping phys addr works now.
-  addr2  = 0x200000000;
-  result = sceKernelMapDirectMemory2(&addr2, 0x4000, 0, 1, 0, phys_addr, 0);
+  uint64_t addr2 = 0x200000000;
+  result         = sceKernelMapDirectMemory2(&addr2, 0x4000, 0, 1, 0, phys_addr, 0);
   CHECK_EQUAL(0, result);
   result = sceKernelMunmap(addr2, 0x4000);
   CHECK_EQUAL(0, result);
@@ -2225,7 +2806,7 @@ TEST(MemoryTests, FlexibleTest) {
   result = sceKernelClose(fd);
   CHECK_EQUAL(0, result);
 
-  // Files in /data don't count towards the budget.
+  // Files in system folders like /data don't count towards the budget.
   fd = sceKernelOpen("/data/test_file.txt", 0x602, 0666);
   CHECK(fd > 0);
   memset(test_buf, 0, sizeof(test_buf));
@@ -2875,6 +3456,10 @@ TEST(MemoryTests, DirectTest) {
   // This should release both allocations.
   result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x20000);
   CHECK_EQUAL(0, result);
+}
+
+TEST(MemoryTests, ProtectTest) {
+  // Start by setting up a memory allocation to perform basic tests with.
 }
 
 // These tests are from my old homebrew, I'll probably rewrite some later.
