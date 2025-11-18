@@ -754,9 +754,9 @@ TEST(MemoryTests, MapMemoryTest) {
   */
 
   // To ensure the calling address (and thus, the name) properly match, define function lambdas which will perform memory behavior for this test.
-  auto reserve_func = [](uint64_t* addr, uint64_t size, int32_t flags) { return sceKernelReserveVirtualRange(addr, size, flags, 0); };
+  auto reserve_func = [](uint64_t* addr, uint64_t size, int32_t flags) __attribute__((optnone)) { return sceKernelReserveVirtualRange(addr, size, flags, 0); };
 
-  auto map_func = [](uint64_t* addr, uint64_t size, uint64_t offset, int32_t flags) {
+  auto map_func = [](uint64_t* addr, uint64_t size, uint64_t offset, int32_t flags) __attribute__((optnone)) {
     int32_t result = 0;
     if (offset != -1) {
       // Assume offset is a physical address, allocate the requested physical space.
@@ -779,7 +779,7 @@ TEST(MemoryTests, MapMemoryTest) {
     return result;
   };
 
-  auto unmap_func = [](uint64_t addr, uint64_t size) {
+  auto unmap_func = [](uint64_t addr, uint64_t size) __attribute__((optnone)) {
     // We can use a VirtualQuery to see if this is flexible or direct
     struct OrbisKernelVirtualQueryInfo {
       uint64_t start;
