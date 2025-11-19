@@ -3599,8 +3599,8 @@ TEST(MemoryTests, CoalescingTest) {
 
   // Now test the NoCoalesce (0x400000) flag
   // With this, even reserved memory will not coalesce.
-  base_addr = addr;
-  result    = map_func(&addr, 0x20000, -1, 0, 0x400111);
+  addr   = base_addr;
+  result = map_func(&addr, 0x20000, -1, 0, 0x400111);
   CHECK_EQUAL(0, result);
 
   addr   = base_addr + 0x80000;
