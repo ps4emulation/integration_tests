@@ -2901,6 +2901,8 @@ TEST(MemoryTests, CoalescingTest) {
   result = map_func(&addr, 0x20000, -1, 0, 0x1010);
   CHECK_EQUAL(0, result);
 
+  mem_scan();
+
   // None of these mappings should combine.
   uint64_t start_addr;
   uint64_t end_addr;
@@ -2928,6 +2930,8 @@ TEST(MemoryTests, CoalescingTest) {
   addr   = base_addr + 0x40000;
   result = map_func(&addr, 0x20000, -1, 0, 0x1010);
   CHECK_EQUAL(0, result);
+
+  mem_scan();
 
   // Nothing combines, we now have 5 separate areas.
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
@@ -2959,6 +2963,8 @@ TEST(MemoryTests, CoalescingTest) {
   result = sceKernelSetVirtualRangeName(base_addr, 0xa0000, "Mapping");
   CHECK_EQUAL(0, result);
 
+  mem_scan();
+
   // Nothing combines, all areas are named separately.
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
   CHECK_EQUAL(0, result);
@@ -2988,6 +2994,8 @@ TEST(MemoryTests, CoalescingTest) {
   // Test using sceKernelMprotect, see if anything merges.
   result = sceKernelMprotect(base_addr, 0xa0000, 0x3);
   CHECK_EQUAL(0, result);
+
+  mem_scan();
 
   // Nothing combines, all areas now have reduced prot.
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
@@ -3019,6 +3027,8 @@ TEST(MemoryTests, CoalescingTest) {
   result = sceKernelMlock(base_addr, 0xa0000);
   CHECK_EQUAL(0, result);
 
+  mem_scan();
+
   // Nothing changes.
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
   CHECK_EQUAL(0, result);
@@ -3049,6 +3059,8 @@ TEST(MemoryTests, CoalescingTest) {
   result = unmap_func(base_addr, 0xa0000);
   CHECK_EQUAL(0, result);
 
+  mem_scan();
+
   // Perform memory reservations instead.
   addr   = base_addr;
   result = map_func(&addr, 0x20000, -1, 0, 0x111);
@@ -3065,6 +3077,8 @@ TEST(MemoryTests, CoalescingTest) {
   addr   = base_addr + 0x60000;
   result = map_func(&addr, 0x20000, -1, 0, 0x111);
   CHECK_EQUAL(0, result);
+
+  mem_scan();
 
   // Check the state of the vmem areas.
   // Reserved areas coalesce normally.
@@ -3101,6 +3115,8 @@ TEST(MemoryTests, CoalescingTest) {
   result = map_func(&addr, 0x20000, -1, 0, 0x111);
   CHECK_EQUAL(0, result);
 
+  mem_scan();
+
   // All reserved areas should coalesce together here.
   memset(&info, 0, sizeof(info));
   result = sceKernelVirtualQuery(base_addr, 0, &info, sizeof(info));
@@ -3111,6 +3127,8 @@ TEST(MemoryTests, CoalescingTest) {
   // Unmap testing memory.
   result = unmap_func(base_addr, 0xa0000);
   CHECK_EQUAL(0, result);
+
+  mem_scan();
 
   // Perform memory reservations without MAP_SHARED. This appears to skip some coalescing logic?
   addr   = base_addr;
@@ -3128,6 +3146,8 @@ TEST(MemoryTests, CoalescingTest) {
   addr   = base_addr + 0x60000;
   result = map_func(&addr, 0x20000, -1, 0, 0x110);
   CHECK_EQUAL(0, result);
+
+  mem_scan();
 
   // Check the state of the vmem areas.
   // sceKernelQueryMemoryProtection returns errors with reserved memory, use sceKernelVirtualQuery instead.
@@ -3148,6 +3168,8 @@ TEST(MemoryTests, CoalescingTest) {
   result = map_func(&addr, 0x20000, -1, 0, 0x110);
   CHECK_EQUAL(0, result);
 
+  mem_scan();
+
   // Without MAP_SHARED, the new mapping only merges with the previous mapping, the later mapping remains unmerged.
   memset(&info, 0, sizeof(info));
   result = sceKernelVirtualQuery(base_addr, 0, &info, sizeof(info));
@@ -3164,6 +3186,8 @@ TEST(MemoryTests, CoalescingTest) {
   // Unmap testing memory.
   result = unmap_func(base_addr, 0xa0000);
   CHECK_EQUAL(0, result);
+
+  mem_scan();
 
   // Now test with direct memory.
   // With SDK version 1.00, this will not coalesce.
@@ -3182,6 +3206,8 @@ TEST(MemoryTests, CoalescingTest) {
   addr   = base_addr + 0x60000;
   result = map_func(&addr, 0x20000, -1, 0x160000, 0x10);
   CHECK_EQUAL(0, result);
+
+  mem_scan();
 
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
   CHECK_EQUAL(0, result);
@@ -3207,6 +3233,8 @@ TEST(MemoryTests, CoalescingTest) {
   addr   = base_addr + 0x40000;
   result = map_func(&addr, 0x20000, -1, 0x140000, 0x10);
   CHECK_EQUAL(0, result);
+
+  mem_scan();
 
   // Mappings remain separate.
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
@@ -3238,6 +3266,8 @@ TEST(MemoryTests, CoalescingTest) {
   result = sceKernelSetVirtualRangeName(base_addr, 0xa0000, "Mapping");
   CHECK_EQUAL(0, result);
 
+  mem_scan();
+
   // Mappings remain separate, name is applied to all.
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
   CHECK_EQUAL(0, result);
@@ -3267,6 +3297,8 @@ TEST(MemoryTests, CoalescingTest) {
   // Test using sceKernelMprotect, see if anything merges.
   result = sceKernelMprotect(base_addr, 0xa0000, 0x3);
   CHECK_EQUAL(0, result);
+
+  mem_scan();
 
   // Mappings remain separate, protection is applied to all.
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
@@ -3298,6 +3330,8 @@ TEST(MemoryTests, CoalescingTest) {
   result = sceKernelMlock(base_addr, 0xa0000);
   CHECK_EQUAL(0, result);
 
+  mem_scan();
+
   // Mappings remain separate.
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
   CHECK_EQUAL(0, result);
@@ -3328,6 +3362,8 @@ TEST(MemoryTests, CoalescingTest) {
   result = unmap_func(base_addr, 0xa0000);
   CHECK_EQUAL(0, result);
 
+  mem_scan();
+
   // Test coalescing with a file mmap.
   int32_t fd = sceKernelOpen("/download0/test_file.txt", 0x602, 0666);
   CHECK(fd > 0);
@@ -3353,6 +3389,8 @@ TEST(MemoryTests, CoalescingTest) {
   result = map_func(&addr, 0x4000, fd, 0x2c000, 0x10);
   CHECK_EQUAL(0, result);
 
+  mem_scan();
+
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
   CHECK_EQUAL(0, result);
   CHECK_EQUAL(base_addr, start_addr);
@@ -3377,6 +3415,8 @@ TEST(MemoryTests, CoalescingTest) {
   addr   = base_addr + 0x8000;
   result = map_func(&addr, 0x4000, fd, 0x28000, 0x10);
   CHECK_EQUAL(0, result);
+
+  mem_scan();
 
   // Mappings remain separate.
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
@@ -3408,6 +3448,8 @@ TEST(MemoryTests, CoalescingTest) {
   result = sceKernelSetVirtualRangeName(base_addr, 0x14000, "Mapping");
   CHECK_EQUAL(0, result);
 
+  mem_scan();
+
   // Mappings remain separate.
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
   CHECK_EQUAL(0, result);
@@ -3437,6 +3479,8 @@ TEST(MemoryTests, CoalescingTest) {
   // Test using sceKernelMprotect, see if anything merges.
   result = sceKernelMprotect(base_addr, 0x14000, 0x1);
   CHECK_EQUAL(0, result);
+
+  mem_scan();
 
   // Mappings remain separate, protection is applied to all.
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
@@ -3468,6 +3512,8 @@ TEST(MemoryTests, CoalescingTest) {
   result = sceKernelMlock(base_addr, 0x14000);
   CHECK_EQUAL(0, result);
 
+  mem_scan();
+
   // Mappings remain separate.
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
   CHECK_EQUAL(0, result);
@@ -3498,6 +3544,8 @@ TEST(MemoryTests, CoalescingTest) {
   result = unmap_func(base_addr, 0x14000);
   CHECK_EQUAL(0, result);
 
+  mem_scan();
+
   // file mmaps coalesce so long as MAP_SHARED is provided. Otherwise, they remain separate.
   // Test with MAP_SHARED here.
   addr   = base_addr;
@@ -3516,6 +3564,8 @@ TEST(MemoryTests, CoalescingTest) {
   result = map_func(&addr, 0x4000, fd, 0x2c000, 0x11);
   CHECK_EQUAL(0, result);
 
+  mem_scan();
+
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
   CHECK_EQUAL(0, result);
   CHECK_EQUAL(base_addr, start_addr);
@@ -3531,6 +3581,8 @@ TEST(MemoryTests, CoalescingTest) {
   result = map_func(&addr, 0x4000, fd, 0x28000, 0x11);
   CHECK_EQUAL(0, result);
 
+  mem_scan();
+
   // Mappings all combine together.
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
   CHECK_EQUAL(0, result);
@@ -3540,6 +3592,8 @@ TEST(MemoryTests, CoalescingTest) {
   // Unmap testing memory.
   result = unmap_func(base_addr, 0x14000);
   CHECK_EQUAL(0, result);
+
+  mem_scan();
 
   sceKernelClose(fd);
 
@@ -3560,6 +3614,8 @@ TEST(MemoryTests, CoalescingTest) {
   addr   = base_addr + 0x60000;
   result = map_func(&addr, 0x20000, -1, 0, 0x400111);
   CHECK_EQUAL(0, result);
+
+  mem_scan();
 
   // Check the state of the vmem areas.
   // Due to the NoCoalesce flag, these won't combine
@@ -3592,6 +3648,8 @@ TEST(MemoryTests, CoalescingTest) {
   addr   = base_addr + 0x40000;
   result = map_func(&addr, 0x20000, -1, 0, 0x111);
   CHECK_EQUAL(0, result);
+
+  mem_scan();
 
   // The mappings remain separate.
   memset(&info, 0, sizeof(info));
@@ -3627,6 +3685,8 @@ TEST(MemoryTests, CoalescingTest) {
   // Test using sceKernelSetVirtualRangeName, see if that merges anything.
   result = sceKernelSetVirtualRangeName(base_addr, 0xa0000, "Mapping");
   CHECK_EQUAL(0, result);
+
+  mem_scan();
 
   // Even there, mappings shouldn't coalesce.
   memset(&info, 0, sizeof(info));
