@@ -1,7 +1,6 @@
 #include "CppUTest/TestHarness.h"
 
 #include <list>
-#include <source_location>
 #include <stdio.h>
 #include <string>
 
@@ -157,7 +156,9 @@ const char* sceKernelGetFsSandboxRandomWord();
 #define ORBIS_KERNEL_ERROR_EICV            (0x80020060)
 #define ORBIS_KERNEL_ERROR_ENOPLAYGOENT    (0x80020061)
 
-void mem_scan(std::source_location location = std::source_location::current()) {
+#define mem_scan() _mem_scan(__FILE__, __LINE__)
+
+void _mem_scan(const char* file, int line) {
   // Helper method from red_prig for printing out memory map information.
   const char* _F = "_F";
   const char* _D = "_D";
@@ -182,7 +183,7 @@ void mem_scan(std::source_location location = std::source_location::current()) {
     char               name[32];
   };
 
-  printf("mem_scan[%s:%d]\n", location.file_name(), location.line());
+  printf("mem_scan[%s:%d]\n", file, line);
 
   uint64_t addr = {};
   int      ret  = {};
