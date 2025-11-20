@@ -112,7 +112,7 @@ jobs:
           name: ps4-integration-tests-no-pkg          
           path: |            
             ./build/install/*
-            !./build/install/*.pkg
+            !./build/install/**/*.pkg
             
       - name: Create release archive
         if: ${{ github.event_name == 'push' }}
