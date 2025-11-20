@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.24)
 
 set(PKG_TITLE "Therapist")
-set(PKG_VERSION "1.21")
+set(PKG_VERSION "1.22")
 set(PKG_TITLE_ID "TEST21370") # Should be unique across all tests in project
 set(PKG_CONTENT_ID "IV0000-${PKG_TITLE_ID}_00-THERAPIST0000000")
 set(PKG_DOWNLOADSIZE 0)

@@ -5,6 +5,8 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <fcntl.h>
+
 
 namespace FS_Test {
 namespace oi = OrbisInternals;
@@ -22,7 +24,8 @@ off_t GetSize(const char* path) {
 }
 
 int32_t touch(const char* path) {
-  return sceKernelClose(sceKernelOpen(path, 0x1 | 0x200 | 0x400, 0777));
+
+  return sceKernelClose(sceKernelOpen(path, O_RDWR | O_CREAT | O_TRUNC, 0777));
 }
 
 void Obliterate(const char* path) {

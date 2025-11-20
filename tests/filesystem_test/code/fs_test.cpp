@@ -5,6 +5,7 @@
 
 #include <chrono>
 #include <cstring>
+#include <fcntl.h>
 #include <filesystem>
 #include <sstream>
 #include <string>
@@ -320,7 +321,7 @@ void RunTests() {
   const char* case_insensitive_path_lower     = "/data/therapist/caseinsensitive.hwdp";
   const char* case_insensitive_path_upper     = "/DATA/THERAPIST/CASEINSENSITIVE.HWDP";
   const char* case_insensitive_path_upper_end = "/data/THERAPIST/CASEINSENSITIVE.HWDP";
-  TEST_CASE(sceKernelClose(creat(case_insensitive_path, 0777)) == 0, "Test file created", "Test file not created");
+  TEST_CASE(sceKernelClose(sceKernelOpen(case_insensitive_path, O_RDWR | O_TRUNC | O_CREAT, 0777)) == 0, "Test file created", "Test file not created");
 
   TEST_CASE(stat(case_insensitive_path, &st) == 0, "Data: 1:1 case sensitivity passed", "Data: Can't resolve 1:1 name", "( ", case_insensitive_path, " )");
   TEST_CASE(stat(case_insensitive_path_lower, &st) != 0 && errno == ENOENT, "Data: Data: Lowercase sensitivity passed", "Data: Resolved name in lowercase",
@@ -534,10 +535,32 @@ bool TestFileRW(const char* path, u16 to_test) {
 
   errno  = 0;
   int bw = sceKernelWrite(fd, writebuf, to_test);
-  TEST_CASE(bw == to_test, "Write succeded", "Write failed", "(", bw, " bytes written)", "( errno =", errno, ")")
+  TEST_CASE(bw == to_test, "Write succeded", "Write failed", "(", bw, " bytes written)", "( errno =", errno, ")");
+
+  struct OrbisKernelStat st {};
+
+  sceKernelFstat(fd, &st);
+  // device is always 0 in size
+  bool not_a_dev   = !S_ISCHR(st.st_mode);
+  auto target_size = st.st_size * not_a_dev;
 
   errno = 0;
-  TEST_CASE(sceKernelLseek(fd, 0, 0) == 0, "Lseek succeded", "Lseek failed", "( errno =", errno, ")")
+  TEST_CASE(int status = sceKernelLseek(fd, 10, 0); status == 10, "", "", "Lseek ORIGIN+10", "val =", status, "should be", 10, "( errno =", errno, ")");
+  errno = 0;
+  TEST_CASE(int status = sceKernelLseek(fd, 1, 1); status == 11, "", "", "Lseek CURRENT+1", "val =", status, "should be", 11, "( errno =", errno, ")");
+  errno = 0;
+  TEST_CASE(int status = sceKernelLseek(fd, -1, 1); status == 10, "", "", "Lseek CURRENT-1", "val =", status, "should be", 10, "( errno =", errno, ")");
+  errno = 0;
+  TEST_CASE(int status = sceKernelLseek(fd, 0, 2);
+            status == target_size, "", "", "Lseek END", "val =", status, "should be", target_size, "( errno =", errno, ")");
+  errno = 0;
+  TEST_CASE(int status = sceKernelLseek(fd, -1, 2); status == (target_size - (1 * not_a_dev)), "", "", "Lseek END-1", "val =", status, "should be",
+                                                    target_size - (1 * not_a_dev), "( errno =", errno, ")");
+  errno = 0;
+  TEST_CASE(int status = sceKernelLseek(fd, 1, 2);
+            status == (target_size + 1), "", "", "Lseek END+1", "val =", status, "should be", target_size + 1, "( errno =", errno, ")");
+  errno = 0;
+  TEST_CASE(int status = sceKernelLseek(fd, 0, 0); status == 0, "", "", "Lseek ORIGIN+0", "val =", status, "should be", 0, "( errno =", errno, ")");
 
   errno  = 0;
   int br = sceKernelRead(fd, readbuf, to_test);
