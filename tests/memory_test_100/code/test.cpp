@@ -156,7 +156,7 @@ const char* sceKernelGetFsSandboxRandomWord();
 #define ORBIS_KERNEL_ERROR_EICV            (0x80020060)
 #define ORBIS_KERNEL_ERROR_ENOPLAYGOENT    (0x80020061)
 
-void mem_scan() {
+void mem_scan(std::source_location location = std::source_location::current()) {
   // Helper method from red_prig for printing out memory map information.
   const char* _F = "_F";
   const char* _D = "_D";
@@ -180,6 +180,8 @@ void mem_scan() {
     uint8_t            isCommitted      : 1;
     char               name[32];
   };
+
+  printf("mem_scan[%s:%d]\n", location.file_name(), location.line());
 
   uint64_t addr = {};
   int      ret  = {};
