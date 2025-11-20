@@ -87,7 +87,7 @@ jobs:
       - name: Configure project
         run: |
           echo "::add-matcher::.github/matchers/cmake.json"
-          cmake -S. -Bbuild -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-19 -DCMAKE_CXX_COMPILER=clang++-19 -DOO_PS4_LINKER_SUFFIX=-19 -DOO_PS4_NOPKG=${{ github.event_name == 'push' && 'OFF' || 'ON' }}
+          cmake -S. -Bbuild -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-19 -DCMAKE_CXX_COMPILER=clang++-19 -DOO_PS4_LINKER_SUFFIX=-19 -DOO_PS4_NOPKG=${{ 'OFF' }}
 
       - name: Build project
         env:
@@ -104,7 +104,16 @@ jobs:
           name: ps4-integration-tests
           path: |
             ./build/install/*
-
+            
+      - name: Upload project artifacts (no pkg)
+        uses: actions/upload-artifact@v4        
+        if: ${{ github.event_name != 'push' }}        
+        with:          
+          name: ps4-integration-tests-no-pkg          
+          path: |            
+            ./build/install/*
+            !./build/install/**/*.pkg
+            
       - name: Create release archive
         if: ${{ github.event_name == 'push' }}
         working-directory: ./build/install/
