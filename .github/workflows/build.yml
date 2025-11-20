@@ -96,13 +96,13 @@ jobs:
           echo "::add-matcher::.github/matchers/cmake.json"
           echo "::add-matcher::.github/matchers/compilers.json"
           cmake --build build -j4
-          
+
       - name: Upload project artifacts
         uses: actions/upload-artifact@v4
         if: ${{ github.event_name != 'push' }}
         with:
           name: ps4-integration-tests
-          path: |           
+          path: |
             ./build/install/*
             
       - name: Upload project artifacts (no pkg)
