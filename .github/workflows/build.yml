@@ -18,18 +18,6 @@ on:
   push:
     tags:
       - 'v*'
-  workflow_dispatch:
-    inputs:
-      branch:
-        description: 'Branch to build'
-        required: true
-        default: 'main'
-        type: choice
-      is_no_pkg:
-        description: 'Build no PKG'
-        required: false
-        default: true
-        type: boolean
   
 jobs:
   formatting-check:
@@ -98,7 +86,7 @@ jobs:
       - name: Configure project
         run: |
           echo "::add-matcher::.github/matchers/cmake.json"
-          cmake -S. -Bbuild -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-19 -DCMAKE_CXX_COMPILER=clang++-19 -DOO_PS4_LINKER_SUFFIX=-19 -DOO_PS4_NOPKG=${{ (github.event_name == 'push' || github.event.inputs.is_no_pkg == 'true') && 'OFF' || 'ON' }}
+          cmake -S. -Bbuild -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-19 -DCMAKE_CXX_COMPILER=clang++-19 -DOO_PS4_LINKER_SUFFIX=-19 -DOO_PS4_NOPKG=${{'OFF' || 'ON' }}
 
       - name: Build project
         env:
