@@ -19,7 +19,7 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
-  
+
 jobs:
   formatting-check:
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository }}
@@ -97,12 +97,12 @@ jobs:
           echo "::add-matcher::.github/matchers/compilers.json"
           cmake --build build -j4
           
-      - name: Upload project artifacts (full)
-        uses: actions/upload-artifact@v4        
-        if: ${{ github.event_name != 'push' }}        
-        with:          
-          name: ps4-integration-tests          
-          path: |            
+      - name: Upload project artifacts
+        uses: actions/upload-artifact@v4
+        if: ${{ github.event_name != 'push' }}
+        with:
+          name: ps4-integration-tests
+          path: |           
             ./build/install/*
             
       - name: Upload project artifacts (no pkg)
@@ -112,7 +112,7 @@ jobs:
           name: ps4-integration-tests-no-pkg          
           path: |            
             ./build/install/*
-            !./build/install/**/*.pkg
+            !./build/install/*.pkg
             
       - name: Create release archive
         if: ${{ github.event_name == 'push' }}
