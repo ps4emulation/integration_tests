@@ -1,12 +1,11 @@
 #include "fs_test.h"
 
+#include <fcntl.h>
 #include <orbis/UserService.h>
 #include <orbis/libkernel.h>
 #include <sstream>
 #include <string>
 #include <vector>
-#include <fcntl.h>
-
 
 namespace FS_Test {
 namespace oi = OrbisInternals;
@@ -335,6 +334,8 @@ void PrintStatInfo(const OrbisKernelStat* info) {
 }
 
 bool StatCmp(const OrbisKernelStat* lhs, const OrbisKernelStat* rhs) {
+  if (nullptr == rhs) return true;
+
   bool was_error = false;
   was_error |= lhs->st_mode != rhs->st_mode;
   was_error |= lhs->st_nlink != rhs->st_nlink;
@@ -344,8 +345,6 @@ bool StatCmp(const OrbisKernelStat* lhs, const OrbisKernelStat* rhs) {
   was_error |= lhs->st_blocks != rhs->st_blocks;
   was_error |= lhs->st_blksize != rhs->st_blksize;
   was_error |= lhs->st_flags != rhs->st_flags;
-
-  if (!was_error) return true;
 
   Log("---- OrbisKernelStat comparsion ----");
   Log("st_mode   \tLHS = ", right("0" + to_octal(lhs->st_mode), 7), "\t|\tRHS = ", right("0" + to_octal(rhs->st_mode), 7));
@@ -357,7 +356,7 @@ bool StatCmp(const OrbisKernelStat* lhs, const OrbisKernelStat* rhs) {
   Log("st_blocks \tLHS = ", right(STR(lhs->st_blocks), 7), "\t|\tRHS = ", right(STR(rhs->st_blocks), 7));
   Log("st_blksize\tLHS = ", right(STR(lhs->st_blksize), 7), "\t|\tRHS = ", right(STR(rhs->st_blksize), 7));
   Log("st_flags  \tLHS = ", right(STR(lhs->st_flags), 7), "\t|\tRHS = ", right(STR(rhs->st_flags), 7));
-  return false;
+  return !was_error;
 }
 
 s8 GetDir(fs::path path, fs::path leaf, oi::PfsDirent* dirent) {

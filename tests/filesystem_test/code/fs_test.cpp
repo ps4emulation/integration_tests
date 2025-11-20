@@ -111,8 +111,8 @@ void RunTests() {
   TEST_CASE(TestStat("/dev/deci_stderr", &DumpedConstants::stat_root_dev_deci_stderr), "Test complete", "Stat comparsion failed");
   TEST_CASE(TestLStat("/dev/deci_stderr"), "Test complete", "Stat comparsion failed");
   TEST_CASE(TestStat("/dev/deci_stdout", &DumpedConstants::stat_root_dev_deci_stdout), "Test complete", "Stat comparsion failed");
-  TEST_CASE(TestStat("/dev/stdin", &DumpedConstants::stat_root_dev_stdin), "Test complete [stat should fail]", "Stat comparsion failed");
-  TEST_CASE(!TestStat("/dev/stdout", &DumpedConstants::stat_root_dev_stdout), "Test complete", "Stat worked on /dev/stdout");
+  TEST_CASE(TestStat("/dev/stdin", nullptr), "Test complete [stat should fail]", "Stat comparsion failed");
+  TEST_CASE(TestStat("/dev/stdout", nullptr), "Test complete", "Stat worked on /dev/stdout");
   TEST_CASE(!TestLStat("/dev/stdout"), "Test complete", "LStat worked on /dev/stdout");
   TEST_CASE(TestStat("/dev/random", &DumpedConstants::stat_root_dev_random), "Test complete", "Stat comparsion failed");
   TEST_CASE(TestStat("/dev/urandom", &DumpedConstants::stat_root_dev_urandom), "Test complete", "Stat comparsion failed");
@@ -160,24 +160,24 @@ void RunTests() {
     // No modifiers
     // O_RDONLY
     TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_ro.txt", O_RDONLY, "O_RDONLY");
-              _errno == 2, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 2, ")");
+              _errno == ENOENT, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 2, ")");
     // O_WRONLY
     TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_wo.txt", O_WRONLY, "O_WRONLY");
-              _errno == 2, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 2, ")");
+              _errno == ENOENT, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 2, ")");
     // O_RDWR
     TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_rw.txt", O_RDWR, "O_RDWR");
-              _errno == 2, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 2, ")");
+              _errno == ENOENT, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 2, ")");
     // O_RDONLY | O_WRONLY | O_RDWR
     TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_rowo.txt", O_RDONLY | O_WRONLY | O_RDWR, "O_RDONLY | O_WRONLY | O_RDWR");
-              _errno == 22, "Pass (EINVAL)", "Fail", "( errno =", _errno, "should be =", 22, ")");
+              _errno == EINVAL, "Pass (EINVAL)", "Fail", "( errno =", _errno, "should be =", 22, ")");
 
     // O_TRUNC
     TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_rot.txt", O_TRUNC, "O_RDONLY | O_TRUNC");
-              _errno == 2, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 2, ")");
+              _errno == ENOENT, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 2, ")");
     TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_wot.txt", O_WRONLY | O_TRUNC, "O_WRONLY | O_TRUNC");
-              _errno == 2, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 2, ")");
+              _errno == ENOENT, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 2, ")");
     TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_rwt.txt", O_RDWR | O_TRUNC, "O_RDWR | O_TRUNC");
-              _errno == 2, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 2, ")");
+              _errno == ENOENT, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 2, ")");
     // O_CREAT
     // these create a file
     TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_roc.txt", O_RDONLY | O_CREAT, "O_RDONLY | O_CREAT");
@@ -196,25 +196,25 @@ void RunTests() {
               _errno == 17, "Pass (EEXIST)", "Fail", "( errno =", _errno, "should be =", 17, ")");
     // O_APPEND
     TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_roa.txt", O_RDONLY | O_APPEND, "O_RDONLY | O_APPEND");
-              _errno == 2, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 2, ")");
+              _errno == ENOENT, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 2, ")");
     TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_woa.txt", O_WRONLY | O_APPEND, "O_WRONLY | O_APPEND");
-              _errno == 2, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 2, ")");
+              _errno == ENOENT, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 2, ")");
     TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_rwa.txt", O_RDWR | O_APPEND, "O_RDWR | O_APPEND");
-              _errno == 2, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 2, ")");
+              _errno == ENOENT, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 2, ")");
     // O_TRUNC | O_APPEND
     TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_rota.txt", O_RDONLY | O_TRUNC | O_APPEND, "O_RDONLY | O_TRUNC | O_APPEND");
-              _errno == 2, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 2, ")");
+              _errno == ENOENT, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 2, ")");
     TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_wota.txt", O_WRONLY | O_TRUNC | O_APPEND, "O_WRONLY | O_TRUNC | O_APPEND");
-              _errno == 2, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 2, ")");
+              _errno == ENOENT, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 2, ")");
     TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_rwta.txt", O_RDWR | O_TRUNC | O_APPEND, "O_RDWR | O_TRUNC | O_APPEND");
-              _errno == 2, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 2, ")");
+              _errno == ENOENT, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 2, ")");
     // O_DIRECTORY (nonexistent file is a target)
     TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_dir_ro.txt", O_RDONLY | O_DIRECTORY, "O_RDONLY | O_DIRECTORY");
-              _errno == 2, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 2, ")");
+              _errno == ENOENT, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 2, ")");
     TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_dir_wo.txt", O_WRONLY | O_DIRECTORY, "O_WRONLY | O_DIRECTORY");
-              _errno == 2, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 2, ")");
+              _errno == ENOENT, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 2, ")");
     TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_dir_rw.txt", O_RDWR | O_DIRECTORY, "O_RDWR | O_DIRECTORY");
-              _errno == 2, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 2, ")");
+              _errno == ENOENT, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 2, ")");
     // O_DIRECTORY (existing directory)
     TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/", 0 | 0x20000, "O_RDONLY | O_DIRECTORY");
               _errno == 0, "Pass", "Fail", "( errno =", _errno, "should be =", 0, ")");
@@ -242,13 +242,13 @@ void RunTests() {
               _errno == 30, "Pass (EROFS)", "Fail", "( errno =", _errno, "should be =", 30, ")");
     // O_RDONLY | O_WRONLY | O_RDWR
     TEST_CASE(int _errno = TestOpenFlags("/app0/assets/misc/file.txt", 0 | 0x1 | 0x2, "O_RDONLY | O_WRONLY | O_RDWR");
-              _errno == 22, "Pass (EINVAL)", "Fail", "( errno =", _errno, "should be =", 22, ")");
+              _errno == EINVAL, "Pass (EINVAL)", "Fail", "( errno =", _errno, "should be =", 22, ")");
     // Obviously bad ones, flags are irrelevant
     TEST_CASE(int _errno = TestOpenFlags("assets/misc/file.txt", 0, "O_RDONLY");
-              _errno == 22, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 22, ")");
+              _errno == EINVAL, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 22, ")");
     TEST_CASE(int _errno = TestOpenFlags("./assets/misc/file.txt", 0, "O_RDONLY");
-              _errno == 22, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 22, ")");
-    TEST_CASE(int _errno = TestOpenFlags("", 0, "O_RDONLY"); _errno == 22, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 22, ")");
+              _errno == EINVAL, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 22, ")");
+    TEST_CASE(int _errno = TestOpenFlags("", 0, "O_RDONLY"); _errno == EINVAL, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 22, ")");
 
     Log("RO+Truncate is undefined. Testing");
     int __fd = sceKernelOpen("/data/therapist/tmp_open/nonexistent_rot.txt", 0x1 | 0x200 | 0x400, 0777);
@@ -257,6 +257,14 @@ void RunTests() {
     TestOpenFlags("/data/therapist/tmp_open/nonexistent_rot.txt", 0 | 0x400, "O_RDONLY | O_TRUNC");
     TEST_CASE(GetSize("/data/therapist/tmp_open/nonexistent_rot.txt") == 0, "RO+TRUNC got truncated to 0", "RO+TRUNC untouched");
   }
+
+  TEST_CASE(int status = sceKernelOpen(
+                "/data/therapist/"
+                "thisisafilewithaverylongnameForrealthisfileissupposedtohaveareallylongnameforthistestcaseOtherwisewewontknowifitworkscorrectlyItsnotusedoftenb"
+                "utcanbeproblematicasthisbreaksdirentswhichcanstoreonly255charactersincludingnullterminatorThisisthelastsentence.goodluck",
+                O_RDONLY, 0777);
+            errno == ENAMETOOLONG, "File name too long detected", "Didn't detect file name >255 characters", "( errno =", errno, ", should be", ENAMETOOLONG,
+            ")");
 
   //
 
