@@ -79,45 +79,97 @@ TEST(MemoryTests, FW350Test) {
   addresses.clear();
 }
 
-// Test behavior that changed in firmware 7.00
-TEST(MemoryTests, FW700Test) {
-  // Starting with firmware 7.00, vm_map_set_name_str received a fix to a vm_map_simplify_entry call
-  // This difference should not be visible here, since this homebrew compiles with SDK version 3.50
-
-  // Test memory coalescing behaviors.
-  // To avoid issues with memory names, use sceKernelSetVirtualRangeName
-  uint64_t addr   = 0x300000000;
-  int32_t  result = sceKernelReserveVirtualRange(&addr, 0x10000, 0x10, 0);
-  CHECK_EQUAL(0, result);
-  // Keep track of this address.
-  uint64_t addr1 = addr;
-  uint64_t addr2 = addr1 + 0x10000;
-  result         = sceKernelReserveVirtualRange(&addr2, 0x10000, 0x10, 0);
-  CHECK_EQUAL(0, result);
-  result = sceKernelSetVirtualRangeName(addr1, 0x20000, "mapping");
+// Test behavior that changed in firmware 5.50, the differences will not be present here.
+TEST(MemoryTests, FW550Test) {
+  // Starting with firmware 5.50, memory mappings performed with different call addresses will now merge.
+  int64_t phys_addr;
+  int32_t result = sceKernelAllocateDirectMemory(0x100000, 0x1a0000, 0xa0000, 0, 0, &phys_addr);
   CHECK_EQUAL(0, result);
 
-  // The two memory areas should not combine by default.
-  uint64_t start;
-  uint64_t end;
-  int32_t  prot;
-  result = sceKernelQueryMemoryProtection(addr1, &start, &end, &prot);
+  uint64_t base_addr = 0x2000000000;
+  uint64_t addr      = base_addr;
+  result             = sceKernelMapDirectMemory(&addr, 0x20000, 0x33, 0x10, 0x100000, 0);
   CHECK_EQUAL(0, result);
-  // Start should be addr1
-  CHECK_EQUAL(addr1, start);
-  // End should be addr2 + size.
-  CHECK_EQUAL(addr1 + 0x10000, end);
-  CHECK_EQUAL(0, prot);
 
-  result = sceKernelQueryMemoryProtection(addr2, &start, &end, &prot);
+  addr   = base_addr + 0x80000;
+  result = sceKernelMapDirectMemory(&addr, 0x20000, 0x33, 0x10, 0x180000, 0);
   CHECK_EQUAL(0, result);
-  // Start should be addr1
-  CHECK_EQUAL(addr2, start);
-  // End should be addr2 + size.
-  CHECK_EQUAL(addr2 + 0x10000, end);
-  CHECK_EQUAL(0, prot);
 
-  // Unmap testing memory
-  result = sceKernelMunmap(addr1, 0x20000);
+  addr   = base_addr + 0x20000;
+  result = sceKernelMapDirectMemory(&addr, 0x20000, 0x33, 0x10, 0x120000, 0);
+  CHECK_EQUAL(0, result);
+
+  addr   = base_addr + 0x60000;
+  result = sceKernelMapDirectMemory(&addr, 0x20000, 0x33, 0x10, 0x160000, 0);
+  CHECK_EQUAL(0, result);
+
+  addr   = base_addr + 0x40000;
+  result = sceKernelMapDirectMemory(&addr, 0x20000, 0x33, 0x10, 0x140000, 0);
+  CHECK_EQUAL(0, result);
+
+  mem_scan();
+
+  // There should be five observable mappings.
+  uint64_t start_addr;
+  uint64_t end_addr;
+  result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr, start_addr);
+  CHECK_EQUAL(base_addr + 0x20000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x20000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x20000, start_addr);
+  CHECK_EQUAL(base_addr + 0x40000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x40000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x40000, start_addr);
+  CHECK_EQUAL(base_addr + 0x60000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x60000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x60000, start_addr);
+  CHECK_EQUAL(base_addr + 0x80000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x80000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x80000, start_addr);
+  CHECK_EQUAL(base_addr + 0xa0000, end_addr);
+
+  // Now call sceKernelSetVirtualRangeName
+  result = sceKernelSetVirtualRangeName(base_addr, 0xa0000, "Mapping");
+  CHECK_EQUAL(0, result);
+
+  mem_scan();
+
+  // Because of the older SDK version, the mappings remain separate.
+  result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr, start_addr);
+  CHECK_EQUAL(base_addr + 0x20000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x20000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x20000, start_addr);
+  CHECK_EQUAL(base_addr + 0x40000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x40000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x40000, start_addr);
+  CHECK_EQUAL(base_addr + 0x60000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x60000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x60000, start_addr);
+  CHECK_EQUAL(base_addr + 0x80000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0x80000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0x80000, start_addr);
+  CHECK_EQUAL(base_addr + 0xa0000, end_addr);
+
+  // Unmap testing memory.
+  result = sceKernelReleaseDirectMemory(phys_addr, 0xa0000);
   CHECK_EQUAL(0, result);
 }
