@@ -19,7 +19,18 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
-
+    inputs:
+      branch:
+        description: 'Branch to build'
+        required: true
+        default: 'main'
+        type: string
+      is_push_event:
+        description: 'Treat as push event (disable NOPKG)'
+        required: false
+        default: false
+        type: boolean
+  
 jobs:
   formatting-check:
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository }}
@@ -87,7 +98,7 @@ jobs:
       - name: Configure project
         run: |
           echo "::add-matcher::.github/matchers/cmake.json"
-          cmake -S. -Bbuild -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-19 -DCMAKE_CXX_COMPILER=clang++-19 -DOO_PS4_LINKER_SUFFIX=-19 -DOO_PS4_NOPKG=${{ github.event_name == 'push' && 'OFF' || 'ON' }}
+          cmake -S. -Bbuild -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-19 -DCMAKE_CXX_COMPILER=clang++-19 -DOO_PS4_LINKER_SUFFIX=-19 -DOO_PS4_NOPKG=${{ (github.event_name == 'push' || github.event.inputs.is_push_event == 'true') && 'OFF' || 'ON' }}
 
       - name: Build project
         env:
