@@ -2,11 +2,10 @@
 
 #pragma clang diagnostic ignored "-Wformat"
 
-TEST_GROUP(InsertqTests) {void setup() {
-
-} void teardown() {
-
-}};
+TEST_GROUP (InsertqTests) {
+  void setup() {}
+  void teardown() {}
+};
 
 extern "C" {
 void longs_equal(long a, long b) { // export
