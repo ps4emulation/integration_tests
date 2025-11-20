@@ -87,7 +87,7 @@ jobs:
       - name: Configure project
         run: |
           echo "::add-matcher::.github/matchers/cmake.json"
-          cmake -S. -Bbuild -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-19 -DCMAKE_CXX_COMPILER=clang++-19 -DOO_PS4_LINKER_SUFFIX=-19 -DOO_PS4_NOPKG=${{'OFF' || 'ON' }}
+          cmake -S. -Bbuild -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-19 -DCMAKE_CXX_COMPILER=clang++-19 -DOO_PS4_LINKER_SUFFIX=-19 -DOO_PS4_NOPKG=${{ github.event_name == 'push' && 'OFF' || 'ON' }}
 
       - name: Build project
         env:
@@ -96,8 +96,8 @@ jobs:
           echo "::add-matcher::.github/matchers/cmake.json"
           echo "::add-matcher::.github/matchers/compilers.json"
           cmake --build build -j4
-
-      - name: Upload project artifacts        
+          
+      - name: Upload project artifacts (full)
         uses: actions/upload-artifact@v4        
         if: ${{ github.event_name != 'push' }}        
         with:          
@@ -105,21 +105,24 @@ jobs:
           path: |            
             ./build/install/*
             
-      - name: Create release archive (full version)
+      - name: Upload project artifacts (no pkg)
+        uses: actions/upload-artifact@v4        
+        if: ${{ github.event_name != 'push' }}        
+        with:          
+          name: ps4-integration-tests-no-pkg          
+          path: |            
+            ./build/install/*
+            !./build/install/**/*.pkg
+            
+      - name: Create release archive
         if: ${{ github.event_name == 'push' }}
         working-directory: ./build/install/
         run: 7z a -tzip ../ps4_tests.zip ./*
-        
-      - name: Create release archive (no pkg files)
+
+      - name: Release stuff
+        uses: softprops/action-gh-release@v2
         if: ${{ github.event_name == 'push' }}
-        working-directory: ./build/install/
-        run: 7z a -tzip ../ps4_tests_no_pkg.zip ./* -xr!*.pkg
-        
-      - name: Release stuff        
-        uses: softprops/action-gh-release@v2        
-        if: ${{ github.event_name == 'push' }}        
-        with:          
-          make_latest: true          
-          files: |            
+        with:
+          make_latest: true
+          files: |
             ./build/ps4_tests.zip
-            ./build/ps4_tests_no_pkg.zip
