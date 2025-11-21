@@ -2620,7 +2620,7 @@ TEST(MemoryTests, CoalescingTest) {
   */
   // Define lambdas for memory calls. This (along with the optnone attribute) is needed to ensure a static calling address
   // (which is one of the things checked when merging vmem areas).
-  auto map_func = [](uint64_t* addr, uint64_t size, int32_t fd, uint64_t offset, int32_t flags) __attribute__((optnone)) {
+  auto map_func = [](uint64_t* addr, uint64_t size, int32_t fd, uint64_t offset, int32_t flags, int32_t prot = 0x33) __attribute__((optnone)) {
     // This function is effectively an mmap wrapper, except for the case of mapping direct memory.
     if (fd == -1 && offset != 0) {
       // Used for a direct memory mapping, use sceKernelAllocateDirectMemory and sceKernelMapDirectMemory.
@@ -2635,10 +2635,9 @@ TEST(MemoryTests, CoalescingTest) {
       }
       return result;
     }
-    int32_t prot = 0x33;
     if (fd != -1) {
       // Can't GPU map files.
-      prot = 0x3;
+      prot &= 0x3;
     }
     if ((flags & 0x100) == 1) {
       // Reserved memory has no protection, mmap just ignores prot.
@@ -3391,6 +3390,53 @@ TEST(MemoryTests, CoalescingTest) {
   CHECK_EQUAL(0, result);
 
   mem_scan();
+
+  // Check behavior for read-only file mmaps without MAP_SHARED
+  // This case also merges, like how MAP_SHARED behaves.
+  addr   = base_addr;
+  result = map_func(&addr, 0x4000, fd, 0x20000, 0x10, 0x1);
+  CHECK_EQUAL(0, result);
+
+  addr   = base_addr + 0x10000;
+  result = map_func(&addr, 0x4000, fd, 0x30000, 0x10, 0x1);
+  CHECK_EQUAL(0, result);
+
+  addr   = base_addr + 0x4000;
+  result = map_func(&addr, 0x4000, fd, 0x24000, 0x10, 0x1);
+  CHECK_EQUAL(0, result);
+
+  addr   = base_addr + 0xc000;
+  result = map_func(&addr, 0x4000, fd, 0x2c000, 0x10, 0x1);
+  CHECK_EQUAL(0, result);
+
+  mem_scan();
+
+  result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr, start_addr);
+  CHECK_EQUAL(base_addr + 0x8000, end_addr);
+
+  result = sceKernelQueryMemoryProtection(base_addr + 0xc000, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr + 0xc000, start_addr);
+  CHECK_EQUAL(base_addr + 0x14000, end_addr);
+
+  // Test making a mapping in between these other mappings.
+  addr   = base_addr + 0x8000;
+  result = map_func(&addr, 0x4000, fd, 0x28000, 0x10, 0x1);
+  CHECK_EQUAL(0, result);
+
+  mem_scan();
+
+  // Mappings all combine together.
+  result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
+  CHECK_EQUAL(0, result);
+  CHECK_EQUAL(base_addr, start_addr);
+  CHECK_EQUAL(base_addr + 0x14000, end_addr);
+
+  // Unmap testing memory.
+  result = unmap_func(base_addr, 0x14000);
+  CHECK_EQUAL(0, result);
 
   sceKernelClose(fd);
 
