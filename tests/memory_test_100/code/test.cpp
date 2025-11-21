@@ -3596,7 +3596,6 @@ TEST(MemoryTests, ProtectTest) {
    *
    * If addr is less than the start of the vmem_map, it is set to the vmem_map start.
    * If end is less than start, start is set to end.
-   * Neither of these edge cases are really testable, since the start of the vmem_map is occupied by the eboot.bin, and size is always interpreted as unsigned.
    *
    * mprotect will split and coalesce memory areas as applicable, using the same simplify code tested in CoalescingTest.
    * This means that most merging edge cases tested there are applicable here, though for the sake of brevity I will only test some necessary ones.
