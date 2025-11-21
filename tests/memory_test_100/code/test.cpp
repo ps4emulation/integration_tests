@@ -500,7 +500,7 @@ TEST(MemoryTests, MapMemoryTest) {
   };
 
   OrbisKernelVirtualQueryInfo info;
-  memset(&info, 0, sizeof(info));
+  info = {};
 
   addr = 0x200000000;
   // VirtualQuery with flags 0 means there must be a mapping here.
@@ -1095,7 +1095,7 @@ TEST(MemoryTests, DeviceFileTest) {
   };
 
   OrbisKernelVirtualQueryInfo info;
-  memset(&info, 0, sizeof(info));
+  info = {};
 
   // If the memory unmapped properly, VirtualQuery will return EACCES.
   result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
@@ -1170,7 +1170,7 @@ TEST(MemoryTests, DeviceFileTest) {
   LONGS_EQUAL(0, result);
 
   // Run sceKernelVirtualQuery to make sure memory area is as expected.
-  memset(&info, 0, sizeof(info));
+  info   = {};
   result = sceKernelVirtualQuery(output_addr, 0, &info, sizeof(info));
   LONGS_EQUAL(0, result);
   LONGS_EQUAL(output_addr, info.start);
@@ -1700,7 +1700,7 @@ TEST(MemoryTests, FileMappingTest) {
   };
 
   OrbisKernelVirtualQueryInfo info;
-  memset(&info, 0, sizeof(info));
+  info   = {};
   result = sceKernelVirtualQuery(output_addr, 0, &info, sizeof(info));
   LONGS_EQUAL(0, result);
   LONGS_EQUAL(start_addr, info.start);
@@ -1775,7 +1775,7 @@ TEST(MemoryTests, FileMappingTest) {
   LONGS_EQUAL(0, result);
 
   // Run sceKernelVirtualQuery to make sure memory area is as expected.
-  memset(&info, 0, sizeof(info));
+  info   = {};
   result = sceKernelVirtualQuery(output_addr, 0, &info, sizeof(info));
   LONGS_EQUAL(0, result);
   LONGS_EQUAL(output_addr, info.start);
@@ -1811,7 +1811,7 @@ TEST(MemoryTests, FileMappingTest) {
   LONGS_EQUAL(0, result);
 
   // Run sceKernelVirtualQuery to make sure memory area is as expected.
-  memset(&info, 0, sizeof(info));
+  info   = {};
   result = sceKernelVirtualQuery(output_addr, 0, &info, sizeof(info));
   LONGS_EQUAL(0, result);
   LONGS_EQUAL(output_addr - 0x1000, info.start);
@@ -2008,7 +2008,7 @@ TEST(MemoryTests, FlexibleTest) {
   };
 
   OrbisKernelVirtualQueryInfo info;
-  memset(&info, 0, sizeof(info));
+  info   = {};
   result = sceKernelVirtualQuery(addr_out, 0, &info, sizeof(info));
   LONGS_EQUAL(0, result);
   LONGS_EQUAL(addr_out, info.start);
@@ -2178,7 +2178,7 @@ TEST(MemoryTests, DirectTest) {
   };
 
   OrbisKernelVirtualQueryInfo info;
-  memset(&info, 0, sizeof(info));
+  info   = {};
   result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
   LONGS_EQUAL(0, result);
   LONGS_EQUAL(addr, info.start);
@@ -2662,7 +2662,7 @@ TEST(MemoryTests, CoalescingTest) {
       char     name[32];
     };
     OrbisKernelVirtualQueryInfo info;
-    memset(&info, 0, sizeof(info));
+    info           = {};
     int32_t result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
     if (info.is_direct == 1) {
       // Just release the direct memory, which will unmap for us.
@@ -2894,13 +2894,13 @@ TEST(MemoryTests, CoalescingTest) {
   };
 
   OrbisKernelVirtualQueryInfo info;
-  memset(&info, 0, sizeof(info));
+  info   = {};
   result = sceKernelVirtualQuery(base_addr, 0, &info, sizeof(info));
   LONGS_EQUAL(0, result);
   LONGS_EQUAL(base_addr, info.start);
   LONGS_EQUAL(base_addr + 0x40000, info.end);
 
-  memset(&info, 0, sizeof(info));
+  info   = {};
   result = sceKernelVirtualQuery(base_addr + 0x80000, 0, &info, sizeof(info));
   LONGS_EQUAL(0, result);
   LONGS_EQUAL(base_addr + 0x60000, info.start);
@@ -2914,7 +2914,7 @@ TEST(MemoryTests, CoalescingTest) {
   mem_scan();
 
   // All reserved areas should coalesce together here.
-  memset(&info, 0, sizeof(info));
+  info   = {};
   result = sceKernelVirtualQuery(base_addr, 0, &info, sizeof(info));
   LONGS_EQUAL(0, result);
   LONGS_EQUAL(base_addr, info.start);
@@ -2947,13 +2947,13 @@ TEST(MemoryTests, CoalescingTest) {
 
   // Check the state of the vmem areas.
   // sceKernelQueryMemoryProtection returns errors with reserved memory, use sceKernelVirtualQuery instead.
-  memset(&info, 0, sizeof(info));
+  info   = {};
   result = sceKernelVirtualQuery(base_addr, 0, &info, sizeof(info));
   LONGS_EQUAL(0, result);
   LONGS_EQUAL(base_addr, info.start);
   LONGS_EQUAL(base_addr + 0x40000, info.end);
 
-  memset(&info, 0, sizeof(info));
+  info   = {};
   result = sceKernelVirtualQuery(base_addr + 0x80000, 0, &info, sizeof(info));
   LONGS_EQUAL(0, result);
   LONGS_EQUAL(base_addr + 0x60000, info.start);
@@ -2967,13 +2967,13 @@ TEST(MemoryTests, CoalescingTest) {
   mem_scan();
 
   // Without MAP_SHARED, the new mapping only merges with the previous mapping, the later mapping remains unmerged.
-  memset(&info, 0, sizeof(info));
+  info   = {};
   result = sceKernelVirtualQuery(base_addr, 0, &info, sizeof(info));
   LONGS_EQUAL(0, result);
   LONGS_EQUAL(base_addr, info.start);
   LONGS_EQUAL(base_addr + 0x60000, info.end);
 
-  memset(&info, 0, sizeof(info));
+  info   = {};
   result = sceKernelVirtualQuery(base_addr + 0x60000, 0, &info, sizeof(info));
   LONGS_EQUAL(0, result);
   LONGS_EQUAL(base_addr + 0x60000, info.start);
@@ -3462,25 +3462,25 @@ TEST(MemoryTests, CoalescingTest) {
 
   // Check the state of the vmem areas.
   // Due to the NoCoalesce flag, these won't combine
-  memset(&info, 0, sizeof(info));
+  info   = {};
   result = sceKernelVirtualQuery(base_addr, 0, &info, sizeof(info));
   LONGS_EQUAL(0, result);
   LONGS_EQUAL(base_addr, info.start);
   LONGS_EQUAL(base_addr + 0x20000, info.end);
 
-  memset(&info, 0, sizeof(info));
+  info   = {};
   result = sceKernelVirtualQuery(base_addr + 0x20000, 0, &info, sizeof(info));
   LONGS_EQUAL(0, result);
   LONGS_EQUAL(base_addr + 0x20000, info.start);
   LONGS_EQUAL(base_addr + 0x40000, info.end);
 
-  memset(&info, 0, sizeof(info));
+  info   = {};
   result = sceKernelVirtualQuery(base_addr + 0x60000, 0, &info, sizeof(info));
   LONGS_EQUAL(0, result);
   LONGS_EQUAL(base_addr + 0x60000, info.start);
   LONGS_EQUAL(base_addr + 0x80000, info.end);
 
-  memset(&info, 0, sizeof(info));
+  info   = {};
   result = sceKernelVirtualQuery(base_addr + 0x80000, 0, &info, sizeof(info));
   LONGS_EQUAL(0, result);
   LONGS_EQUAL(base_addr + 0x80000, info.start);
@@ -3495,31 +3495,31 @@ TEST(MemoryTests, CoalescingTest) {
   mem_scan();
 
   // The mappings remain separate.
-  memset(&info, 0, sizeof(info));
+  info   = {};
   result = sceKernelVirtualQuery(base_addr, 0, &info, sizeof(info));
   LONGS_EQUAL(0, result);
   LONGS_EQUAL(base_addr, info.start);
   LONGS_EQUAL(base_addr + 0x20000, info.end);
 
-  memset(&info, 0, sizeof(info));
+  info   = {};
   result = sceKernelVirtualQuery(base_addr + 0x20000, 0, &info, sizeof(info));
   LONGS_EQUAL(0, result);
   LONGS_EQUAL(base_addr + 0x20000, info.start);
   LONGS_EQUAL(base_addr + 0x40000, info.end);
 
-  memset(&info, 0, sizeof(info));
+  info   = {};
   result = sceKernelVirtualQuery(base_addr + 0x40000, 0, &info, sizeof(info));
   LONGS_EQUAL(0, result);
   LONGS_EQUAL(base_addr + 0x40000, info.start);
   LONGS_EQUAL(base_addr + 0x60000, info.end);
 
-  memset(&info, 0, sizeof(info));
+  info   = {};
   result = sceKernelVirtualQuery(base_addr + 0x60000, 0, &info, sizeof(info));
   LONGS_EQUAL(0, result);
   LONGS_EQUAL(base_addr + 0x60000, info.start);
   LONGS_EQUAL(base_addr + 0x80000, info.end);
 
-  memset(&info, 0, sizeof(info));
+  info   = {};
   result = sceKernelVirtualQuery(base_addr + 0x80000, 0, &info, sizeof(info));
   LONGS_EQUAL(0, result);
   LONGS_EQUAL(base_addr + 0x80000, info.start);
@@ -3532,31 +3532,31 @@ TEST(MemoryTests, CoalescingTest) {
   mem_scan();
 
   // Even there, mappings shouldn't coalesce.
-  memset(&info, 0, sizeof(info));
+  info   = {};
   result = sceKernelVirtualQuery(base_addr, 0, &info, sizeof(info));
   LONGS_EQUAL(0, result);
   LONGS_EQUAL(base_addr, info.start);
   LONGS_EQUAL(base_addr + 0x20000, info.end);
 
-  memset(&info, 0, sizeof(info));
+  info   = {};
   result = sceKernelVirtualQuery(base_addr + 0x20000, 0, &info, sizeof(info));
   LONGS_EQUAL(0, result);
   LONGS_EQUAL(base_addr + 0x20000, info.start);
   LONGS_EQUAL(base_addr + 0x40000, info.end);
 
-  memset(&info, 0, sizeof(info));
+  info   = {};
   result = sceKernelVirtualQuery(base_addr + 0x40000, 0, &info, sizeof(info));
   LONGS_EQUAL(0, result);
   LONGS_EQUAL(base_addr + 0x40000, info.start);
   LONGS_EQUAL(base_addr + 0x60000, info.end);
 
-  memset(&info, 0, sizeof(info));
+  info   = {};
   result = sceKernelVirtualQuery(base_addr + 0x60000, 0, &info, sizeof(info));
   LONGS_EQUAL(0, result);
   LONGS_EQUAL(base_addr + 0x60000, info.start);
   LONGS_EQUAL(base_addr + 0x80000, info.end);
 
-  memset(&info, 0, sizeof(info));
+  info   = {};
   result = sceKernelVirtualQuery(base_addr + 0x80000, 0, &info, sizeof(info));
   LONGS_EQUAL(0, result);
   LONGS_EQUAL(base_addr + 0x80000, info.start);
@@ -3569,8 +3569,8 @@ TEST(MemoryTests, CoalescingTest) {
 
 TEST(MemoryTests, ProtectTest) {
   // Set up some basic memory this test can use.
-  // Allocate a decent chunk of direct memory
-  int64_t  dmem_start = 0x100000;
+  // Allocate a decent chunk of direct memory, this area should be free, and isn't touched by other tests.
+  int64_t  dmem_start = 0x300000;
   uint64_t dmem_size  = 0x100000;
   int64_t  dmem_phys_addr;
   int32_t  result = sceKernelAllocateDirectMemory(dmem_start, dmem_start + dmem_size, dmem_size, 0, 0, &dmem_phys_addr);
@@ -3579,8 +3579,8 @@ TEST(MemoryTests, ProtectTest) {
   LONGS_EQUAL(dmem_start, dmem_phys_addr);
 
   // Reserve a chunk of memory for testing with.
-  // Use a fixed base address that should be free, this is the same address utilized by the coalescing tests.
-  uint64_t vmem_start = 0x2000000000;
+  // Use a fixed base address that should be free.
+  uint64_t vmem_start = 0x4000000000;
   uint64_t vmem_size  = 0x1000000;
   uint64_t addr       = vmem_start;
   result              = sceKernelReserveVirtualRange(&addr, vmem_size, 0x10, 0);
@@ -3588,11 +3588,131 @@ TEST(MemoryTests, ProtectTest) {
   // MAP_FIXED should ensure this is the same.
   LONGS_EQUAL(vmem_start, addr);
 
-  // Memory reserved through sceKernelReserveVirtualRange (or mmap with MAP_VOID) restricts prot to 0.
-  // sceKernelMprotect will still succeed, but nothing will change in the vmem area.
+  /**
+   * Decompilation notes:
+   * Address and size are aligned to the nearest page. Address is aligned down, while size is aligned up.
+   * Technically size is aligned through the formula (addr & page_mask) + page_mask + size & page_mask.
+   * Due to the order of operations, this is effectively equivalent to aligning size up.
+   *
+   * If addr is less than the start of the vmem_map, it is set to the vmem_map start.
+   * If end is less than start, start is set to end.
+   * Neither of these edge cases are really testable, since the start of the vmem_map is occupied by the eboot.bin, and size is always interpreted as unsigned.
+   *
+   * mprotect will split and coalesce memory areas as applicable, using the same simplify code tested in CoalescingTest.
+   * This means that most merging edge cases tested there are applicable here, though for the sake of brevity I will only test some necessary ones.
+   * mprotect will error if called on free memory?
+   */
+
+  // Start with some "normal" behavior to ensure edge case tests are based on valid calls.
+  // Map some direct memory, give it write permissions, write some test data, then protect with read and read that data back.
+  // This will test basic functionality of mprotect.
+  addr   = vmem_start + 0x20000;
+  result = sceKernelMapDirectMemory(&addr, 0x20000, 0, 0x10, dmem_start + 0x20000, 0);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, vmem_start + 0x20000);
+
+  // For simplicity, use sceKernelVirtualQuery to validate prot.
+  // While not necessary for most mappings, some tests will need it.
+  struct OrbisKernelVirtualQueryInfo {
+    uint64_t start;
+    uint64_t end;
+    int64_t  offset;
+    int32_t  prot;
+    int32_t  memory_type;
+    uint8_t  is_flexible  : 1;
+    uint8_t  is_direct    : 1;
+    uint8_t  is_stack     : 1;
+    uint8_t  is_pooled    : 1;
+    uint8_t  is_committed : 1;
+    char     name[32];
+  };
+
+  // Verify the lack of protection.
+  OrbisKernelVirtualQueryInfo info = {};
+  result                           = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(0, info.prot);
+
+  // Use mprotect to set the full memory area to read-write.
+  // A future edge case to test is that read is forcibly appended to write mappings (which is why I'm using read-write prot here).
+  result = sceKernelMprotect(addr, 0x20000, 0x3);
+  LONGS_EQUAL(0, result);
+
+  info   = {};
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(3, info.prot);
+
+  // Now write to the new memory area.
+  const char* test_str = "This is a test of memory writing";
+  strcpy((char*)addr, test_str);
+
+  // Now protect with no prot
+  result = sceKernelMprotect(addr, 0x20000, 0x0);
+  LONGS_EQUAL(0, result);
+
+  info   = {};
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(0, info.prot);
+
+  // Now protect with read prot.
+  // If protection is handled properly, the string I copied should still be there.
+  result = sceKernelMprotect(addr, 0x20000, 0x1);
+  LONGS_EQUAL(0, result);
+
+  info   = {};
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(1, info.prot);
+
+  // Now read from the memory
+  result = strcmp((char*)addr, test_str);
+  LONGS_EQUAL(0, result);
+
+  // Replace mapped memory with a reserved area before proceeding.
+  // Since this compiles with SDK ver 1.00, the only way to ensure all mappings coalesce into one is to re-reserve the whole area.
+  addr   = vmem_start;
+  result = sceKernelReserveVirtualRange(&addr, vmem_size, 0x10, 0);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(vmem_start, addr);
+
+  // Memory reserved through sceKernelReserveVirtualRange (or mmap with MAP_VOID) restricts maximum prot to 0.
+  // That said, this call still splits the vmem area.
+  result = sceKernelMprotect(addr + 0x20000, 0x20000, 0x1);
+  LONGS_EQUAL(0, result);
+
+  info   = {};
+  result = sceKernelVirtualQuery(addr + 0x20000, 0, &info, sizeof(info));
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr + 0x20000, info.start);
+  LONGS_EQUAL(addr + 0x40000, info.end);
+  LONGS_EQUAL(0, info.prot);
+
+  // Note: Attempting to give GPU protections to a reserved memory area causes a full system crash.
+  // Only uncomment this if you're willing to unplug your PS4 just to get it to shut off
+  // result = sceKernelMprotect(addr, 0x20000, 0x10);
+
+  // See if this re-coalesces the area?
+  result = sceKernelMprotect(addr + 0x20000, 0x20000, 0x0);
+  LONGS_EQUAL(0, result);
+
+  info   = {};
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + vmem_size, info.end);
+  LONGS_EQUAL(0, info.prot);
+
+  /**
+   * Other tests to perform:
+   * Make sure executable memory is handled properly
+   * Direct memory can't be mapped with executable prot, but you can protect it with executable prot.
+   * Protect on free memory
+   */
 
   // Clean up memory used.
-  result = sceKernelMunmap(addr, vmem_size);
+  result = sceKernelMunmap(vmem_start, vmem_size);
   LONGS_EQUAL(0, result);
   result = sceKernelCheckedReleaseDirectMemory(dmem_start, dmem_size);
   LONGS_EQUAL(0, result);
