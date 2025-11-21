@@ -1,12 +1,12 @@
 #include "fs_test.h"
 
 #include "fs_constants.h"
-#include "orbis/UserService.h"
 
 #include <chrono>
 #include <cstring>
 #include <fcntl.h>
 #include <filesystem>
+#include <orbis/UserService.h>
 #include <sstream>
 #include <string>
 
@@ -752,7 +752,7 @@ bool TestDirEnts() {
   // // compare before and after opening
 
   // LogFilesystem("Creating a new file...\n");
-  // sceKernelClose(sceKernelOpen("/data/therapist/tmp/2created_after_opening", (int32_t)OpenFlags::Create, 644));
+  // sceKernelClose(sceKernelOpen("/data/therapist/tmp/2created_after_opening", (int32_t)OpenFlags::Create, 0644));
 
   // sceKernelLseek(tmpfd, 0, 0);
   // result = sceKernelGetdirentries(tmpfd, buffer, BUFFER_SIZE, nullptr);
@@ -765,7 +765,7 @@ bool TestDirEnts() {
 
   // {
   //     LogFilesystemStatus("Opening directory again after creating a file\n", Test::TEST);
-  //     tmpfd = sceKernelOpen("/data/therapist/tmp_dirent", 0, 511);
+  //     tmpfd = sceKernelOpen("/data/therapist/tmp_dirent", 0, 0777);
   //     LogFilesystemStatus("Printed entries (%lu bytes)\n", ASSERT(printContents(prebuffer, result)), result);
   //     sceKernelClose(tmpfd);
   // }
@@ -775,13 +775,13 @@ bool TestDirEnts() {
   // char tmpname[24]{0};
   // const char *tftemplate = "/data/therapist/tmp/XD%d";
 
-  // tmpfd = sceKernelOpen("/data/therapist/tmp_dirent", 0, 644);
+  // tmpfd = sceKernelOpen("/data/therapist/tmp_dirent", 0, 0644);
   // result = sceKernelGetdirentries(tmpfd, prebuffer, BUFFER_SIZE, nullptr);
 
   // for (u16 idx = 0; idx < TESTFILES; idx++)
   // {
   //     snprintf(tmpname, 24, tftemplate, idx);
-  //     sceKernelClose(sceKernelOpen(tmpname, (int32_t)OpenFlags::Create, 644));
+  //     sceKernelClose(sceKernelOpen(tmpname, (int32_t)OpenFlags::Create, 0644));
   // }
 
   // for (u16 midx = 0; midx < 10; midx++)

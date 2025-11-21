@@ -45,13 +45,26 @@ void Obliterate(const char* path) {
     const char* pp = it->c_str();
 
     // see what sticks
+
+    struct OrbisKernelStat st {0};
+
     errno = 0;
-    if (0 == sceKernelUnlink(pp)) continue;
+    sceKernelStat(pp, &st);
+    if (2 == errno)
+      // not found, good
+      continue;
+
     errno = 0;
-    if (0 == sceKernelRmdir(pp)) continue;
-    LogError("Cannot remove [", pp, "] ( errno =", errno, ")");
+    if (S_ISDIR(st.st_mode)) sceKernelRmdir(pp);
+    if (S_ISREG(st.st_mode)) sceKernelUnlink(pp);
+
+    if (errno != 0) LogError("Cannot remove [", pp, "] ( errno =", errno, ")");
   }
-  if (0 != sceKernelRmdir(path)) LogError("Cannot remove [", path, "] ( errno =", errno, ")");
+
+  errno = 0;
+  sceKernelRmdir(path);
+
+  if (!(ENOENT == errno || 0 == errno)) LogError("Cannot remove [", path, "] ( errno =", errno, ")");
 
   LogSuccess(">> rm -rf [", path, "] <<");
   return;
@@ -151,7 +164,7 @@ u16 dumpDirRecursive(fs::path path, int depth) {
 
   //   Log(depDir.c_str(), path_str.c_str());
 
-  s32 fd = sceKernelOpen(path.c_str(), 0, 511);
+  s32 fd = sceKernelOpen(path.c_str(), 0, 0777);
   if (fd < 0) {
     Log("\t\t\t\t", depEnt.c_str(), "//NO ACCESS//");
     return 0;
@@ -369,7 +382,7 @@ s8 GetDir(fs::path path, fs::path leaf, oi::PfsDirent* dirent) {
   s64         diff;
   bool        found {false};
 
-  int fd = sceKernelOpen(path.c_str(), 0, 511);
+  int fd = sceKernelOpen(path.c_str(), 0, 0777);
   if (fd < 0) {
     LogError("[PFS] Cannot open [", target_file_name, "]");
     return -1;
@@ -442,7 +455,7 @@ s8 GetDir(fs::path path, fs::path leaf, oi::FolderDirent* dirent) {
   s64         diff;
   bool        found {false};
 
-  int fd = sceKernelOpen(path.c_str(), 0, 511);
+  int fd = sceKernelOpen(path.c_str(), 0, 0777);
   if (fd < 0) {
     LogError("[Normal] Cannot open [", target_file_name, "]");
     return -1;
