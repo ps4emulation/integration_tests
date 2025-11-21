@@ -21,7 +21,7 @@ TEST_GROUP (MemoryTests) {
 TEST(MemoryTests, MapMemoryTest) {
   // These tests assume a 16KB page size, so check getpagesize to validate this.
   int32_t page_size = getpagesize();
-  CHECK_EQUAL(0x4000, page_size);
+  LONGS_EQUAL(0x4000, page_size);
 
   // Most memory functions in libkernel rely on sceKernelMmap,
   // leading to overlap in some edge cases.
@@ -29,26 +29,26 @@ TEST(MemoryTests, MapMemoryTest) {
   // If size is less than page size, or size is not page aligned, return EINVAL
   uint64_t addr   = 0;
   int32_t  result = sceKernelMapFlexibleMemory(&addr, 0x5000, 0, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
   result = sceKernelMapFlexibleMemory(&addr, 0x2000, 0, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // Protection should be a bitwise-or'ed combination of flags. It can be zero,
   // or include Read (1) | Write (2) | Execute (4) | GpuRead (0x10) | GpuWrite (0x20).
   // If a value is inputted for protection that doesn't match those flags, it returns EINVAL.
   result = sceKernelMapFlexibleMemory(&addr, 0x4000, 8, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
   result = sceKernelMapFlexibleMemory(&addr, 0x4000, 64, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // The only permitted flags are: Fixed (0x10) | NoOverwrite (0x80) | NoCoalesce (0x400000)
   // If flags is non-zero, and includes bits not contained in that list, then it returns EINVAL.
   result = sceKernelMapFlexibleMemory(&addr, 0x4000, 0, 1);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
   result = sceKernelMapFlexibleMemory(&addr, 0x4000, 0, 0x100);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
   result = sceKernelMapFlexibleMemory(&addr, 0x4000, 0, 0x2000);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   /**
    * Other sceKernelMapFlexibleMemory Notes:
@@ -60,11 +60,11 @@ TEST(MemoryTests, MapMemoryTest) {
   // Now for edge cases in sceKernelMapDirectMemory. This function allows flags:
   // Fixed (0x10) | NoOverwrite (0x80) | DmemCompat (0x400) | Sanitizer (0x200000) | NoCoalesce (0x400000)
   result = sceKernelMapDirectMemory(&addr, 0x4000, 0, 1, 0, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
   result = sceKernelMapDirectMemory(&addr, 0x4000, 0, 0x100, 0, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
   result = sceKernelMapDirectMemory(&addr, 0x4000, 0, 0x2000, 0, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   /**
    * Notes:
@@ -79,9 +79,9 @@ TEST(MemoryTests, MapMemoryTest) {
   // If a value is inputted for protection that doesn't match those flags, it returns EINVAL.
   // Note that the execute flag causes mmap to fail, that will come up during later edge case tests.
   result = sceKernelMapDirectMemory(&addr, 0x4000, 8, 0, 0, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
   result = sceKernelMapDirectMemory(&addr, 0x4000, 64, 0, 0, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   /**
    * Note:
@@ -96,31 +96,31 @@ TEST(MemoryTests, MapMemoryTest) {
   int64_t dmem_size  = sceKernelGetDirectMemorySize();
   int64_t phys_addr  = 0;
   result             = sceKernelAllocateDirectMemory(dmem_start, dmem_size, 0x8000, 0x4000, 0, &phys_addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Input address, length, phys_addr, and alignment all must be page-aligned.
   addr   = (uint64_t)0x200002000;
   result = sceKernelMapDirectMemory(&addr, 0x4000, 0, 0, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
   addr   = 0x200000000;
   result = sceKernelMapDirectMemory(&addr, 0x2000, 0, 0, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
   result = sceKernelMapDirectMemory(&addr, 0x4000, 0, 0, phys_addr + 0x2000, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
   result = sceKernelMapDirectMemory(&addr, 0x4000, 0, 0, phys_addr, 0x2000);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // Additionally, alignment must be a power of two.
   result = sceKernelMapDirectMemory(&addr, 0x4000, 0, 0, phys_addr, 0xc000);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // Finally, alignment must be less than 0x100000000
   result = sceKernelMapDirectMemory(&addr, 0x4000, 0, 0, phys_addr, 0x100000000);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // Release allocated direct memory
   result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x8000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   /**
    * Other sceKernelMapDirectMemory Notes:
@@ -133,31 +133,31 @@ TEST(MemoryTests, MapMemoryTest) {
   // Alignment must be power of two
   addr   = 0x200000000;
   result = sceKernelReserveVirtualRange(&addr, 0x4000, 0, 0xc000);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // Flags can only be Fixed, NoOverwrite, and NoCoalesce
   result = sceKernelReserveVirtualRange(&addr, 0x4000, 0x400, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
   result = sceKernelReserveVirtualRange(&addr, 0x4000, 0x1000, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // Address input must be aligned.
   addr   = 0x200002000;
   result = sceKernelReserveVirtualRange(&addr, 0x4000, 0, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // length input must be aligned.
   addr   = 0x200000000;
   result = sceKernelReserveVirtualRange(&addr, 0x2000, 0, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // Alignment input must be aligned.
   result = sceKernelReserveVirtualRange(&addr, 0x4000, 0, 0x2000);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // Alignment input must be less than 0x100000000
   result = sceKernelReserveVirtualRange(&addr, 0x4000, 0, 0x100000000);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   /**
    * Other notes for sceKernelReserveVirtualRange:
@@ -175,78 +175,78 @@ TEST(MemoryTests, MapMemoryTest) {
   // This combination of flags is what sceKernelMapSanitizerShadowMemory uses.
   addr   = 0x300000000;
   result = sceKernelMmap(addr, 0x4000, 0, 0x203090, -1, 0, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // If length == 0, return EINVAL
   addr   = 0x200000000;
   result = sceKernelMmap(addr, 0, 0, 0x1000, -1, 0, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // If flags include Void (0x100) or Anon (0x1000), and phys_addr is non-zero or fd is not -1, return EINVAL.
   // Note: Void flag means this is reserving memory, sceKernelReserveVirtualRange uses it internally.
   result = sceKernelMmap(addr, 0x4000, 0, 0x1000, -1, 0x4000, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
   result = sceKernelMmap(addr, 0x4000, 0, 0x1000, 0, 0, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
   result = sceKernelMmap(addr, 0x4000, 0, 0x100, -1, 0x4000, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
   result = sceKernelMmap(addr, 0x4000, 0, 0x100, 0, 0, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // Successful call with anon flag for comparison.
   result = sceKernelMmap(addr, 0x4000, 0, 0x1000, -1, 0, &addr_out);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(addr_out, 0x4000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Successful call with void flag for comparison.
   result = sceKernelMmap(addr, 0x4000, 0, 0x100, -1, 0, &addr_out);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(addr_out, 0x4000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // If flags include Stack (0x400) and prot does not include CpuReadWrite or fd is not -1, return EINVAL.
   addr   = 0xfc00000000;
   result = sceKernelMmap(addr, 0x4000, 0, 0x400, -1, 0, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
   result = sceKernelMmap(addr, 0x4000, 3, 0x400, 0, 0, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // Successful stack mappings.
   addr   = 0xfb00000000;
   result = sceKernelMmap(addr, 0x4000, 3, 0x400, -1, 0, &addr_out);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(addr_out, 0x4000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   addr   = 0xfc00000000;
   result = sceKernelMmap(addr, 0x4000, 3, 0x400, -1, 0, &addr_out);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(addr_out, 0x4000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Compiled SDK version 3.00 or above prohibit stack mappings above 0xfc00000000.
   // Since this test homebrew has SDK version 1.00, this should succeed.
   addr   = 0xff00000000;
   result = sceKernelMmap(addr, 0x4000, 3, 0x400, -1, 0, &addr_out);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(addr_out, 0x4000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   addr   = 0x200400000;
   result = sceKernelMmap(addr, 0x4000, 3, 0x400, -1, 0, &addr_out);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(addr_out, 0x4000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Stack flag does not allow memory overwriting.
   addr   = 0xfb00000000;
   result = sceKernelMmap(addr, 0x4000, 3, 0x400, -1, 0, &addr_out);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMmap(addr, 0x4000, 3, 0x400, -1, 0, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_ENOMEM, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_ENOMEM, result);
   result = sceKernelMunmap(addr_out, 0x4000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   /**
    * Other notes here:
@@ -259,7 +259,7 @@ TEST(MemoryTests, MapMemoryTest) {
   // If flag Fixed (0x10) is specified, address must have the same offset as phys_addr.
   addr   = 0x200002000;
   result = sceKernelMmap(addr, 0x4000, 0, 0x1010, -1, 0, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   /**
    * Notes:
@@ -271,30 +271,30 @@ TEST(MemoryTests, MapMemoryTest) {
   // If an unopened file descriptor is specified, then returns EBADF.
   addr   = 0x200000000;
   result = sceKernelMmap(addr, 0x4000, 1, 0, 100, 0, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EBADF, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EBADF, result);
 
   int32_t fd = sceKernelOpen("/app0/assets/misc/test_file.txt", 0, 0666);
   CHECK(fd > 0);
 
   result = sceKernelMmap(addr, 0x4000, 3, 0, fd, 0, &addr_out);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(addr_out, 0x4000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   result = sceKernelMmap(addr, 0x4000, 7, 0, fd, 0, &addr_out);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(addr_out, 0x4000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Offset is where in the file we want to map.
   // The file is ~500KB large, so offset 0x10000 should be valid.
   result = sceKernelMmap(addr, 0x4000, 3, 0, fd, 0x10000, &addr_out);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(addr_out, 0x4000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   result = sceKernelClose(fd);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Try file mmap with read-write file
   fd = sceKernelOpen("/download0/test_file.txt", 0x602, 0666);
@@ -304,82 +304,82 @@ TEST(MemoryTests, MapMemoryTest) {
   char buf[0x10000];
   memset(buf, 0, sizeof(buf));
   result = sceKernelWrite(fd, buf, 0x8000);
-  CHECK_EQUAL(0x8000, result);
+  LONGS_EQUAL(0x8000, result);
 
   // Read only file mmap for read-write file
   result = sceKernelMmap(addr, 0x4000, 1, 0, fd, 0, &addr_out);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(addr_out, 0x4000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Read-write file mmap on read-write file
   result = sceKernelMmap(addr, 0x4000, 3, 0, fd, 0, &addr_out);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(addr_out, 0x4000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Read-write-execute file mmap on read-write file
   result = sceKernelMmap(addr, 0x4000, 7, 0, fd, 0, &addr_out);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(addr_out, 0x4000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // file mmap with offset == file size.
   result = sceKernelMmap(addr, 0x4000, 3, 0, fd, 0x8000, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
 
   // file mmap with offset + size greater than file size
   result = sceKernelMmap(addr, 0x8000, 3, 0, fd, 0x4000, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
 
   // file mmap with offset 0 + size greater than file size
   result = sceKernelMmap(addr, 0x10000, 3, 0, fd, 0, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
 
   result = sceKernelClose(fd);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   fd = sceKernelOpen("/download0/test_file.txt", 0x0, 0666);
   CHECK(fd > 0);
 
   // Read-only file mmap on read-only file
   result = sceKernelMmap(addr, 0x4000, 1, 0, fd, 0, &addr_out);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(addr_out, 0x4000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Read-write file mmap on read-only file
   result = sceKernelMmap(addr, 0x4000, 3, 0, fd, 0, &addr_out);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(addr_out, 0x4000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Read-write-execute file mmap on read-only file
   result = sceKernelMmap(addr, 0x4000, 7, 0, fd, 0, &addr_out);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(addr_out, 0x4000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // file mmap with valid offset.
   result = sceKernelMmap(addr, 0x4000, 3, 0, fd, 0x4000, &addr_out);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(addr_out, 0x4000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // file mmap with offset == file size.
   result = sceKernelMmap(addr, 0x4000, 3, 0, fd, 0x8000, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
 
   // file mmap with offset + size greater than file size
   result = sceKernelMmap(addr, 0x8000, 3, 0, fd, 0x4000, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
 
   // file mmap with offset 0 + size greater than file size
   result = sceKernelMmap(addr, 0x10000, 3, 0, fd, 0, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
 
   result = sceKernelClose(fd);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Try file mmap with read-write file
   fd = sceKernelOpen("/download0/test_file.txt", 0x602, 0666);
@@ -387,46 +387,46 @@ TEST(MemoryTests, MapMemoryTest) {
 
   // Write empty data to the file
   result = sceKernelWrite(fd, buf, 0xf000);
-  CHECK_EQUAL(0xf000, result);
+  LONGS_EQUAL(0xf000, result);
 
   // Checks for file size in both size and offset parameters are aligned up.
   // Here, we shouldn't see errors unless I try size + offset > 0x10000
   // file mmap with offset == file size.
   result = sceKernelMmap(addr, 0x4000, 3, 0, fd, 0x10000, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
 
   // file mmap with offset + size greater than file size
   result = sceKernelMmap(addr, 0xc000, 3, 0, fd, 0x8000, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
 
   // file mmap with offset 0 + size greater than file size
   result = sceKernelMmap(addr, 0x14000, 3, 0, fd, 0, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
 
   // file mmap with size + offset greater than file size, but less than page-aligned file size.
   result = sceKernelMmap(addr, 0x8000, 3, 0, fd, 0x8000, &addr_out);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(addr_out, 0x8000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // file mmap with size greater than file size, but less than page-aligned file size.
   result = sceKernelMmap(addr, 0x10000, 3, 0, fd, 0, &addr_out);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(addr_out, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   result = sceKernelClose(fd);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // file mmap on directories fails with EINVAL
   fd = sceKernelOpen("/download0", 0, 0666);
   CHECK(fd > 0);
 
   result = sceKernelMmap(addr, 0x4000, 3, 0, fd, 0, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   result = sceKernelClose(fd);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   /**
    * Notes:
@@ -453,35 +453,35 @@ TEST(MemoryTests, MapMemoryTest) {
   addr     = 0;
   addr_out = 0;
   result   = sceKernelMmap(addr, 0x10000, 3, 0x1010, -1, 0, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // When fixed is specified, address will match the input address exactly.
   addr     = 0x300000000;
   addr_out = 0;
   result   = sceKernelMmap(addr, 0x10000, 3, 0x1010, -1, 0, &addr_out);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(addr, addr_out);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, addr_out);
 
   // If a mapping already exists at the address, and no overwrite is not specified, then it will overwrite the mapping.
   // This is tested more thoroughly in the flexible memory tests.
   result = sceKernelMmap(addr, 0x10000, 3, 0x110, -1, 0, &addr_out);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(addr, addr_out);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, addr_out);
 
   // If no overwrite is specified and the area contains a mapping, mmap returns an error.
   result = sceKernelMmap(addr, 0x10000, 3, 0x1090, -1, 0, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_ENOMEM, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_ENOMEM, result);
 
   // Make sure this check is properly applied if the range is partially mapped.
   result = sceKernelMmap(addr - 0x4000, 0x10000, 3, 0x1090, -1, 0, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_ENOMEM, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_ENOMEM, result);
 
   // Make sure this check is properly applied if the range is partially mapped.
   result = sceKernelMmap(addr + 0x4000, 0x10000, 3, 0x1090, -1, 0, &addr_out);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_ENOMEM, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_ENOMEM, result);
 
   result = sceKernelMunmap(addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // When fixed is not specified, address will search for a free area, starting at a base of 0x200000000.
   // libc mappings follow this behavior, so we can't hardcode an address here, instead search manually for a free address to check against.
@@ -516,30 +516,30 @@ TEST(MemoryTests, MapMemoryTest) {
   uint64_t expected_addr = addr;
   addr                   = 0;
   result                 = sceKernelMmap(addr, 0x4000, 0, 0x1000, -1, 0, &addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   // If this succeeds, sceKernelMmap is using the correct base address for addr == nullptr.
-  CHECK_EQUAL(expected_addr, addr);
+  LONGS_EQUAL(expected_addr, addr);
 
   result = sceKernelMunmap(addr, 0x4000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // If fixed is not specified, but address is free, then the mapping will use the specified address.
   // Use a hardcoded, but presumably free address for this.
   addr          = 0x300000000;
   expected_addr = addr;
   result        = sceKernelMmap(addr, 0x4000, 0, 0x1000, -1, 0, &addr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(expected_addr, addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(expected_addr, addr);
 
   // When fixed is not specified, mmap will search to higher addresses, not lower ones.
   addr          = 0x300000000;
   expected_addr = 0x300004000;
   result        = sceKernelMmap(addr, 0x4000, 0, 0x1000, -1, 0, &addr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(expected_addr, addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(expected_addr, addr);
 
   result = sceKernelMunmap(addr - 0x4000, 0x8000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   /**
    * Run mmap with various remaining valid flags to ensure all are at least usable when they should be.
@@ -550,230 +550,230 @@ TEST(MemoryTests, MapMemoryTest) {
   // Test anon unbacked mmap with shared (1)
   addr   = 0x200000000;
   result = sceKernelMmap(addr, 0x10000, 3, 0x1001, -1, 0, &addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Run VirtualQuery to see if mapping behaved as expected
   result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(addr, info.start);
-  CHECK_EQUAL(addr + 0x10000, info.end);
-  CHECK_EQUAL(0, info.offset);
-  CHECK_EQUAL(3, info.prot);
-  CHECK_EQUAL(0, info.memory_type);
-  CHECK_EQUAL(1, info.is_flexible);
-  CHECK_EQUAL(0, info.is_direct);
-  CHECK_EQUAL(0, info.is_stack);
-  CHECK_EQUAL(0, info.is_pooled);
-  CHECK_EQUAL(1, info.is_committed);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + 0x10000, info.end);
+  LONGS_EQUAL(0, info.offset);
+  LONGS_EQUAL(3, info.prot);
+  LONGS_EQUAL(0, info.memory_type);
+  LONGS_EQUAL(1, info.is_flexible);
+  LONGS_EQUAL(0, info.is_direct);
+  LONGS_EQUAL(0, info.is_stack);
+  LONGS_EQUAL(0, info.is_pooled);
+  LONGS_EQUAL(1, info.is_committed);
 
   // Test writing data to memory
   memset(buf, 0, sizeof(buf));
   memcpy(reinterpret_cast<void*>(addr), buf, 0x10000);
   result = memcmp(reinterpret_cast<void*>(addr), buf, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Unmap after testing.
   result = sceKernelMunmap(addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // While the shared flag would make the data persist for a file mapping, it does not do anything for anon mappings.
   addr   = 0x200000000;
   result = sceKernelMmap(addr, 0x10000, 3, 0x1001, -1, 0, &addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = memcmp(reinterpret_cast<void*>(addr), buf, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Test anon unbacked mmap with private (2)
   addr   = 0x200000000;
   result = sceKernelMmap(addr, 0x10000, 3, 0x1002, -1, 0, &addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Run VirtualQuery to see if mapping behaved as expected
   result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(addr, info.start);
-  CHECK_EQUAL(addr + 0x10000, info.end);
-  CHECK_EQUAL(0, info.offset);
-  CHECK_EQUAL(3, info.prot);
-  CHECK_EQUAL(0, info.memory_type);
-  CHECK_EQUAL(1, info.is_flexible);
-  CHECK_EQUAL(0, info.is_direct);
-  CHECK_EQUAL(0, info.is_stack);
-  CHECK_EQUAL(0, info.is_pooled);
-  CHECK_EQUAL(1, info.is_committed);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + 0x10000, info.end);
+  LONGS_EQUAL(0, info.offset);
+  LONGS_EQUAL(3, info.prot);
+  LONGS_EQUAL(0, info.memory_type);
+  LONGS_EQUAL(1, info.is_flexible);
+  LONGS_EQUAL(0, info.is_direct);
+  LONGS_EQUAL(0, info.is_stack);
+  LONGS_EQUAL(0, info.is_pooled);
+  LONGS_EQUAL(1, info.is_committed);
 
   // Test writing data to memory
   memset(buf, 0, sizeof(buf));
   memcpy(reinterpret_cast<void*>(addr), buf, 0x10000);
   result = memcmp(reinterpret_cast<void*>(addr), buf, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Unmap after testing.
   result = sceKernelMunmap(addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Test anon unbacked mmap with void (0x100)
   addr   = 0x200000000;
   result = sceKernelMmap(addr, 0x10000, 3, 0x1100, -1, 0, &addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Run VirtualQuery to see if mapping behaved as expected
   result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(addr, info.start);
-  CHECK_EQUAL(addr + 0x10000, info.end);
-  CHECK_EQUAL(0, info.offset);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + 0x10000, info.end);
+  LONGS_EQUAL(0, info.offset);
   // void flag forces prot = 0
-  CHECK_EQUAL(0, info.prot);
-  CHECK_EQUAL(0, info.memory_type);
-  CHECK_EQUAL(0, info.is_flexible);
-  CHECK_EQUAL(0, info.is_direct);
-  CHECK_EQUAL(0, info.is_stack);
-  CHECK_EQUAL(0, info.is_pooled);
-  CHECK_EQUAL(0, info.is_committed);
+  LONGS_EQUAL(0, info.prot);
+  LONGS_EQUAL(0, info.memory_type);
+  LONGS_EQUAL(0, info.is_flexible);
+  LONGS_EQUAL(0, info.is_direct);
+  LONGS_EQUAL(0, info.is_stack);
+  LONGS_EQUAL(0, info.is_pooled);
+  LONGS_EQUAL(0, info.is_committed);
 
   // Unmap after testing.
   result = sceKernelMunmap(addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Test anon mmap with has semaphore (0x200)
   addr   = 0x200000000;
   result = sceKernelMmap(addr, 0x10000, 3, 0x1200, -1, 0, &addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Run VirtualQuery to see if mapping behaved as expected
   result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(addr, info.start);
-  CHECK_EQUAL(addr + 0x10000, info.end);
-  CHECK_EQUAL(0, info.offset);
-  CHECK_EQUAL(3, info.prot);
-  CHECK_EQUAL(0, info.memory_type);
-  CHECK_EQUAL(1, info.is_flexible);
-  CHECK_EQUAL(0, info.is_direct);
-  CHECK_EQUAL(0, info.is_stack);
-  CHECK_EQUAL(0, info.is_pooled);
-  CHECK_EQUAL(1, info.is_committed);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + 0x10000, info.end);
+  LONGS_EQUAL(0, info.offset);
+  LONGS_EQUAL(3, info.prot);
+  LONGS_EQUAL(0, info.memory_type);
+  LONGS_EQUAL(1, info.is_flexible);
+  LONGS_EQUAL(0, info.is_direct);
+  LONGS_EQUAL(0, info.is_stack);
+  LONGS_EQUAL(0, info.is_pooled);
+  LONGS_EQUAL(1, info.is_committed);
 
   // Test writing data to memory
   memset(buf, 0, sizeof(buf));
   memcpy(reinterpret_cast<void*>(addr), buf, 0x10000);
   result = memcmp(reinterpret_cast<void*>(addr), buf, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Unmap after testing.
   result = sceKernelMunmap(addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Test anon mmap with no sync (0x800)
   addr   = 0x200000000;
   result = sceKernelMmap(addr, 0x10000, 3, 0x1800, -1, 0, &addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Run VirtualQuery to see if mapping behaved as expected
   result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(addr, info.start);
-  CHECK_EQUAL(addr + 0x10000, info.end);
-  CHECK_EQUAL(0, info.offset);
-  CHECK_EQUAL(3, info.prot);
-  CHECK_EQUAL(0, info.memory_type);
-  CHECK_EQUAL(1, info.is_flexible);
-  CHECK_EQUAL(0, info.is_direct);
-  CHECK_EQUAL(0, info.is_stack);
-  CHECK_EQUAL(0, info.is_pooled);
-  CHECK_EQUAL(1, info.is_committed);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + 0x10000, info.end);
+  LONGS_EQUAL(0, info.offset);
+  LONGS_EQUAL(3, info.prot);
+  LONGS_EQUAL(0, info.memory_type);
+  LONGS_EQUAL(1, info.is_flexible);
+  LONGS_EQUAL(0, info.is_direct);
+  LONGS_EQUAL(0, info.is_stack);
+  LONGS_EQUAL(0, info.is_pooled);
+  LONGS_EQUAL(1, info.is_committed);
 
   // Test writing data to memory
   memset(buf, 0, sizeof(buf));
   memcpy(reinterpret_cast<void*>(addr), buf, 0x10000);
   result = memcmp(reinterpret_cast<void*>(addr), buf, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Unmap after testing.
   result = sceKernelMunmap(addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Test anon mmap with system (0x2000)
   addr   = 0x200000000;
   result = sceKernelMmap(addr, 0x10000, 3, 0x3000, -1, 0, &addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Run VirtualQuery to see if mapping behaved as expected
   result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(addr, info.start);
-  CHECK_EQUAL(addr + 0x10000, info.end);
-  CHECK_EQUAL(0, info.offset);
-  CHECK_EQUAL(3, info.prot);
-  CHECK_EQUAL(0, info.memory_type);
-  CHECK_EQUAL(1, info.is_flexible);
-  CHECK_EQUAL(0, info.is_direct);
-  CHECK_EQUAL(0, info.is_stack);
-  CHECK_EQUAL(0, info.is_pooled);
-  CHECK_EQUAL(1, info.is_committed);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + 0x10000, info.end);
+  LONGS_EQUAL(0, info.offset);
+  LONGS_EQUAL(3, info.prot);
+  LONGS_EQUAL(0, info.memory_type);
+  LONGS_EQUAL(1, info.is_flexible);
+  LONGS_EQUAL(0, info.is_direct);
+  LONGS_EQUAL(0, info.is_stack);
+  LONGS_EQUAL(0, info.is_pooled);
+  LONGS_EQUAL(1, info.is_committed);
 
   // Test writing data to memory
   memset(buf, 0, sizeof(buf));
   memcpy(reinterpret_cast<void*>(addr), buf, 0x10000);
   result = memcmp(reinterpret_cast<void*>(addr), buf, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // MAP_SYSTEM would normally place this memory under a different budget, test that in FlexibleTest
 
   // Unmap after testing.
   result = sceKernelMunmap(addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Test anon mmap with all available (0x4000)
   addr   = 0x200000000;
   result = sceKernelMmap(addr, 0x10000, 3, 0x5000, -1, 0, &addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Run VirtualQuery to see if mapping behaved as expected
   result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(addr, info.start);
-  CHECK_EQUAL(addr + 0x10000, info.end);
-  CHECK_EQUAL(0, info.offset);
-  CHECK_EQUAL(3, info.prot);
-  CHECK_EQUAL(0, info.memory_type);
-  CHECK_EQUAL(1, info.is_flexible);
-  CHECK_EQUAL(0, info.is_direct);
-  CHECK_EQUAL(0, info.is_stack);
-  CHECK_EQUAL(0, info.is_pooled);
-  CHECK_EQUAL(1, info.is_committed);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + 0x10000, info.end);
+  LONGS_EQUAL(0, info.offset);
+  LONGS_EQUAL(3, info.prot);
+  LONGS_EQUAL(0, info.memory_type);
+  LONGS_EQUAL(1, info.is_flexible);
+  LONGS_EQUAL(0, info.is_direct);
+  LONGS_EQUAL(0, info.is_stack);
+  LONGS_EQUAL(0, info.is_pooled);
+  LONGS_EQUAL(1, info.is_committed);
 
   // Test writing data to memory
   memset(buf, 0, sizeof(buf));
   memcpy(reinterpret_cast<void*>(addr), buf, 0x10000);
   result = memcmp(reinterpret_cast<void*>(addr), buf, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Unmap after testing.
   result = sceKernelMunmap(addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Test anon mmap with 2mb align (0x10000)
   addr   = 0x300004000;
   result = sceKernelMmap(addr, 0x10000, 3, 0x11000, -1, 0, &addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Run VirtualQuery to see if mapping behaved as expected
   result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(addr, info.start);
-  CHECK_EQUAL(addr + 0x10000, info.end);
-  CHECK_EQUAL(0, info.offset);
-  CHECK_EQUAL(3, info.prot);
-  CHECK_EQUAL(0, info.memory_type);
-  CHECK_EQUAL(1, info.is_flexible);
-  CHECK_EQUAL(0, info.is_direct);
-  CHECK_EQUAL(0, info.is_stack);
-  CHECK_EQUAL(0, info.is_pooled);
-  CHECK_EQUAL(1, info.is_committed);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + 0x10000, info.end);
+  LONGS_EQUAL(0, info.offset);
+  LONGS_EQUAL(3, info.prot);
+  LONGS_EQUAL(0, info.memory_type);
+  LONGS_EQUAL(1, info.is_flexible);
+  LONGS_EQUAL(0, info.is_direct);
+  LONGS_EQUAL(0, info.is_stack);
+  LONGS_EQUAL(0, info.is_pooled);
+  LONGS_EQUAL(1, info.is_committed);
 
   // The 2mb align flag is removed in mmap, so this has no impact on address alignment.
   CHECK(addr % 0x200000 != 0);
@@ -782,160 +782,160 @@ TEST(MemoryTests, MapMemoryTest) {
   memset(buf, 0, sizeof(buf));
   memcpy(reinterpret_cast<void*>(addr), buf, 0x10000);
   result = memcmp(reinterpret_cast<void*>(addr), buf, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Unmap after testing.
   result = sceKernelMunmap(addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Test anon mmap with no core (0x20000)
   addr   = 0x200000000;
   result = sceKernelMmap(addr, 0x10000, 3, 0x21000, -1, 0, &addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Run VirtualQuery to see if mapping behaved as expected
   result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(addr, info.start);
-  CHECK_EQUAL(addr + 0x10000, info.end);
-  CHECK_EQUAL(0, info.offset);
-  CHECK_EQUAL(3, info.prot);
-  CHECK_EQUAL(0, info.memory_type);
-  CHECK_EQUAL(1, info.is_flexible);
-  CHECK_EQUAL(0, info.is_direct);
-  CHECK_EQUAL(0, info.is_stack);
-  CHECK_EQUAL(0, info.is_pooled);
-  CHECK_EQUAL(1, info.is_committed);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + 0x10000, info.end);
+  LONGS_EQUAL(0, info.offset);
+  LONGS_EQUAL(3, info.prot);
+  LONGS_EQUAL(0, info.memory_type);
+  LONGS_EQUAL(1, info.is_flexible);
+  LONGS_EQUAL(0, info.is_direct);
+  LONGS_EQUAL(0, info.is_stack);
+  LONGS_EQUAL(0, info.is_pooled);
+  LONGS_EQUAL(1, info.is_committed);
 
   // Test writing data to memory
   memset(buf, 0, sizeof(buf));
   memcpy(reinterpret_cast<void*>(addr), buf, 0x10000);
   result = memcmp(reinterpret_cast<void*>(addr), buf, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Unmap after testing.
   result = sceKernelMunmap(addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Test anon mmap with prefault read (0x40000)
   addr   = 0x200000000;
   result = sceKernelMmap(addr, 0x10000, 3, 0x41000, -1, 0, &addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Run VirtualQuery to see if mapping behaved as expected
   result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(addr, info.start);
-  CHECK_EQUAL(addr + 0x10000, info.end);
-  CHECK_EQUAL(0, info.offset);
-  CHECK_EQUAL(3, info.prot);
-  CHECK_EQUAL(0, info.memory_type);
-  CHECK_EQUAL(1, info.is_flexible);
-  CHECK_EQUAL(0, info.is_direct);
-  CHECK_EQUAL(0, info.is_stack);
-  CHECK_EQUAL(0, info.is_pooled);
-  CHECK_EQUAL(1, info.is_committed);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + 0x10000, info.end);
+  LONGS_EQUAL(0, info.offset);
+  LONGS_EQUAL(3, info.prot);
+  LONGS_EQUAL(0, info.memory_type);
+  LONGS_EQUAL(1, info.is_flexible);
+  LONGS_EQUAL(0, info.is_direct);
+  LONGS_EQUAL(0, info.is_stack);
+  LONGS_EQUAL(0, info.is_pooled);
+  LONGS_EQUAL(1, info.is_committed);
 
   // Test writing data to memory
   memset(buf, 0, sizeof(buf));
   memcpy(reinterpret_cast<void*>(addr), buf, 0x10000);
   result = memcmp(reinterpret_cast<void*>(addr), buf, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Unmap after testing.
   result = sceKernelMunmap(addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Test anon mmap with self (0x80000)
   addr   = 0x200000000;
   result = sceKernelMmap(addr, 0x10000, 3, 0x81000, -1, 0, &addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Run VirtualQuery to see if mapping behaved as expected
   result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(addr, info.start);
-  CHECK_EQUAL(addr + 0x10000, info.end);
-  CHECK_EQUAL(0, info.offset);
-  CHECK_EQUAL(3, info.prot);
-  CHECK_EQUAL(0, info.memory_type);
-  CHECK_EQUAL(1, info.is_flexible);
-  CHECK_EQUAL(0, info.is_direct);
-  CHECK_EQUAL(0, info.is_stack);
-  CHECK_EQUAL(0, info.is_pooled);
-  CHECK_EQUAL(1, info.is_committed);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + 0x10000, info.end);
+  LONGS_EQUAL(0, info.offset);
+  LONGS_EQUAL(3, info.prot);
+  LONGS_EQUAL(0, info.memory_type);
+  LONGS_EQUAL(1, info.is_flexible);
+  LONGS_EQUAL(0, info.is_direct);
+  LONGS_EQUAL(0, info.is_stack);
+  LONGS_EQUAL(0, info.is_pooled);
+  LONGS_EQUAL(1, info.is_committed);
 
   // Test writing data to memory
   memset(buf, 0, sizeof(buf));
   memcpy(reinterpret_cast<void*>(addr), buf, 0x10000);
   result = memcmp(reinterpret_cast<void*>(addr), buf, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Unmap after testing.
   result = sceKernelMunmap(addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Test anon mmap with optimal space (0x100000)
   addr   = 0x200000000;
   result = sceKernelMmap(addr, 0x10000, 3, 0x101000, -1, 0, &addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Run VirtualQuery to see if mapping behaved as expected
   result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(addr, info.start);
-  CHECK_EQUAL(addr + 0x10000, info.end);
-  CHECK_EQUAL(0, info.offset);
-  CHECK_EQUAL(3, info.prot);
-  CHECK_EQUAL(0, info.memory_type);
-  CHECK_EQUAL(1, info.is_flexible);
-  CHECK_EQUAL(0, info.is_direct);
-  CHECK_EQUAL(0, info.is_stack);
-  CHECK_EQUAL(0, info.is_pooled);
-  CHECK_EQUAL(1, info.is_committed);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + 0x10000, info.end);
+  LONGS_EQUAL(0, info.offset);
+  LONGS_EQUAL(3, info.prot);
+  LONGS_EQUAL(0, info.memory_type);
+  LONGS_EQUAL(1, info.is_flexible);
+  LONGS_EQUAL(0, info.is_direct);
+  LONGS_EQUAL(0, info.is_stack);
+  LONGS_EQUAL(0, info.is_pooled);
+  LONGS_EQUAL(1, info.is_committed);
 
   // Test writing data to memory
   memset(buf, 0, sizeof(buf));
   memcpy(reinterpret_cast<void*>(addr), buf, 0x10000);
   result = memcmp(reinterpret_cast<void*>(addr), buf, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Unmap after testing.
   result = sceKernelMunmap(addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Test anon mmap with writable wb garlic (0x800000)
   addr   = 0x200000000;
   result = sceKernelMmap(addr, 0x10000, 3, 0x801000, -1, 0, &addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Run VirtualQuery to see if mapping behaved as expected
   result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(addr, info.start);
-  CHECK_EQUAL(addr + 0x10000, info.end);
-  CHECK_EQUAL(0, info.offset);
-  CHECK_EQUAL(3, info.prot);
-  CHECK_EQUAL(0, info.memory_type);
-  CHECK_EQUAL(1, info.is_flexible);
-  CHECK_EQUAL(0, info.is_direct);
-  CHECK_EQUAL(0, info.is_stack);
-  CHECK_EQUAL(0, info.is_pooled);
-  CHECK_EQUAL(1, info.is_committed);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + 0x10000, info.end);
+  LONGS_EQUAL(0, info.offset);
+  LONGS_EQUAL(3, info.prot);
+  LONGS_EQUAL(0, info.memory_type);
+  LONGS_EQUAL(1, info.is_flexible);
+  LONGS_EQUAL(0, info.is_direct);
+  LONGS_EQUAL(0, info.is_stack);
+  LONGS_EQUAL(0, info.is_pooled);
+  LONGS_EQUAL(1, info.is_committed);
 
   // Test writing data to memory
   memset(buf, 0, sizeof(buf));
   memcpy(reinterpret_cast<void*>(addr), buf, 0x10000);
   result = memcmp(reinterpret_cast<void*>(addr), buf, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Unmap after testing.
   result = sceKernelMunmap(addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Executable protections cause dmem file mmaps to fail.
   result = sceKernelMapDirectMemory(&addr, 0x4000, 0x7, 0, 0, 0x2000);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   /**
    * Continued notes:
@@ -953,18 +953,18 @@ TEST(MemoryTests, MapMemoryTest) {
   // To run sys_mmap_dmem without worries from phys addresses, allocate some dmem first.
   phys_addr = 0;
   result    = sceKernelAllocateMainDirectMemory(0x4000, 0, 0, &phys_addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   addr = 0x200000000;
   // Not power of 2
   result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0, phys_addr, 0xc000);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
   // Not page aligned
   result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0, phys_addr, 0x100);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
   // Too large.
   result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0, phys_addr, 0x100000000);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   /**
    * Notes for sys_mmap_dmem:
@@ -985,71 +985,71 @@ TEST(MemoryTests, MapMemoryTest) {
   // Misaligned addr
   addr   = 0x200002000;
   result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // Misaligned phys_addr
   addr   = 0x200000000;
   result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0, phys_addr - 0x2000, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // Misaligned length
   result = sceKernelMapDirectMemory2(&addr, 0x2000, 0, 1, 0, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // Zero length
   result = sceKernelMapDirectMemory2(&addr, 0, 0, 1, 0, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // Invalid flags
   result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 1, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // Invalid prot
   result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 0x7, 0, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
   result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 0x8, 0, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // Invalid mtype
   result = sceKernelMapDirectMemory2(&addr, 0x4000, 11, 1, 0, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // -1 mtype skips assigning type.
   result = sceKernelMapDirectMemory2(&addr, 0x4000, -1, 1, 0, phys_addr, 0);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Overlapping phys addr causes EBUSY
   result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EBUSY, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EBUSY, result);
 
   // Try enabling dmem aliasing
   result = sceKernelEnableDmemAliasing();
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Overlapping phys addr works now.
   uint64_t addr2 = 0x200000000;
   result         = sceKernelMapDirectMemory2(&addr2, 0x4000, 0, 1, 0, phys_addr, 0);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(addr2, 0x4000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(addr, 0x4000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Lower negatives are invalid.
   result = sceKernelMapDirectMemory2(&addr, 0x4000, -2, 1, 0, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // Map Sanitizer
   result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0x200000, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // null address with map fixed
   addr   = 0;
   result = sceKernelMapDirectMemory2(&addr, 0x4000, 0, 1, 0x10, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x4000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Might continue down this rabbit hole at some point, but I don't see too much of a point?
   // I've gleamed the error cases they start with, everything else will just come from testing, as always.
@@ -1067,17 +1067,17 @@ TEST(MemoryTests, DeviceFileTest) {
   // Allocate some direct memory for direct memory mapping.
   int64_t phys_addr = 0;
   int32_t result    = sceKernelAllocateMainDirectMemory(0x10000, 0x10000, 10, &phys_addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Start with a typical mmap to verify we're mapping to the dmem file.
   // Like libkernel, specify MAP_SHARED flag, though this is theoretically not required.
   uint64_t addr = 0;
   result        = sceKernelMmap(addr, 0x10000, 1, 0x1, dmem1_fd, phys_addr, &addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // To confirm this actually mapped the expected direct memory, check if sceKernelReleaseDirectMemory can unmap it.
   result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Define OrbisKernelVirtualQueryInfo struct
   struct OrbisKernelVirtualQueryInfo {
@@ -1099,66 +1099,66 @@ TEST(MemoryTests, DeviceFileTest) {
 
   // If the memory unmapped properly, VirtualQuery will return EACCES.
   result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
 
   // Now test the MAP_WRITABLE_WB_GARLIC flag.
   result = sceKernelAllocateMainDirectMemory(0x10000, 0x10000, 10, &phys_addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Read-only CPU mapping normally works.
   addr   = 0;
   result = sceKernelMmap(addr, 0x10000, 1, 0x800001, dmem1_fd, phys_addr, &addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Run VirtualQuery on this mapping to make sure it has the correct types.
   result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(addr, info.start);
-  CHECK_EQUAL(addr + 0x10000, info.end);
-  CHECK_EQUAL(0x10000, info.offset);
-  CHECK_EQUAL(1, info.prot);
-  CHECK_EQUAL(10, info.memory_type);
-  CHECK_EQUAL(0, info.is_flexible);
-  CHECK_EQUAL(1, info.is_direct);
-  CHECK_EQUAL(0, info.is_stack);
-  CHECK_EQUAL(0, info.is_pooled);
-  CHECK_EQUAL(1, info.is_committed);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + 0x10000, info.end);
+  LONGS_EQUAL(0x10000, info.offset);
+  LONGS_EQUAL(1, info.prot);
+  LONGS_EQUAL(10, info.memory_type);
+  LONGS_EQUAL(0, info.is_flexible);
+  LONGS_EQUAL(1, info.is_direct);
+  LONGS_EQUAL(0, info.is_stack);
+  LONGS_EQUAL(0, info.is_pooled);
+  LONGS_EQUAL(1, info.is_committed);
 
   result = sceKernelMunmap(addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Despite the flag, write prot on CPU still returns EACCESS for this mtype.
   addr   = 0;
   result = sceKernelMmap(addr, 0x10000, 2, 0x800001, dmem1_fd, phys_addr, &addr);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
   result = sceKernelMmap(addr, 0x10000, 3, 0x800001, dmem1_fd, phys_addr, &addr);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
 
   // Read-only GPU mapping normally works.
   result = sceKernelMmap(addr, 0x10000, 0x10, 0x800001, dmem1_fd, phys_addr, &addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // write-only GPU should work due to the flag, normally this fails.
   result = sceKernelMmap(addr, 0x10000, 0x20, 0x800001, dmem1_fd, phys_addr, &addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // read-write GPU should work due to the flag, normally this fails.
   result = sceKernelMmap(addr, 0x10000, 0x30, 0x800001, dmem1_fd, phys_addr, &addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Release direct memory.
   result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Close dmem1 file
   result = sceKernelClose(dmem1_fd);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Some devices can be mmapped, these can follow different rules.
   int32_t fd = sceKernelOpen("/dev/gc", 0x602, 0666);
@@ -1167,22 +1167,22 @@ TEST(MemoryTests, DeviceFileTest) {
   // Perform device file mmap.
   uint64_t output_addr = 0;
   result               = sceKernelMmap(0, 0x4000, 3, 0, fd, 0, &output_addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Run sceKernelVirtualQuery to make sure memory area is as expected.
   memset(&info, 0, sizeof(info));
   result = sceKernelVirtualQuery(output_addr, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(output_addr, info.start);
-  CHECK_EQUAL(output_addr + 0x4000, info.end);
-  CHECK_EQUAL(0, info.offset);
-  CHECK_EQUAL(3, info.prot);
-  CHECK_EQUAL(0, info.memory_type);
-  CHECK_EQUAL(0, info.is_flexible);
-  CHECK_EQUAL(0, info.is_direct);
-  CHECK_EQUAL(0, info.is_stack);
-  CHECK_EQUAL(0, info.is_pooled);
-  CHECK_EQUAL(0, info.is_committed);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(output_addr, info.start);
+  LONGS_EQUAL(output_addr + 0x4000, info.end);
+  LONGS_EQUAL(0, info.offset);
+  LONGS_EQUAL(3, info.prot);
+  LONGS_EQUAL(0, info.memory_type);
+  LONGS_EQUAL(0, info.is_flexible);
+  LONGS_EQUAL(0, info.is_direct);
+  LONGS_EQUAL(0, info.is_stack);
+  LONGS_EQUAL(0, info.is_pooled);
+  LONGS_EQUAL(0, info.is_committed);
 
   // Device file mmaps are supposed to automatically append MAP_SHARED.
   memset(reinterpret_cast<void*>(output_addr), 1, 0x1000);
@@ -1194,25 +1194,25 @@ TEST(MemoryTests, DeviceFileTest) {
   // Since we can't sceKernelRead our way through this, we can instead check for MAP_SHARED by unmapping, then remapping the file.
   // If changes persist, this memory is likely backed in some form. If not, we can assume MAP_SHARED was not appended.
   result = sceKernelMunmap(output_addr, 0x4000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Perform device file mmap.
   result = sceKernelMmap(0, 0x4000, 3, 0, fd, 0, &output_addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Compare the device memory before and after. If the changes from before are still present, the mapping must have MAP_SHARED.
   result = memcmp(reinterpret_cast<void*>(output_addr), dev_buf, 0x4000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   result = sceKernelMunmap(output_addr, 0x4000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Device file mmaps fail with EINVAL if you map with flags Private (2)
   result = sceKernelMmap(0, 0x4000, 3, 2, fd, 0, &output_addr);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   result = sceKernelClose(fd);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Test budget behaviors that wouldn't come up in normal games.
   std::list<uint64_t> addresses;
@@ -1221,10 +1221,10 @@ TEST(MemoryTests, DeviceFileTest) {
     result = sceKernelMapFlexibleMemory(&addr_out, 0x4000, 3, 0);
     if (result < 0) {
       // Out of flex mem
-      CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+      LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
     } else {
       // Mapped flex mem successfully.
-      CHECK_EQUAL(0, result);
+      LONGS_EQUAL(0, result);
       // Add the mapping address to addresses, need to unmap later to clean up.
       addresses.emplace_back(addr_out);
     }
@@ -1233,18 +1233,18 @@ TEST(MemoryTests, DeviceFileTest) {
   // After all these mappings, available flex size should be 0.
   uint64_t avail_flex_size = 0;
   result                   = sceKernelAvailableFlexibleMemorySize(&avail_flex_size);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(0, avail_flex_size);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(0, avail_flex_size);
 
   // Device mmaps do not use the flexible budget.
   fd = sceKernelOpen("/dev/gc", 0x602, 0666);
   CHECK(fd > 0);
   result = sceKernelMmap(0, 0x4000, 3, 0, fd, 0, &output_addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(output_addr, 0x4000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelClose(fd);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // mmaps from system folders do not use the flexible budget.
   const char* sys_folder = sceKernelGetFsSandboxRandomWord();
@@ -1255,16 +1255,16 @@ TEST(MemoryTests, DeviceFileTest) {
   CHECK(fd > 0);
 
   result = sceKernelMmap(0, 0x4000, 3, 0, fd, 0, &output_addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(output_addr, 0x4000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelClose(fd);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Unmap all of the flexible memory used here.
   for (uint64_t addr: addresses) {
     result = sceKernelMunmap(addr, 0x4000);
-    CHECK_EQUAL(0, result);
+    LONGS_EQUAL(0, result);
   }
   addresses.clear();
 }
@@ -1280,111 +1280,111 @@ TEST(MemoryTests, AvailableDirectMemoryTest) {
   uint64_t size      = 0;
   int32_t  result    = sceKernelAvailableDirectMemorySize(0, dmem_size, 0, &phys_addr, &size);
   // Check for success
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   // Check for known quirks on success.
   // Specifically, the dmem map already has a mapping (which comes from libSceGnmDriver).
   // Many games are built with this assumption in mind, though most don't need it emulated.
   // This mapping will be from physical addresses 0 to 0x10000 under these circumstances.
-  CHECK_EQUAL(0x10000, phys_addr);
-  CHECK_EQUAL(dmem_size - 0x10000, size);
+  LONGS_EQUAL(0x10000, phys_addr);
+  LONGS_EQUAL(dmem_size - 0x10000, size);
 
   // Now test for potential edge cases.
   // Based on decompilation, this function should accept both phys_addr and size of nullptr.
   result = sceKernelAvailableDirectMemorySize(0, dmem_size, 0, nullptr, nullptr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // If there is no size to output, this function returns ENOMEM
   result = sceKernelAvailableDirectMemorySize(0, 0, 0, nullptr, nullptr);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_ENOMEM, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_ENOMEM, result);
 
   // The alignment check is very lenient, they run (align - 1) & align to check.
   // While this alignment value is far lower than the usually acceptable amount, this still works.
   result = sceKernelAvailableDirectMemorySize(0, dmem_size, 0x100, nullptr, nullptr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // If you use a value that triggers the check, it returns EINVAL
   result = sceKernelAvailableDirectMemorySize(0, dmem_size, 0x11111, nullptr, nullptr);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // There is no specific error for start > end, it still returns ENOMEM.
   result = sceKernelAvailableDirectMemorySize(dmem_size, 0, 0, nullptr, nullptr);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_ENOMEM, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_ENOMEM, result);
 
   // There's also no specific error for the range being outside the dmem map, it returns ENOMEM.
   result = sceKernelAvailableDirectMemorySize(dmem_size, dmem_size * 2, 0, nullptr, nullptr);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_ENOMEM, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_ENOMEM, result);
 
   result = sceKernelAvailableDirectMemorySize(dmem_size * 5, dmem_size * 6, 0, nullptr, nullptr);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_ENOMEM, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_ENOMEM, result);
 
   // Start and end phys addresses are limited internally, with no error return for them.
   // Make sure size is appropriately restricted.
   result = sceKernelAvailableDirectMemorySize(0, dmem_size * 5, 0, nullptr, &size);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(dmem_size - 0x10000, size);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(dmem_size - 0x10000, size);
 
   // phys_addr and size are restricted based on the start and end.
   // So in a case like this, where start is after the start of the free dmem area, size and phys_addr are restricted.
   result = sceKernelAvailableDirectMemorySize(dmem_size / 2, dmem_size, 0, &phys_addr, &size);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(dmem_size / 2, phys_addr);
-  CHECK_EQUAL(dmem_size / 2, size);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(dmem_size / 2, phys_addr);
+  LONGS_EQUAL(dmem_size / 2, size);
 
   // phys_addr and size are restricted based on the start and end.
   // So in a case like this, where end is before the end of the free dmem area, size and phys_addr are restricted.
   result = sceKernelAvailableDirectMemorySize(0, dmem_size / 2, 0, &phys_addr, &size);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(0x10000, phys_addr);
-  CHECK_EQUAL((dmem_size / 2) - 0x10000, size);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(0x10000, phys_addr);
+  LONGS_EQUAL((dmem_size / 2) - 0x10000, size);
 
   // start is rounded up to alignment.
   result = sceKernelAvailableDirectMemorySize(0x1c001, dmem_size, 0, &phys_addr, &size);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(0x20000, phys_addr);
-  CHECK_EQUAL(dmem_size - 0x20000, size);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(0x20000, phys_addr);
+  LONGS_EQUAL(dmem_size - 0x20000, size);
 
   // end ignores alignment
   result = sceKernelAvailableDirectMemorySize(0x10000, dmem_size - 0x3fff, 0, &phys_addr, &size);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(0x10000, phys_addr);
-  CHECK_EQUAL(dmem_size - 0x13fff, size);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(0x10000, phys_addr);
+  LONGS_EQUAL(dmem_size - 0x13fff, size);
 
   // Alignments below the system requirements are rounded up to the system-wide page size of 0x4000.
   // This can be tested with the search start, as that is rounded up to alignment.
   result = sceKernelAvailableDirectMemorySize(0x1c001, dmem_size, 0x100, &phys_addr, &size);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(0x20000, phys_addr);
-  CHECK_EQUAL(dmem_size - 0x20000, size);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(0x20000, phys_addr);
+  LONGS_EQUAL(dmem_size - 0x20000, size);
 
   // phys_addr is aligned up to alignment, size is aligned down to compensate.
   result = sceKernelAvailableDirectMemorySize(0, dmem_size, 0x20000, &phys_addr, &size);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(0x20000, phys_addr);
-  CHECK_EQUAL(dmem_size - 0x20000, size);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(0x20000, phys_addr);
+  LONGS_EQUAL(dmem_size - 0x20000, size);
 
   // returned statistics are always from the largest area of free space.
   // Do an allocation in the middle of the dmem map to demonstrate this.
   int64_t phys_addr_out = 0;
   result                = sceKernelAllocateDirectMemory(dmem_size / 2, dmem_size, 0x100000, 0, 0, &phys_addr_out);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   // Nothing else in that area of the dmem map, so this should be the returned phys address.
-  CHECK_EQUAL(dmem_size / 2, phys_addr_out);
+  LONGS_EQUAL(dmem_size / 2, phys_addr_out);
 
   result = sceKernelAvailableDirectMemorySize(0, dmem_size, 0, &phys_addr, &size);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   // The larger area should be from 0x10000 to dmem_size / 2 here.
-  CHECK_EQUAL(0x10000, phys_addr);
-  CHECK_EQUAL((dmem_size / 2) - 0x10000, size);
+  LONGS_EQUAL(0x10000, phys_addr);
+  LONGS_EQUAL((dmem_size / 2) - 0x10000, size);
 
   // Release the direct memory used for testing this, we want a clean dmem_map.
   result = sceKernelCheckedReleaseDirectMemory(phys_addr_out, 0x100000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Free mappings should coalesce, make sure sceKernelAvailableDirectMemorySize still returns the expected values.
   result = sceKernelAvailableDirectMemorySize(0, dmem_size, 0, &phys_addr, &size);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(0x10000, phys_addr);
-  CHECK_EQUAL(dmem_size - 0x10000, size);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(0x10000, phys_addr);
+  LONGS_EQUAL(dmem_size - 0x10000, size);
 }
 
 TEST(MemoryTests, AllocateDirectMemoryTest) {
@@ -1394,56 +1394,56 @@ TEST(MemoryTests, AllocateDirectMemoryTest) {
   int64_t  dmem_start = 0x100000;
   int64_t  phys_addr  = 0;
   int32_t  result     = sceKernelAllocateDirectMemory(dmem_start, dmem_size, 0x10000, 0, 0, &phys_addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // When there is no direct memory at the start, phys_addr equals start.
-  CHECK_EQUAL(dmem_start, phys_addr);
+  LONGS_EQUAL(dmem_start, phys_addr);
 
   // Keep dmem_map clean.
   result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // If either start or end is less than zero, returns EINVAL
   phys_addr = 0;
   result    = sceKernelAllocateDirectMemory(-1, dmem_size, 0x10000, 0, 0, &phys_addr);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
   result = sceKernelAllocateDirectMemory(0, -1, 0x10000, 0, 0, &phys_addr);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // If length is zero, returns EINVAL
   result = sceKernelAllocateDirectMemory(0, dmem_size, 0, 0, 0, &phys_addr);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // If there is more than one active bit in align, returns EINVAL
   // 0xc000 is page-aligned, but should fail this.
   result = sceKernelAllocateDirectMemory(0, dmem_size, 0x10000, 0xc000, 0, &phys_addr);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // If alignment or length is not page aligned, returns EINVAL
   result = sceKernelAllocateDirectMemory(0, dmem_size, 0x1000, 0x10000, 0, &phys_addr);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
   result = sceKernelAllocateDirectMemory(0, dmem_size, 0x10000, 0x1000, 0, &phys_addr);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // If type > 10, return EINVAL
   result = sceKernelAllocateDirectMemory(0, dmem_size, 0x10000, 0, 11, &phys_addr);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // If type < 0, return EINVAL
   result = sceKernelAllocateDirectMemory(0, dmem_size, 0x10000, 0, -1, &phys_addr);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // If limited end <= start, return EAGAIN
   result = sceKernelAllocateDirectMemory(0x100000, 0x10000, 0x10000, 0, 0, &phys_addr);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EAGAIN, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EAGAIN, result);
 
   // If limited end < length, return EAGAIN
   result = sceKernelAllocateDirectMemory(0, 0x100000, 0x200000, 0, 0, &phys_addr);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EAGAIN, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EAGAIN, result);
 
   // If limited end - length < start, return EAGAIN
   result = sceKernelAllocateDirectMemory(0x10000, 0x40000, 0x40000, 0, 0, &phys_addr);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EAGAIN, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EAGAIN, result);
 
   // There is no check for if phys_addr is null in firmware. This call WILL crash the application.
   // result = sceKernelAllocateDirectMemory(0, dmem_size, 0x20000, 0, 0, nullptr);
@@ -1452,66 +1452,66 @@ TEST(MemoryTests, AllocateDirectMemoryTest) {
   result = sceKernelAllocateDirectMemory(dmem_start, dmem_start + 0x10000, 0x10000, 0, 0, &phys_addr);
   // This call fails with EAGAIN, since there's no direct memory in that area.
   result = sceKernelAllocateDirectMemory(dmem_start, dmem_start + 0x10000, 0x10000, 0, 0, &phys_addr);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EAGAIN, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EAGAIN, result);
 
   result = sceKernelReleaseDirectMemory(dmem_start, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // phys_addr will be aligned up to alignment.
   dmem_start = 0x110000;
   result     = sceKernelAllocateDirectMemory(dmem_start, dmem_size, 0x20000, 0x20000, 0, &phys_addr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(dmem_start + 0x10000, phys_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(dmem_start + 0x10000, phys_addr);
 
   // Keep dmem_map clean.
   result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x20000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // size is not affected by alignment
   dmem_start = 0x100000;
   result     = sceKernelAllocateDirectMemory(dmem_start, dmem_size, 0x10000, 0x20000, 0, &phys_addr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(dmem_start, phys_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(dmem_start, phys_addr);
 
   // Run sceKernelGetDirectMemoryType to confirm mapping dimensions.
   int32_t out_type;
   int64_t out_start;
   int64_t out_end;
   result = sceKernelGetDirectMemoryType(phys_addr, &out_type, &out_start, &out_end);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(phys_addr, out_start);
-  CHECK_EQUAL(phys_addr + 0x10000, out_end);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(phys_addr, out_start);
+  LONGS_EQUAL(phys_addr + 0x10000, out_end);
 
   // Keep dmem_map clean.
   result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // If start is later than the start of the free pages, phys_addr = start
   result = sceKernelAllocateDirectMemory(dmem_size / 2, dmem_size, 0x10000, 0, 0, &phys_addr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(dmem_size / 2, phys_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(dmem_size / 2, phys_addr);
 
   // Keep dmem_map clean.
   result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // If align would force phys_addr up to a mapped page, then that area is unsuitable.
   dmem_start = 0x100000;
   result     = sceKernelAllocateDirectMemory(dmem_start, dmem_size, 0x4000, 0, 0, &phys_addr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(dmem_start, phys_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(dmem_start, phys_addr);
 
   int64_t phys_addr2 = 0;
   result             = sceKernelAllocateDirectMemory(dmem_start - 0x10000, dmem_size, 0x20000, 0x20000, 0, &phys_addr2);
-  CHECK_EQUAL(0, result);
-  // Since dmem_start - dmem_start + 0x4000 is mapped, and alignment is 0x20000, the returned phys_addr is aligned up to dmem_start + 0x20000.
-  CHECK_EQUAL(dmem_start + 0x20000, phys_addr2);
+  LONGS_EQUAL(0, result);
+  // Since dmem_start through dmem_start + 0x4000 is mapped, and alignment is 0x20000, the returned phys_addr is aligned up to dmem_start + 0x20000.
+  LONGS_EQUAL(dmem_start + 0x20000, phys_addr2);
 
   // Keep dmem_map clean.
   result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x4000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelCheckedReleaseDirectMemory(phys_addr2, 0x20000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Firmware doesn't align search start, which allows this call to create a misaligned dmem page.
   // A notable side effect of this behavior is crashing the entire console.
@@ -1523,83 +1523,83 @@ TEST(MemoryTests, ReleaseDirectMemoryTest) {
   int64_t  dmem_start = 0x100000;
   uint64_t dmem_size  = sceKernelGetDirectMemorySize();
   int32_t  result     = sceKernelReleaseDirectMemory(dmem_start, 0x3000);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
   result = sceKernelReleaseDirectMemory(dmem_start + 0x3000, 0x10000);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // Releasing free dmem causes error ENOENT on checked release
   result = sceKernelCheckedReleaseDirectMemory(dmem_start, 0x10000);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_ENOENT, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_ENOENT, result);
 
   // Releasing free dmem "succeeds" on unchecked release
   result = sceKernelReleaseDirectMemory(dmem_start, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Allocate a little dmem to test with
   int64_t phys_addr = 0;
   result            = sceKernelAllocateDirectMemory(dmem_start, dmem_size, 0x20000, 0x20000, 0, &phys_addr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(dmem_start, phys_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(dmem_start, phys_addr);
   int64_t phys_addr2 = 0;
   result             = sceKernelAllocateDirectMemory(dmem_start + 0x30000, dmem_size, 0x10000, 0x10000, 0, &phys_addr2);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(dmem_start + 0x30000, phys_addr2);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(dmem_start + 0x30000, phys_addr2);
 
   // Now we've got 0x100000-0x120000 and 0x130000-0x140000 allocated.
   // Checked fails if anything in the range is free.
   // Make sure you're checking the end of the range.
   result = sceKernelCheckedReleaseDirectMemory(dmem_start, 0x30000);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_ENOENT, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_ENOENT, result);
   // Check for the start of the range.
   result = sceKernelCheckedReleaseDirectMemory(dmem_start + 0x20000, 0x20000);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_ENOENT, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_ENOENT, result);
   // Check for the middle of the range, first 0x10000 and last 0x10000 are allocated, middle 0x10000 is free.
   result = sceKernelCheckedReleaseDirectMemory(dmem_start + 0x10000, 0x30000);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_ENOENT, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_ENOENT, result);
 
   // Because of how checked fails, the allocations are safe.
   int32_t out_type;
   int64_t out_start;
   int64_t out_end;
   result = sceKernelGetDirectMemoryType(phys_addr, &out_type, &out_start, &out_end);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(phys_addr, out_start);
-  CHECK_EQUAL(phys_addr + 0x20000, out_end);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(phys_addr, out_start);
+  LONGS_EQUAL(phys_addr + 0x20000, out_end);
 
   result = sceKernelGetDirectMemoryType(phys_addr2, &out_type, &out_start, &out_end);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(phys_addr2, out_start);
-  CHECK_EQUAL(phys_addr2 + 0x10000, out_end);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(phys_addr2, out_start);
+  LONGS_EQUAL(phys_addr2 + 0x10000, out_end);
 
   // Unchecked will deallocate both free areas
   result = sceKernelReleaseDirectMemory(phys_addr, 0x40000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // As a result of the unchecked release, this sceKernelGetDirectMemoryType call fails.
   result = sceKernelGetDirectMemoryType(phys_addr, &out_type, &out_start, &out_end);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_ENOENT, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_ENOENT, result);
   result = sceKernelGetDirectMemoryType(phys_addr2, &out_type, &out_start, &out_end);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_ENOENT, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_ENOENT, result);
 
   // Release should unmap any mappings that reference the physical block.
   // Allocate a little dmem to test with
   result = sceKernelAllocateDirectMemory(dmem_start, dmem_size, 0x10000, 0x20000, 0, &phys_addr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(dmem_start, phys_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(dmem_start, phys_addr);
 
   uint64_t addr = 0;
   result        = sceKernelMapDirectMemory(&addr, 0x10000, 3, 0, phys_addr, 0);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   result = sceKernelReleaseDirectMemory(phys_addr, 0x30000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   uint64_t start_addr;
   uint64_t end_addr;
   int32_t  out_prot;
   // Since the mapping was unmapped through ReleaseDirectMemory, QueryMemoryProtection should return EACCES.
   result = sceKernelQueryMemoryProtection(addr, &start_addr, &end_addr, &out_prot);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
 }
 
 // Test for various edge cases related to file mmaps
@@ -1612,7 +1612,7 @@ TEST(MemoryTests, FileMappingTest) {
   // Run a sceKernelRead to read from the file directly.
   char    read_buf[0x40000];
   int64_t bytes_read = sceKernelRead(fd, read_buf, sizeof(read_buf));
-  CHECK_EQUAL(sizeof(read_buf), bytes_read);
+  LONGS_EQUAL(sizeof(read_buf), bytes_read);
 
   // mmap file to memory
   // Using flags 0, prot read-write.
@@ -1620,7 +1620,7 @@ TEST(MemoryTests, FileMappingTest) {
   uint64_t output_addr = 0;
   uint64_t offset      = 0;
   int32_t  result      = sceKernelMmap(addr, 0x10000, 3, 0, fd, offset, &output_addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // With this mmap, we should be able to read from the file.
   // Run a memcpy to copy from this memory to a buffer.
@@ -1629,7 +1629,7 @@ TEST(MemoryTests, FileMappingTest) {
 
   // Compare memory buffer to file contents.
   result = memcmp(mem_buf, &read_buf[offset], sizeof(mem_buf));
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Write zeros to the memory area, then read back the new data.
   memset(reinterpret_cast<void*>(output_addr), 0, sizeof(mem_buf));
@@ -1637,9 +1637,9 @@ TEST(MemoryTests, FileMappingTest) {
 
   // Re-read file contents
   bytes_read = sceKernelLseek(fd, 0, 0);
-  CHECK_EQUAL(0, bytes_read);
+  LONGS_EQUAL(0, bytes_read);
   bytes_read = sceKernelRead(fd, read_buf, sizeof(read_buf));
-  CHECK_EQUAL(sizeof(read_buf), bytes_read);
+  LONGS_EQUAL(sizeof(read_buf), bytes_read);
 
   // Compare memory buffer to file contents.
   result = memcmp(mem_buf, &read_buf[offset], sizeof(mem_buf));
@@ -1648,40 +1648,40 @@ TEST(MemoryTests, FileMappingTest) {
 
   // Unmap test memory
   result = sceKernelMunmap(output_addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // mmap with offset
   offset = 0x4000;
   result = sceKernelMmap(addr, 0x10000, 3, 0, fd, offset, &output_addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Run a memcpy to copy from this memory to a buffer.
   memcpy(mem_buf, reinterpret_cast<void*>(output_addr), sizeof(mem_buf));
 
   // Compare memory buffer to file contents.
   result = memcmp(mem_buf, &read_buf[offset], sizeof(mem_buf));
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Unmap test memory
   result = sceKernelMunmap(output_addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Check for alignment behavior.
   offset = 0x6000;
   result = sceKernelMmap(addr, 0xe000, 3, 0, fd, offset, &output_addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Size should round up to 0x10000, offset should round down to 0x4000.
   uint64_t start_addr;
   uint64_t end_addr;
   int32_t  prot;
   result = sceKernelQueryMemoryProtection(output_addr, &start_addr, &end_addr, &prot);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   // mmap's address output is increased by page offset.
   // This is not reflected in the actual mapping.
-  CHECK_EQUAL(output_addr - 0x2000, start_addr);
-  CHECK_EQUAL(output_addr + 0xe000, end_addr);
-  CHECK_EQUAL(3, prot);
+  LONGS_EQUAL(output_addr - 0x2000, start_addr);
+  LONGS_EQUAL(output_addr + 0xe000, end_addr);
+  LONGS_EQUAL(3, prot);
 
   // Run virtual query to check details
   // Need to define struct first.
@@ -1702,33 +1702,33 @@ TEST(MemoryTests, FileMappingTest) {
   OrbisKernelVirtualQueryInfo info;
   memset(&info, 0, sizeof(info));
   result = sceKernelVirtualQuery(output_addr, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(start_addr, info.start);
-  CHECK_EQUAL(end_addr, info.end);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(start_addr, info.start);
+  LONGS_EQUAL(end_addr, info.end);
   // VirtualQuery does not report file mmap offsets.
-  CHECK_EQUAL(0, info.offset);
-  CHECK_EQUAL(prot, info.prot);
-  CHECK_EQUAL(0, info.memory_type);
-  CHECK_EQUAL(1, info.is_flexible);
-  CHECK_EQUAL(0, info.is_direct);
-  CHECK_EQUAL(0, info.is_stack);
-  CHECK_EQUAL(0, info.is_pooled);
-  CHECK_EQUAL(1, info.is_committed);
+  LONGS_EQUAL(0, info.offset);
+  LONGS_EQUAL(prot, info.prot);
+  LONGS_EQUAL(0, info.memory_type);
+  LONGS_EQUAL(1, info.is_flexible);
+  LONGS_EQUAL(0, info.is_direct);
+  LONGS_EQUAL(0, info.is_stack);
+  LONGS_EQUAL(0, info.is_pooled);
+  LONGS_EQUAL(1, info.is_committed);
 
   // Run a memcpy to copy from this memory to a buffer.
   memcpy(mem_buf, reinterpret_cast<void*>(start_addr), sizeof(mem_buf));
 
   // Compare memory buffer to file contents.
   result = memcmp(mem_buf, &read_buf[offset - 0x2000], sizeof(mem_buf));
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Unmap test memory
   result = sceKernelMunmap(start_addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Close file
   result = sceKernelClose(fd);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Open test file
   fd = sceKernelOpen("/download0/test_file.txt", 0x602, 0666);
@@ -1738,15 +1738,15 @@ TEST(MemoryTests, FileMappingTest) {
   int32_t random_fd = sceKernelOpen("/dev/urandom", 0, 0777);
   CHECK(random_fd > 0);
   bytes_read = sceKernelRead(random_fd, read_buf, sizeof(read_buf));
-  CHECK_EQUAL(sizeof(read_buf), bytes_read);
+  LONGS_EQUAL(sizeof(read_buf), bytes_read);
 
   // Use sceKernelWrite to write the random data to the file.
   bytes_read = sceKernelWrite(fd, read_buf, sizeof(read_buf));
-  CHECK_EQUAL(sizeof(read_buf), bytes_read);
+  LONGS_EQUAL(sizeof(read_buf), bytes_read);
 
   // Seek back to the beginning of the file.
   bytes_read = sceKernelLseek(fd, 0, 0);
-  CHECK_EQUAL(0, bytes_read);
+  LONGS_EQUAL(0, bytes_read);
 
   // mmap file to memory
   // Using flags 0, prot read-write.
@@ -1754,16 +1754,16 @@ TEST(MemoryTests, FileMappingTest) {
   output_addr = 0;
   offset      = 0;
   result      = sceKernelMmap(addr, 0x10000, 3, 0, fd, offset, &output_addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Run a memcpy to copy from this memory to a buffer, then compare it to the file data.
   memcpy(mem_buf, reinterpret_cast<void*>(output_addr), sizeof(mem_buf));
   result = memcmp(mem_buf, read_buf, sizeof(mem_buf));
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Unmap test memory
   result = sceKernelMunmap(output_addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Test misaligned file size behavior.
   // This should leave the file contents intact.
@@ -1772,79 +1772,79 @@ TEST(MemoryTests, FileMappingTest) {
   // mmap file to memory
   // Using flags 0, prot read-write.
   result = sceKernelMmap(addr, 0x10000, 3, 0, fd, offset, &output_addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Run sceKernelVirtualQuery to make sure memory area is as expected.
   memset(&info, 0, sizeof(info));
   result = sceKernelVirtualQuery(output_addr, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(output_addr, info.start);
-  CHECK_EQUAL(output_addr + 0x10000, info.end);
-  CHECK_EQUAL(0, info.offset);
-  CHECK_EQUAL(3, info.prot);
-  CHECK_EQUAL(0, info.memory_type);
-  CHECK_EQUAL(1, info.is_flexible);
-  CHECK_EQUAL(0, info.is_direct);
-  CHECK_EQUAL(0, info.is_stack);
-  CHECK_EQUAL(0, info.is_pooled);
-  CHECK_EQUAL(1, info.is_committed);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(output_addr, info.start);
+  LONGS_EQUAL(output_addr + 0x10000, info.end);
+  LONGS_EQUAL(0, info.offset);
+  LONGS_EQUAL(3, info.prot);
+  LONGS_EQUAL(0, info.memory_type);
+  LONGS_EQUAL(1, info.is_flexible);
+  LONGS_EQUAL(0, info.is_direct);
+  LONGS_EQUAL(0, info.is_stack);
+  LONGS_EQUAL(0, info.is_pooled);
+  LONGS_EQUAL(1, info.is_committed);
 
   // Run a memcpy to copy from this memory to a buffer, then compare it to the file data.
   memcpy(mem_buf, reinterpret_cast<void*>(output_addr), sizeof(mem_buf));
   // Only compare the parts that are in the file. Outside the file, memory contents differ from old file contents.
   result = memcmp(mem_buf, read_buf, 0xf000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Bytes outside the file contents are zeroed.
   char test_buf[0x1000];
   memset(test_buf, 0, 0x1000);
   result = memcmp(&mem_buf[0xf000], test_buf, 0x1000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Unmap test memory
   result = sceKernelMunmap(output_addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Alignment behavior allows this call to succeed too, since offset aligns down and size aligns up.
   // Remember that output_addr is misaligned here due to the offset.
   result = sceKernelMmap(addr, 0xf000, 3, 0, fd, 0x1000, &output_addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Run sceKernelVirtualQuery to make sure memory area is as expected.
   memset(&info, 0, sizeof(info));
   result = sceKernelVirtualQuery(output_addr, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(output_addr - 0x1000, info.start);
-  CHECK_EQUAL(output_addr + 0xf000, info.end);
-  CHECK_EQUAL(0, info.offset);
-  CHECK_EQUAL(3, info.prot);
-  CHECK_EQUAL(0, info.memory_type);
-  CHECK_EQUAL(1, info.is_flexible);
-  CHECK_EQUAL(0, info.is_direct);
-  CHECK_EQUAL(0, info.is_stack);
-  CHECK_EQUAL(0, info.is_pooled);
-  CHECK_EQUAL(1, info.is_committed);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(output_addr - 0x1000, info.start);
+  LONGS_EQUAL(output_addr + 0xf000, info.end);
+  LONGS_EQUAL(0, info.offset);
+  LONGS_EQUAL(3, info.prot);
+  LONGS_EQUAL(0, info.memory_type);
+  LONGS_EQUAL(1, info.is_flexible);
+  LONGS_EQUAL(0, info.is_direct);
+  LONGS_EQUAL(0, info.is_stack);
+  LONGS_EQUAL(0, info.is_pooled);
+  LONGS_EQUAL(1, info.is_committed);
 
   // Run a memcpy to copy from this memory to a buffer, then compare it to the file data.
   memcpy(mem_buf, reinterpret_cast<void*>(output_addr - 0x1000), sizeof(mem_buf));
   // Only compare the parts that are in the file. Outside the file, memory contents differ from old file contents.
   result = memcmp(mem_buf, read_buf, 0xf000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Bytes outside the file contents are zeroed.
   memset(test_buf, 0, 0x1000);
   result = memcmp(&mem_buf[0xf000], test_buf, 0x1000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Unmap test memory
   result = sceKernelMunmap(output_addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Now test MAP_SHARED behavior (safely).
   // This flag copies changes from memory to the file.
   // Note that using this flag with read-only files is dangerous, instantly crashes PS4s and causes data corruption.
   result = sceKernelMmap(addr, 0x8000, 3, 1, fd, offset, &output_addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Right now the data we get will be the same random values.
   // Do a memory write to write 0s to the start of the file.
@@ -1852,21 +1852,21 @@ TEST(MemoryTests, FileMappingTest) {
 
   // Lseek to the start of the file, then read the first 0x8000 bytes.
   result = sceKernelLseek(fd, 0, 0);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   bytes_read = sceKernelRead(fd, read_buf, 0x8000);
-  CHECK_EQUAL(0x8000, bytes_read);
+  LONGS_EQUAL(0x8000, bytes_read);
 
   // Compare the memory to the raw file contents.
   result = memcmp(read_buf, reinterpret_cast<void*>(output_addr), 0x8000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Unmap test memory
   result = sceKernelMunmap(output_addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Close test file
   result = sceKernelClose(fd);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Test closing a file while it's mmapped
   fd = sceKernelOpen("/download0/test_file.txt", 0x2, 0666);
@@ -1874,24 +1874,24 @@ TEST(MemoryTests, FileMappingTest) {
 
   // mmap file to memory
   result = sceKernelMmap(addr, 0x8000, 3, 0, fd, offset, &output_addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Check file contents
   memset(read_buf, 0, 0x8000);
   bytes_read = sceKernelRead(fd, read_buf, 0x8000);
-  CHECK_EQUAL(0x8000, bytes_read);
+  LONGS_EQUAL(0x8000, bytes_read);
 
   // Close test file
   result = sceKernelClose(fd);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Compare the memory to the raw file contents.
   result = memcmp(read_buf, reinterpret_cast<void*>(output_addr), 0x8000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Unmap test memory
   result = sceKernelMunmap(output_addr, 0x8000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 }
 
 TEST(MemoryTests, FlexibleTest) {
@@ -1904,10 +1904,10 @@ TEST(MemoryTests, FlexibleTest) {
     result = sceKernelMapFlexibleMemory(&addr_out, 0x4000, 3, 0);
     if (result < 0) {
       // Out of flex mem
-      CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+      LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
     } else {
       // Mapped flex mem successfully.
-      CHECK_EQUAL(0, result);
+      LONGS_EQUAL(0, result);
       // Add the mapping address to addresses, need to unmap later to clean up.
       addresses.emplace_back(addr_out);
     }
@@ -1916,32 +1916,32 @@ TEST(MemoryTests, FlexibleTest) {
   // After all these mappings, available flex size should be 0.
   uint64_t avail_flex_size = 0;
   result                   = sceKernelAvailableFlexibleMemorySize(&avail_flex_size);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(0, avail_flex_size);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(0, avail_flex_size);
 
   // sceKernelMmap with MAP_ANON uses the flexible budget.
   uint64_t test_addr;
   result = sceKernelMmap(0, 0x4000, 3, 0x1000, -1, 0, &test_addr);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // Test budget behavior with MAP_STACK
   test_addr = 0xfb00000000;
   result    = sceKernelMmap(test_addr, 0x4000, 3, 0x400, -1, 0, &test_addr);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // sceKernelMmap with MAP_VOID
   result = sceKernelMmap(test_addr, 0x4000, 3, 0x100, -1, 0, &test_addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(test_addr, 0x4000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // sceKernelMmap with files also uses the flexible budget.
   int32_t fd = sceKernelOpen("/app0/assets/misc/test_file.txt", 0, 0666);
   CHECK(fd > 0);
   result = sceKernelMmap(0, 0x4000, 3, 0, fd, 0, &test_addr);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
   result = sceKernelClose(fd);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Make sure download dir file has enough space to mmap before trying.
   fd = sceKernelOpen("/download0/test_file.txt", 0x602, 0666);
@@ -1949,28 +1949,28 @@ TEST(MemoryTests, FlexibleTest) {
   char test_buf[0x100000];
   memset(test_buf, 0, sizeof(test_buf));
   int64_t bytes = sceKernelWrite(fd, test_buf, sizeof(test_buf));
-  CHECK_EQUAL(sizeof(test_buf), bytes);
+  LONGS_EQUAL(sizeof(test_buf), bytes);
 
   // mmap download dir file.
   result = sceKernelMmap(0, 0x4000, 3, 0, fd, 0, &test_addr);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
   result = sceKernelClose(fd);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Files in system folders like /data don't count towards the budget.
   fd = sceKernelOpen("/data/test_file.txt", 0x602, 0666);
   CHECK(fd > 0);
   memset(test_buf, 0, sizeof(test_buf));
   bytes = sceKernelWrite(fd, test_buf, sizeof(test_buf));
-  CHECK_EQUAL(sizeof(test_buf), bytes);
+  LONGS_EQUAL(sizeof(test_buf), bytes);
 
   // mmap data dir file.
   result = sceKernelMmap(0, 0x4000, 3, 0, fd, 0, &test_addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(test_addr, 0x4000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelClose(fd);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // We can't directly correlate flex size to mapped memory,
   // since my list of addresses will also cut into the flex mem budget.
@@ -1978,19 +1978,19 @@ TEST(MemoryTests, FlexibleTest) {
   // Unmap all of the flexible memory used here.
   for (uint64_t addr: addresses) {
     result = sceKernelMunmap(addr, 0x4000);
-    CHECK_EQUAL(0, result);
+    LONGS_EQUAL(0, result);
   }
   addresses.clear();
 
   // Available flex size should be greater than 0 now
   result = sceKernelAvailableFlexibleMemorySize(&avail_flex_size);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   CHECK(avail_flex_size != 0);
 
   // Flexible memory is not backed in any way, so the contents are garbage before initializing.
   addr_out = 0x300000000;
   result   = sceKernelMapFlexibleMemory(&addr_out, 0x10000, 3, 0);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // While we're here, make sure stored memory info matches expectations for flexible memory.
   struct OrbisKernelVirtualQueryInfo {
@@ -2010,17 +2010,17 @@ TEST(MemoryTests, FlexibleTest) {
   OrbisKernelVirtualQueryInfo info;
   memset(&info, 0, sizeof(info));
   result = sceKernelVirtualQuery(addr_out, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(addr_out, info.start);
-  CHECK_EQUAL(addr_out + 0x10000, info.end);
-  CHECK_EQUAL(0, info.offset);
-  CHECK_EQUAL(3, info.prot);
-  CHECK_EQUAL(0, info.memory_type);
-  CHECK_EQUAL(1, info.is_flexible);
-  CHECK_EQUAL(0, info.is_direct);
-  CHECK_EQUAL(0, info.is_stack);
-  CHECK_EQUAL(0, info.is_pooled);
-  CHECK_EQUAL(1, info.is_committed);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr_out, info.start);
+  LONGS_EQUAL(addr_out + 0x10000, info.end);
+  LONGS_EQUAL(0, info.offset);
+  LONGS_EQUAL(3, info.prot);
+  LONGS_EQUAL(0, info.memory_type);
+  LONGS_EQUAL(1, info.is_flexible);
+  LONGS_EQUAL(0, info.is_direct);
+  LONGS_EQUAL(0, info.is_stack);
+  LONGS_EQUAL(0, info.is_pooled);
+  LONGS_EQUAL(1, info.is_committed);
 
   // Write 1's to the full memory range.
   memset(reinterpret_cast<void*>(addr_out), 1, 0x10000);
@@ -2028,23 +2028,23 @@ TEST(MemoryTests, FlexibleTest) {
   // Ensure the full range has 1's
   memset(test_buf, 1, sizeof(test_buf));
   result = memcmp(test_buf, reinterpret_cast<void*>(addr_out), 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Unmap the middle of the range
   result = sceKernelMunmap(addr_out + 0x4000, 0x8000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Ensure the remaining mapped areas are still filled with 1's
   result = memcmp(test_buf, reinterpret_cast<void*>(addr_out), 0x4000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = memcmp(&test_buf[0xc000], reinterpret_cast<void*>(addr_out + 0xc000), 0x4000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Remap the unmapped area, use flag fixed to ensure correct placement.
   uint64_t new_addr = addr_out + 0x4000;
   result            = sceKernelMapFlexibleMemory(&new_addr, 0x8000, 3, 0x10);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(addr_out + 0x4000, new_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr_out + 0x4000, new_addr);
 
   // The new memory area will not have the contents of the old memory.
   result = memcmp(&test_buf[0x4000], reinterpret_cast<void*>(new_addr), 0x8000);
@@ -2053,24 +2053,24 @@ TEST(MemoryTests, FlexibleTest) {
   // Re-fill the area with 1's
   memset(reinterpret_cast<void*>(addr_out), 1, 0x10000);
   result = memcmp(test_buf, reinterpret_cast<void*>(addr_out), 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Overwrite the whole memory area, this should destroy the contents within.
   new_addr = addr_out;
   result   = sceKernelMapFlexibleMemory(&new_addr, 0x10000, 3, 0x10);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(new_addr, addr_out);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(new_addr, addr_out);
 
   result = memcmp(test_buf, reinterpret_cast<void*>(addr_out), 0x10000);
   CHECK(result != 0);
 
   result = sceKernelMunmap(new_addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Get a base budget value to calculate with.
   uint64_t avail_flex_size_before = 0;
   result                          = sceKernelAvailableFlexibleMemorySize(&avail_flex_size_before);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   CHECK(avail_flex_size_before != 0);
 
   // Note: Seems like allocations are not directly consuming the budget.
@@ -2078,63 +2078,63 @@ TEST(MemoryTests, FlexibleTest) {
 
   // Test sceKernelMapFlexibleMemory to see how it impacts the budget.
   result = sceKernelMapFlexibleMemory(&new_addr, 0x100000, 3, 0x0);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // This should reduce available size by 0x100000.
   result = sceKernelAvailableFlexibleMemorySize(&avail_flex_size);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(avail_flex_size_before - 0x100000, avail_flex_size);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(avail_flex_size_before - 0x100000, avail_flex_size);
 
   // Unmap the memory
   result = sceKernelMunmap(new_addr, 0x100000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // This should bring available back to normal.
   result = sceKernelAvailableFlexibleMemorySize(&avail_flex_size);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(avail_flex_size_before, avail_flex_size);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(avail_flex_size_before, avail_flex_size);
 
   // Test mmap with MAP_ANON to see how it impacts the budget.
   result = sceKernelMmap(0, 0x100000, 3, 0x1000, -1, 0, &new_addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // This should reduce available size by 0x100000.
   result = sceKernelAvailableFlexibleMemorySize(&avail_flex_size);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(avail_flex_size_before - 0x100000, avail_flex_size);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(avail_flex_size_before - 0x100000, avail_flex_size);
 
   // Unmap the memory
   result = sceKernelMunmap(new_addr, 0x100000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // This should bring available back to normal.
   result = sceKernelAvailableFlexibleMemorySize(&avail_flex_size);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(avail_flex_size_before, avail_flex_size);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(avail_flex_size_before, avail_flex_size);
 
   // Test file mmap from download dir to see how it impacts the budget.
   fd = sceKernelOpen("/download0/test_file.txt", 0, 0666);
   CHECK(fd > 0);
   result = sceKernelMmap(0, 0x100000, 3, 0, fd, 0, &new_addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // This should reduce available size by 0x10000.
   result = sceKernelAvailableFlexibleMemorySize(&avail_flex_size);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(avail_flex_size_before - 0x100000, avail_flex_size);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(avail_flex_size_before - 0x100000, avail_flex_size);
 
   // Unmap the memory
   result = sceKernelMunmap(new_addr, 0x100000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Close the file
   result = sceKernelClose(fd);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // This should bring available back to normal.
   result = sceKernelAvailableFlexibleMemorySize(&avail_flex_size);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(avail_flex_size_before, avail_flex_size);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(avail_flex_size_before, avail_flex_size);
 }
 
 TEST(MemoryTests, DirectTest) {
@@ -2145,22 +2145,22 @@ TEST(MemoryTests, DirectTest) {
   // Once again, due to the SceGnmDriver mapping, 0 through 0x10000 is allocated.
   uint64_t addr   = 0;
   int32_t  result = sceKernelMapDirectMemory(&addr, 0x10000, 3, 0, 0x10000, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
-  CHECK_EQUAL(0, addr);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  LONGS_EQUAL(0, addr);
 
   // Since it's a different syscall, check sceKernelMapDirectMemory2 as well.
   result = sceKernelMapDirectMemory2(&addr, 0x10000, 0, 3, 0, 0x10000, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
-  CHECK_EQUAL(0, addr);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  LONGS_EQUAL(0, addr);
 
   // Allocate some direct memory to test with.
   int64_t phys_addr = 0;
   result            = sceKernelAllocateMainDirectMemory(0x10000, 0x10000, 0, &phys_addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Perform a direct memory mapping.
   result = sceKernelMapDirectMemory(&addr, 0x10000, 3, 0, phys_addr, 0);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // While we're here, make sure stored memory info matches expectations for direct memory.
   struct OrbisKernelVirtualQueryInfo {
@@ -2180,28 +2180,28 @@ TEST(MemoryTests, DirectTest) {
   OrbisKernelVirtualQueryInfo info;
   memset(&info, 0, sizeof(info));
   result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(addr, info.start);
-  CHECK_EQUAL(addr + 0x10000, info.end);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + 0x10000, info.end);
   // Offset is set to physical address.
-  CHECK_EQUAL(phys_addr, info.offset);
-  CHECK_EQUAL(3, info.prot);
-  CHECK_EQUAL(0, info.memory_type);
-  CHECK_EQUAL(0, info.is_flexible);
-  CHECK_EQUAL(1, info.is_direct);
-  CHECK_EQUAL(0, info.is_stack);
-  CHECK_EQUAL(0, info.is_pooled);
-  CHECK_EQUAL(1, info.is_committed);
+  LONGS_EQUAL(phys_addr, info.offset);
+  LONGS_EQUAL(3, info.prot);
+  LONGS_EQUAL(0, info.memory_type);
+  LONGS_EQUAL(0, info.is_flexible);
+  LONGS_EQUAL(1, info.is_direct);
+  LONGS_EQUAL(0, info.is_stack);
+  LONGS_EQUAL(0, info.is_pooled);
+  LONGS_EQUAL(1, info.is_committed);
 
   // Perform a second mapping to the same physical address, this should mirror the first one.
   uint64_t addr2 = 0;
   result         = sceKernelMapDirectMemory(&addr2, 0x10000, 3, 0, phys_addr, 0);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Both calls should succeed, and writes to the first address will be mirrored to the second.
   memset(reinterpret_cast<void*>(addr), 1, 0x10000);
   result = memcmp(reinterpret_cast<void*>(addr), reinterpret_cast<void*>(addr2), 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Store the current state of this memory
   char test_buf[0x10000];
@@ -2209,59 +2209,59 @@ TEST(MemoryTests, DirectTest) {
 
   // Both addresses should be unmapped by sceKernelCheckedReleaseDirectMemory
   result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Ensure physical memory is properly released
   result = sceKernelMapDirectMemory(&addr, 0x10000, 3, 0, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
 
   // Reallocate memory
   result = sceKernelAllocateMainDirectMemory(0x10000, 0x10000, 0, &phys_addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   result = sceKernelMapDirectMemory(&addr, 0x10000, 3, 0, phys_addr, 0);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Backing contents should remain the same despite the direct memory release.
   result = memcmp(reinterpret_cast<void*>(addr), test_buf, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Partially release page. In theory, this should only unmap the part of mapped to these physical addresses.
   result = sceKernelCheckedReleaseDirectMemory(phys_addr + 0x4000, 0x4000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Use sceKernelQueryMemoryProtection to validate expected addresses.
   uint64_t start_addr;
   uint64_t end_addr;
   int32_t  prot;
   result = sceKernelQueryMemoryProtection(addr, &start_addr, &end_addr, &prot);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(addr, start_addr);
-  CHECK_EQUAL(addr + 0x4000, end_addr);
-  CHECK_EQUAL(3, prot);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, start_addr);
+  LONGS_EQUAL(addr + 0x4000, end_addr);
+  LONGS_EQUAL(3, prot);
 
   // We unmapped from 0x4000 to 0x8000 in the mapping. Query past that gap
   result = sceKernelQueryMemoryProtection(end_addr + 0x4000, &start_addr, &end_addr, &prot);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(addr + 0x8000, start_addr);
-  CHECK_EQUAL(addr + 0x10000, end_addr);
-  CHECK_EQUAL(3, prot);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr + 0x8000, start_addr);
+  LONGS_EQUAL(addr + 0x10000, end_addr);
+  LONGS_EQUAL(3, prot);
 
   // Unmap the full direct memory area.
   result = sceKernelMunmap(addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Remap the area, this should fail due to the missing physical address chunk.
   result = sceKernelMapDirectMemory(&addr, 0x10000, 3, 0, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
 
   // Since it's a different syscall, check sceKernelMapDirectMemory2 as well.
   result = sceKernelMapDirectMemory2(&addr, 0x10000, 0, 3, 0, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
 
   // Release any remaining physical memory from before. Use sceKernelReleaseDirectMemory to skip the unallocated addresses.
   result = sceKernelReleaseDirectMemory(phys_addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Loop through all possible mtypes, ensure all are backed appropriately
   int64_t dmem_start = 0x100000;
@@ -2269,166 +2269,166 @@ TEST(MemoryTests, DirectTest) {
   for (int32_t mtype = 0; mtype < 10; ++mtype) {
     // Allocate direct memory using specified mtype
     result = sceKernelAllocateDirectMemory(dmem_start, dmem_size, 0x10000, 0x10000, mtype, &phys_addr);
-    CHECK_EQUAL(0, result);
+    LONGS_EQUAL(0, result);
 
     // Map direct memory to this physical address space
     addr   = 0;
     result = sceKernelMapDirectMemory(&addr, 0x10000, 0x33, 0, phys_addr, 0);
-    CHECK_EQUAL(0, result);
+    LONGS_EQUAL(0, result);
 
     // Check for proper backing behavior. As per usual, copy bytes, unmap, remap, then check for bytes.
     memset(reinterpret_cast<void*>(addr), 1, 0x10000);
     memcpy(test_buf, reinterpret_cast<void*>(addr), 0x10000);
 
     result = sceKernelMunmap(addr, 0x10000);
-    CHECK_EQUAL(0, result);
+    LONGS_EQUAL(0, result);
 
     result = sceKernelMapDirectMemory(&addr, 0x10000, 0x33, 0, phys_addr, 0);
-    CHECK_EQUAL(0, result);
+    LONGS_EQUAL(0, result);
 
     // If this succeeds, this memory is backed.
     result = memcmp(reinterpret_cast<void*>(addr), test_buf, 0x10000);
-    CHECK_EQUAL(0, result);
+    LONGS_EQUAL(0, result);
 
     // Release direct memory used for this test.
     result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x10000);
-    CHECK_EQUAL(0, result);
+    LONGS_EQUAL(0, result);
 
     // While we're here, we can test sceKernelMapDirectMemory2's type-setting.
     // The following code was written with the SceGnmDriver dmem allocation in mind,
     // instead of rewriting the code to remove that assumption, perform an extra dmem allocation with the same type and size.
     int64_t phys_addr2 = 0;
     result             = sceKernelAllocateDirectMemory(dmem_start, dmem_size, 0x10000, 0x10000, 3, &phys_addr2);
-    CHECK_EQUAL(0, result);
+    LONGS_EQUAL(0, result);
 
     for (int32_t test_mtype = 0; test_mtype < 10; ++test_mtype) {
       // Allocate direct memory with mtype
       result = sceKernelAllocateDirectMemory(dmem_start, dmem_size, 0x10000, 0x10000, mtype, &phys_addr);
-      CHECK_EQUAL(0, result);
+      LONGS_EQUAL(0, result);
 
       // Use sceKernelGetDirectMemoryType to ensure type is stored correctly
       int64_t phys_start;
       int64_t phys_end;
       int32_t out_mtype;
       result = sceKernelGetDirectMemoryType(phys_addr, &out_mtype, &phys_start, &phys_end);
-      CHECK_EQUAL(0, result);
+      LONGS_EQUAL(0, result);
       if (out_mtype == 3) {
         // This is the mtype of our extra allocation.
         // Allocations with this type will coalesce with it.
-        CHECK_EQUAL(phys_addr2, phys_start);
+        LONGS_EQUAL(phys_addr2, phys_start);
       } else {
-        CHECK_EQUAL(phys_addr, phys_start);
+        LONGS_EQUAL(phys_addr, phys_start);
       }
-      CHECK_EQUAL(phys_addr + 0x10000, phys_end);
-      CHECK_EQUAL(mtype, out_mtype);
+      LONGS_EQUAL(phys_addr + 0x10000, phys_end);
+      LONGS_EQUAL(mtype, out_mtype);
 
       // Use sceKernelMapDirectMemory2 to change memory type.
       addr   = 0;
       result = sceKernelMapDirectMemory2(&addr, 0x10000, test_mtype, 0x33, 0, phys_addr, 0);
-      CHECK_EQUAL(0, result);
+      LONGS_EQUAL(0, result);
 
       // Use sceKernelGetDirectMemoryType to ensure type is updated correctly
       result = sceKernelGetDirectMemoryType(phys_addr, &out_mtype, &phys_start, &phys_end);
-      CHECK_EQUAL(0, result);
+      LONGS_EQUAL(0, result);
       // sceKernelMapDirectMemory2 doesn't coalesce dmem areas after changing type.
       if (out_mtype == 3 && mtype == 3) {
         // This is the mtype of our extra allocation.
         // Allocations with this type will coalesce with it.
-        CHECK_EQUAL(phys_addr2, phys_start);
+        LONGS_EQUAL(phys_addr2, phys_start);
       } else {
-        CHECK_EQUAL(phys_addr, phys_start);
+        LONGS_EQUAL(phys_addr, phys_start);
       }
-      CHECK_EQUAL(phys_addr + 0x10000, phys_end);
-      CHECK_EQUAL(test_mtype, out_mtype);
+      LONGS_EQUAL(phys_addr + 0x10000, phys_end);
+      LONGS_EQUAL(test_mtype, out_mtype);
 
       // Use sceKernelMunmap to unmap memory
       result = sceKernelMunmap(addr, 0x10000);
-      CHECK_EQUAL(0, result);
+      LONGS_EQUAL(0, result);
 
       // Use sceKernelGetDirectMemoryType to ensure type remains the same
       result = sceKernelGetDirectMemoryType(phys_addr, &out_mtype, &phys_start, &phys_end);
-      CHECK_EQUAL(0, result);
+      LONGS_EQUAL(0, result);
       // sceKernelMapDirectMemory2 doesn't coalesce dmem areas after changing type.
       if (out_mtype == 3 && mtype == 3) {
         // This is the mtype of our extra allocation.
         // Allocations with this type will coalesce with it.
-        CHECK_EQUAL(phys_addr2, phys_start);
+        LONGS_EQUAL(phys_addr2, phys_start);
       } else {
-        CHECK_EQUAL(phys_addr, phys_start);
+        LONGS_EQUAL(phys_addr, phys_start);
       }
-      CHECK_EQUAL(phys_addr + 0x10000, phys_end);
-      CHECK_EQUAL(test_mtype, out_mtype);
+      LONGS_EQUAL(phys_addr + 0x10000, phys_end);
+      LONGS_EQUAL(test_mtype, out_mtype);
 
       // Use sceKernelCheckedReleaseDirectMemory to erase direct memory
       result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x10000);
-      CHECK_EQUAL(0, result);
+      LONGS_EQUAL(0, result);
     }
 
     // Release the extra allocation as well.
     result = sceKernelCheckedReleaseDirectMemory(phys_addr2, 0x10000);
-    CHECK_EQUAL(0, result);
+    LONGS_EQUAL(0, result);
   }
 
   // memory type 10 does not allow write permissions of any form.
   result = sceKernelAllocateDirectMemory(dmem_start, dmem_size, 0x10000, 0, 10, &phys_addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   addr   = 0;
   result = sceKernelMapDirectMemory(&addr, 0x10000, 0, 0, phys_addr, 0);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   addr   = 0;
   result = sceKernelMapDirectMemory(&addr, 0x10000, 1, 0, phys_addr, 0);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   result = sceKernelMapDirectMemory(&addr, 0x10000, 2, 0, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
 
   addr   = 0;
   result = sceKernelMapDirectMemory(&addr, 0x10000, 0x10, 0, phys_addr, 0);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   addr   = 0;
   result = sceKernelMapDirectMemory(&addr, 0x10000, 0x11, 0, phys_addr, 0);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   result = sceKernelMapDirectMemory(&addr, 0x10000, 0x20, 0, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
   result = sceKernelMapDirectMemory(&addr, 0x10000, 0x22, 0, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
   result = sceKernelMapDirectMemory(&addr, 0x10000, 0x30, 0, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
   result = sceKernelMapDirectMemory(&addr, 0x10000, 0x33, 0, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
 
   result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Make sure permissions are checked appropriately when changing type through sceKernelMapDirectMemory2
   result = sceKernelAllocateDirectMemory(dmem_start, dmem_size, 0x10000, 0, 10, &phys_addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   addr   = 0;
   result = sceKernelMapDirectMemory2(&addr, 0x10000, 10, 3, 0, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
   result = sceKernelMapDirectMemory2(&addr, 0x10000, 10, 0x20, 0, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
   result = sceKernelMapDirectMemory2(&addr, 0x10000, 10, 0x11, 0, phys_addr, 0);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   result = sceKernelMunmap(addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Test dmem coalescing edge cases
   // We can get two "mergable" direct memory areas by utilizing sceKernelMapDirectMemory2.
@@ -2436,55 +2436,55 @@ TEST(MemoryTests, DirectTest) {
 
   // This will produce two separate direct memory areas.
   result = sceKernelAllocateDirectMemory(dmem_start, dmem_size, 0x10000, 0, 0, &phys_addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelAllocateDirectMemory(dmem_start, dmem_size, 0x10000, 0, 3, &phys_addr2);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Use sceKernelMapDirectMemory2 to set the mtype of the first allocation to match the second.
   // Despite doing this, the two areas remain separate.
   addr   = 0;
   result = sceKernelMapDirectMemory2(&addr, 0x10000, 3, 3, 0, phys_addr, 0);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   // We don't need the dmem mapped for this test, so unmap it.
   result = sceKernelMunmap(addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Verify dmem map state
   int64_t phys_start;
   int64_t phys_end;
   int32_t out_mtype;
   result = sceKernelGetDirectMemoryType(phys_addr, &out_mtype, &phys_start, &phys_end);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(phys_addr, phys_start);
-  CHECK_EQUAL(phys_addr + 0x10000, phys_end);
-  CHECK_EQUAL(3, out_mtype);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(phys_addr, phys_start);
+  LONGS_EQUAL(phys_addr + 0x10000, phys_end);
+  LONGS_EQUAL(3, out_mtype);
   result = sceKernelGetDirectMemoryType(phys_addr2, &out_mtype, &phys_start, &phys_end);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(phys_addr2, phys_start);
-  CHECK_EQUAL(phys_addr2 + 0x10000, phys_end);
-  CHECK_EQUAL(3, out_mtype);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(phys_addr2, phys_start);
+  LONGS_EQUAL(phys_addr2 + 0x10000, phys_end);
+  LONGS_EQUAL(3, out_mtype);
 
   // Try to map both areas in one sceKernelMapDirectMemory call.
   result = sceKernelMapDirectMemory(&addr, 0x20000, 3, 0, phys_addr, 0);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(addr, 0x20000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // That mapping will not coalesce the dmem areas.
   result = sceKernelGetDirectMemoryType(phys_addr, &out_mtype, &phys_start, &phys_end);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(phys_addr, phys_start);
-  CHECK_EQUAL(phys_addr + 0x10000, phys_end);
-  CHECK_EQUAL(3, out_mtype);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(phys_addr, phys_start);
+  LONGS_EQUAL(phys_addr + 0x10000, phys_end);
+  LONGS_EQUAL(3, out_mtype);
   result = sceKernelGetDirectMemoryType(phys_addr2, &out_mtype, &phys_start, &phys_end);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(phys_addr2, phys_start);
-  CHECK_EQUAL(phys_addr2 + 0x10000, phys_end);
-  CHECK_EQUAL(3, out_mtype);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(phys_addr2, phys_start);
+  LONGS_EQUAL(phys_addr2 + 0x10000, phys_end);
+  LONGS_EQUAL(3, out_mtype);
 
   // Ensure checked release works properly under these conditions.
   result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x20000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   phys_addr          = 0;
   phys_addr2         = 0;
@@ -2493,120 +2493,120 @@ TEST(MemoryTests, DirectTest) {
   int64_t phys_addr5 = 0;
   // Set up four separate allocations, unmergable due to memory type.
   result = sceKernelAllocateDirectMemory(dmem_start, dmem_size, 0x10000, 0, 0, &phys_addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelAllocateDirectMemory(dmem_start + 0x10000, dmem_size, 0x10000, 0, 3, &phys_addr2);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   // Leave a gap here, this will be where we allocate the third area.
   result = sceKernelAllocateDirectMemory(dmem_start + 0x30000, dmem_size, 0x10000, 0, 0, &phys_addr4);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelAllocateDirectMemory(dmem_start + 0x40000, dmem_size, 0x10000, 0, 3, &phys_addr5);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Use sceKernelMapDirectMemory2 to set the mtypes of the first and third allocations to match the second and fourth.
   addr   = 0;
   result = sceKernelMapDirectMemory2(&addr, 0x10000, 3, 3, 0, phys_addr, 0);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   addr   = 0;
   result = sceKernelMapDirectMemory2(&addr, 0x10000, 3, 3, 0, phys_addr4, 0);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Now allocate a fifth area that is mergable with all nearby areas. This will merge 2, 3, and 4, but leave 1 and 5 separate.
   result = sceKernelAllocateDirectMemory(dmem_start, dmem_size, 0x10000, 0, 3, &phys_addr3);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Use sceKernelGetDirectMemoryType to check.
   result = sceKernelGetDirectMemoryType(phys_addr, &out_mtype, &phys_start, &phys_end);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(phys_addr, phys_start);
-  CHECK_EQUAL(phys_addr2, phys_end);
-  CHECK_EQUAL(3, out_mtype);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(phys_addr, phys_start);
+  LONGS_EQUAL(phys_addr2, phys_end);
+  LONGS_EQUAL(3, out_mtype);
   result = sceKernelGetDirectMemoryType(phys_addr3, &out_mtype, &phys_start, &phys_end);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(phys_addr2, phys_start);
-  CHECK_EQUAL(phys_addr5, phys_end);
-  CHECK_EQUAL(3, out_mtype);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(phys_addr2, phys_start);
+  LONGS_EQUAL(phys_addr5, phys_end);
+  LONGS_EQUAL(3, out_mtype);
   result = sceKernelGetDirectMemoryType(phys_addr5, &out_mtype, &phys_start, &phys_end);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(phys_addr5, phys_start);
-  CHECK_EQUAL(phys_addr5 + 0x10000, phys_end);
-  CHECK_EQUAL(3, out_mtype);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(phys_addr5, phys_start);
+  LONGS_EQUAL(phys_addr5 + 0x10000, phys_end);
+  LONGS_EQUAL(3, out_mtype);
 
   // This should release all allocations.
   result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x50000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Set up two unmerged and unmapped allocations to test sceKernelMapDirectMemory2 with.
   // Release our allocation, then set the unmerged dmem areas back up.
   result = sceKernelAllocateMainDirectMemory(0x10000, 0, 0, &phys_addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   addr   = 0;
   result = sceKernelMapDirectMemory2(&addr, 0x10000, 3, 3, 0, phys_addr, 0);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelAllocateMainDirectMemory(0x10000, 0, 0, &phys_addr2);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   addr   = 0;
   result = sceKernelMapDirectMemory2(&addr, 0x10000, 3, 3, 0, phys_addr2, 0);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(addr, 0x10000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Now we have two 0x10000 dmem pages with the same type, but unmerged. Validate this.
   result = sceKernelGetDirectMemoryType(phys_addr, &out_mtype, &phys_start, &phys_end);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(phys_addr, phys_start);
-  CHECK_EQUAL(phys_addr + 0x10000, phys_end);
-  CHECK_EQUAL(3, out_mtype);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(phys_addr, phys_start);
+  LONGS_EQUAL(phys_addr + 0x10000, phys_end);
+  LONGS_EQUAL(3, out_mtype);
   result = sceKernelGetDirectMemoryType(phys_addr2, &out_mtype, &phys_start, &phys_end);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(phys_addr2, phys_start);
-  CHECK_EQUAL(phys_addr2 + 0x10000, phys_end);
-  CHECK_EQUAL(3, out_mtype);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(phys_addr2, phys_start);
+  LONGS_EQUAL(phys_addr2 + 0x10000, phys_end);
+  LONGS_EQUAL(3, out_mtype);
 
   // Run sceKernelMapDirectMemory2 to map both unallocated pages. Use -1 for mtype param to skip changing mtype.
   result = sceKernelMapDirectMemory2(&addr, 0x20000, -1, 3, 0, phys_addr, 0);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(addr, 0x20000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // This will not merge the areas.
   result = sceKernelGetDirectMemoryType(phys_addr, &out_mtype, &phys_start, &phys_end);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(phys_addr, phys_start);
-  CHECK_EQUAL(phys_addr + 0x10000, phys_end);
-  CHECK_EQUAL(3, out_mtype);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(phys_addr, phys_start);
+  LONGS_EQUAL(phys_addr + 0x10000, phys_end);
+  LONGS_EQUAL(3, out_mtype);
   result = sceKernelGetDirectMemoryType(phys_addr2, &out_mtype, &phys_start, &phys_end);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(phys_addr2, phys_start);
-  CHECK_EQUAL(phys_addr2 + 0x10000, phys_end);
-  CHECK_EQUAL(3, out_mtype);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(phys_addr2, phys_start);
+  LONGS_EQUAL(phys_addr2 + 0x10000, phys_end);
+  LONGS_EQUAL(3, out_mtype);
 
   // Run sceKernelMapDirectMemory2 to map and change type for both areas.
   result = sceKernelMapDirectMemory2(&addr, 0x20000, 0, 3, 0, phys_addr, 0);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
   result = sceKernelMunmap(addr, 0x20000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // This does not merge the areas.
   result = sceKernelGetDirectMemoryType(phys_addr, &out_mtype, &phys_start, &phys_end);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(phys_addr, phys_start);
-  CHECK_EQUAL(phys_addr + 0x10000, phys_end);
-  CHECK_EQUAL(0, out_mtype);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(phys_addr, phys_start);
+  LONGS_EQUAL(phys_addr + 0x10000, phys_end);
+  LONGS_EQUAL(0, out_mtype);
   result = sceKernelGetDirectMemoryType(phys_addr2, &out_mtype, &phys_start, &phys_end);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(phys_addr2, phys_start);
-  CHECK_EQUAL(phys_addr2 + 0x10000, phys_end);
-  CHECK_EQUAL(0, out_mtype);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(phys_addr2, phys_start);
+  LONGS_EQUAL(phys_addr2 + 0x10000, phys_end);
+  LONGS_EQUAL(0, out_mtype);
 
   // This should release both allocations.
   result = sceKernelCheckedReleaseDirectMemory(phys_addr, 0x20000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 }
 
 TEST(MemoryTests, CoalescingTest) {
@@ -2678,24 +2678,24 @@ TEST(MemoryTests, CoalescingTest) {
   // For safety, start by reserving a 0xa0000 sized chunk of virtual memory
   uint64_t addr   = 0x2000000000;
   int32_t  result = sceKernelReserveVirtualRange(&addr, 0xa0000, 0, 0);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // To test coalescing in it's fullest, we'll map outside-in
   uint64_t base_addr = addr;
   result             = map_func(&addr, 0x20000, -1, 0, 0x1010);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   addr   = base_addr + 0x80000;
   result = map_func(&addr, 0x20000, -1, 0, 0x1010);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   addr   = base_addr + 0x20000;
   result = map_func(&addr, 0x20000, -1, 0, 0x1010);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   addr   = base_addr + 0x60000;
   result = map_func(&addr, 0x20000, -1, 0, 0x1010);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   mem_scan();
 
@@ -2703,176 +2703,176 @@ TEST(MemoryTests, CoalescingTest) {
   uint64_t start_addr;
   uint64_t end_addr;
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr, start_addr);
-  CHECK_EQUAL(base_addr + 0x20000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr, start_addr);
+  LONGS_EQUAL(base_addr + 0x20000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x20000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x20000, start_addr);
-  CHECK_EQUAL(base_addr + 0x40000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x20000, start_addr);
+  LONGS_EQUAL(base_addr + 0x40000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x60000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x60000, start_addr);
-  CHECK_EQUAL(base_addr + 0x80000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x60000, start_addr);
+  LONGS_EQUAL(base_addr + 0x80000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x80000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x80000, start_addr);
-  CHECK_EQUAL(base_addr + 0xa0000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x80000, start_addr);
+  LONGS_EQUAL(base_addr + 0xa0000, end_addr);
 
   // Test making a mapping in between these other mappings.
   addr   = base_addr + 0x40000;
   result = map_func(&addr, 0x20000, -1, 0, 0x1010);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   mem_scan();
 
   // Nothing combines, we now have 5 separate areas.
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr, start_addr);
-  CHECK_EQUAL(base_addr + 0x20000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr, start_addr);
+  LONGS_EQUAL(base_addr + 0x20000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x20000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x20000, start_addr);
-  CHECK_EQUAL(base_addr + 0x40000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x20000, start_addr);
+  LONGS_EQUAL(base_addr + 0x40000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x40000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x40000, start_addr);
-  CHECK_EQUAL(base_addr + 0x60000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x40000, start_addr);
+  LONGS_EQUAL(base_addr + 0x60000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x60000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x60000, start_addr);
-  CHECK_EQUAL(base_addr + 0x80000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x60000, start_addr);
+  LONGS_EQUAL(base_addr + 0x80000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x80000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x80000, start_addr);
-  CHECK_EQUAL(base_addr + 0xa0000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x80000, start_addr);
+  LONGS_EQUAL(base_addr + 0xa0000, end_addr);
 
   // Test using sceKernelSetVirtualRangeName, see if that merges anything.
   result = sceKernelSetVirtualRangeName(base_addr, 0xa0000, "Mapping");
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   mem_scan();
 
   // Nothing combines, all areas are named separately.
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr, start_addr);
-  CHECK_EQUAL(base_addr + 0x20000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr, start_addr);
+  LONGS_EQUAL(base_addr + 0x20000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x20000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x20000, start_addr);
-  CHECK_EQUAL(base_addr + 0x40000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x20000, start_addr);
+  LONGS_EQUAL(base_addr + 0x40000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x40000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x40000, start_addr);
-  CHECK_EQUAL(base_addr + 0x60000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x40000, start_addr);
+  LONGS_EQUAL(base_addr + 0x60000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x60000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x60000, start_addr);
-  CHECK_EQUAL(base_addr + 0x80000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x60000, start_addr);
+  LONGS_EQUAL(base_addr + 0x80000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x80000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x80000, start_addr);
-  CHECK_EQUAL(base_addr + 0xa0000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x80000, start_addr);
+  LONGS_EQUAL(base_addr + 0xa0000, end_addr);
 
   // Test using sceKernelMprotect, see if anything merges.
   result = sceKernelMprotect(base_addr, 0xa0000, 0x3);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   mem_scan();
 
   // Nothing combines, all areas now have reduced prot.
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr, start_addr);
-  CHECK_EQUAL(base_addr + 0x20000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr, start_addr);
+  LONGS_EQUAL(base_addr + 0x20000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x20000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x20000, start_addr);
-  CHECK_EQUAL(base_addr + 0x40000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x20000, start_addr);
+  LONGS_EQUAL(base_addr + 0x40000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x40000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x40000, start_addr);
-  CHECK_EQUAL(base_addr + 0x60000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x40000, start_addr);
+  LONGS_EQUAL(base_addr + 0x60000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x60000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x60000, start_addr);
-  CHECK_EQUAL(base_addr + 0x80000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x60000, start_addr);
+  LONGS_EQUAL(base_addr + 0x80000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x80000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x80000, start_addr);
-  CHECK_EQUAL(base_addr + 0xa0000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x80000, start_addr);
+  LONGS_EQUAL(base_addr + 0xa0000, end_addr);
 
   // Test using sceKernelMlock, see if anything merges.
   result = sceKernelMlock(base_addr, 0xa0000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   mem_scan();
 
   // Nothing changes.
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr, start_addr);
-  CHECK_EQUAL(base_addr + 0x20000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr, start_addr);
+  LONGS_EQUAL(base_addr + 0x20000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x20000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x20000, start_addr);
-  CHECK_EQUAL(base_addr + 0x40000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x20000, start_addr);
+  LONGS_EQUAL(base_addr + 0x40000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x40000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x40000, start_addr);
-  CHECK_EQUAL(base_addr + 0x60000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x40000, start_addr);
+  LONGS_EQUAL(base_addr + 0x60000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x60000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x60000, start_addr);
-  CHECK_EQUAL(base_addr + 0x80000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x60000, start_addr);
+  LONGS_EQUAL(base_addr + 0x80000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x80000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x80000, start_addr);
-  CHECK_EQUAL(base_addr + 0xa0000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x80000, start_addr);
+  LONGS_EQUAL(base_addr + 0xa0000, end_addr);
 
   // Unmap testing memory.
   result = unmap_func(base_addr, 0xa0000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   mem_scan();
 
   // Perform memory reservations instead.
   addr   = base_addr;
   result = map_func(&addr, 0x20000, -1, 0, 0x111);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   addr   = base_addr + 0x80000;
   result = map_func(&addr, 0x20000, -1, 0, 0x111);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   addr   = base_addr + 0x20000;
   result = map_func(&addr, 0x20000, -1, 0, 0x111);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   addr   = base_addr + 0x60000;
   result = map_func(&addr, 0x20000, -1, 0, 0x111);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   mem_scan();
 
@@ -2896,52 +2896,52 @@ TEST(MemoryTests, CoalescingTest) {
   OrbisKernelVirtualQueryInfo info;
   memset(&info, 0, sizeof(info));
   result = sceKernelVirtualQuery(base_addr, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr, info.start);
-  CHECK_EQUAL(base_addr + 0x40000, info.end);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr, info.start);
+  LONGS_EQUAL(base_addr + 0x40000, info.end);
 
   memset(&info, 0, sizeof(info));
   result = sceKernelVirtualQuery(base_addr + 0x80000, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x60000, info.start);
-  CHECK_EQUAL(base_addr + 0xa0000, info.end);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x60000, info.start);
+  LONGS_EQUAL(base_addr + 0xa0000, info.end);
 
   // Test making a mapping in between these other mappings.
   addr   = base_addr + 0x40000;
   result = map_func(&addr, 0x20000, -1, 0, 0x111);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   mem_scan();
 
   // All reserved areas should coalesce together here.
   memset(&info, 0, sizeof(info));
   result = sceKernelVirtualQuery(base_addr, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr, info.start);
-  CHECK_EQUAL(base_addr + 0xa0000, info.end);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr, info.start);
+  LONGS_EQUAL(base_addr + 0xa0000, info.end);
 
   // Unmap testing memory.
   result = unmap_func(base_addr, 0xa0000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   mem_scan();
 
   // Perform memory reservations without MAP_SHARED. This appears to skip some coalescing logic?
   addr   = base_addr;
   result = map_func(&addr, 0x20000, -1, 0, 0x110);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   addr   = base_addr + 0x80000;
   result = map_func(&addr, 0x20000, -1, 0, 0x110);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   addr   = base_addr + 0x20000;
   result = map_func(&addr, 0x20000, -1, 0, 0x110);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   addr   = base_addr + 0x60000;
   result = map_func(&addr, 0x20000, -1, 0, 0x110);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   mem_scan();
 
@@ -2949,39 +2949,39 @@ TEST(MemoryTests, CoalescingTest) {
   // sceKernelQueryMemoryProtection returns errors with reserved memory, use sceKernelVirtualQuery instead.
   memset(&info, 0, sizeof(info));
   result = sceKernelVirtualQuery(base_addr, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr, info.start);
-  CHECK_EQUAL(base_addr + 0x40000, info.end);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr, info.start);
+  LONGS_EQUAL(base_addr + 0x40000, info.end);
 
   memset(&info, 0, sizeof(info));
   result = sceKernelVirtualQuery(base_addr + 0x80000, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x60000, info.start);
-  CHECK_EQUAL(base_addr + 0xa0000, info.end);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x60000, info.start);
+  LONGS_EQUAL(base_addr + 0xa0000, info.end);
 
   // Test making a mapping in between these other mappings.
   addr   = base_addr + 0x40000;
   result = map_func(&addr, 0x20000, -1, 0, 0x110);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   mem_scan();
 
   // Without MAP_SHARED, the new mapping only merges with the previous mapping, the later mapping remains unmerged.
   memset(&info, 0, sizeof(info));
   result = sceKernelVirtualQuery(base_addr, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr, info.start);
-  CHECK_EQUAL(base_addr + 0x60000, info.end);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr, info.start);
+  LONGS_EQUAL(base_addr + 0x60000, info.end);
 
   memset(&info, 0, sizeof(info));
   result = sceKernelVirtualQuery(base_addr + 0x60000, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x60000, info.start);
-  CHECK_EQUAL(base_addr + 0xa0000, info.end);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x60000, info.start);
+  LONGS_EQUAL(base_addr + 0xa0000, info.end);
 
   // Unmap testing memory.
   result = unmap_func(base_addr, 0xa0000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   mem_scan();
 
@@ -2989,174 +2989,174 @@ TEST(MemoryTests, CoalescingTest) {
   // With SDK version 1.00, this will not coalesce.
   addr   = base_addr;
   result = map_func(&addr, 0x20000, -1, 0x100000, 0x10);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   addr   = base_addr + 0x80000;
   result = map_func(&addr, 0x20000, -1, 0x180000, 0x10);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   addr   = base_addr + 0x20000;
   result = map_func(&addr, 0x20000, -1, 0x120000, 0x10);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   addr   = base_addr + 0x60000;
   result = map_func(&addr, 0x20000, -1, 0x160000, 0x10);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   mem_scan();
 
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr, start_addr);
-  CHECK_EQUAL(base_addr + 0x20000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr, start_addr);
+  LONGS_EQUAL(base_addr + 0x20000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x20000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x20000, start_addr);
-  CHECK_EQUAL(base_addr + 0x40000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x20000, start_addr);
+  LONGS_EQUAL(base_addr + 0x40000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x60000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x60000, start_addr);
-  CHECK_EQUAL(base_addr + 0x80000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x60000, start_addr);
+  LONGS_EQUAL(base_addr + 0x80000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x80000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x80000, start_addr);
-  CHECK_EQUAL(base_addr + 0xa0000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x80000, start_addr);
+  LONGS_EQUAL(base_addr + 0xa0000, end_addr);
 
   // Test making a mapping in between these other mappings.
   addr   = base_addr + 0x40000;
   result = map_func(&addr, 0x20000, -1, 0x140000, 0x10);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   mem_scan();
 
   // Mappings remain separate.
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr, start_addr);
-  CHECK_EQUAL(base_addr + 0x20000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr, start_addr);
+  LONGS_EQUAL(base_addr + 0x20000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x20000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x20000, start_addr);
-  CHECK_EQUAL(base_addr + 0x40000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x20000, start_addr);
+  LONGS_EQUAL(base_addr + 0x40000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x40000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x40000, start_addr);
-  CHECK_EQUAL(base_addr + 0x60000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x40000, start_addr);
+  LONGS_EQUAL(base_addr + 0x60000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x60000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x60000, start_addr);
-  CHECK_EQUAL(base_addr + 0x80000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x60000, start_addr);
+  LONGS_EQUAL(base_addr + 0x80000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x80000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x80000, start_addr);
-  CHECK_EQUAL(base_addr + 0xa0000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x80000, start_addr);
+  LONGS_EQUAL(base_addr + 0xa0000, end_addr);
 
   // Test using sceKernelSetVirtualRangeName, see if that merges anything.
   result = sceKernelSetVirtualRangeName(base_addr, 0xa0000, "Mapping");
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   mem_scan();
 
   // Mappings remain separate, name is applied to all.
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr, start_addr);
-  CHECK_EQUAL(base_addr + 0x20000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr, start_addr);
+  LONGS_EQUAL(base_addr + 0x20000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x20000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x20000, start_addr);
-  CHECK_EQUAL(base_addr + 0x40000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x20000, start_addr);
+  LONGS_EQUAL(base_addr + 0x40000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x40000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x40000, start_addr);
-  CHECK_EQUAL(base_addr + 0x60000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x40000, start_addr);
+  LONGS_EQUAL(base_addr + 0x60000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x60000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x60000, start_addr);
-  CHECK_EQUAL(base_addr + 0x80000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x60000, start_addr);
+  LONGS_EQUAL(base_addr + 0x80000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x80000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x80000, start_addr);
-  CHECK_EQUAL(base_addr + 0xa0000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x80000, start_addr);
+  LONGS_EQUAL(base_addr + 0xa0000, end_addr);
 
   // Test using sceKernelMprotect, see if anything merges.
   result = sceKernelMprotect(base_addr, 0xa0000, 0x3);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   mem_scan();
 
   // Mappings remain separate, protection is applied to all.
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr, start_addr);
-  CHECK_EQUAL(base_addr + 0x20000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr, start_addr);
+  LONGS_EQUAL(base_addr + 0x20000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x20000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x20000, start_addr);
-  CHECK_EQUAL(base_addr + 0x40000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x20000, start_addr);
+  LONGS_EQUAL(base_addr + 0x40000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x40000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x40000, start_addr);
-  CHECK_EQUAL(base_addr + 0x60000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x40000, start_addr);
+  LONGS_EQUAL(base_addr + 0x60000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x60000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x60000, start_addr);
-  CHECK_EQUAL(base_addr + 0x80000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x60000, start_addr);
+  LONGS_EQUAL(base_addr + 0x80000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x80000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x80000, start_addr);
-  CHECK_EQUAL(base_addr + 0xa0000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x80000, start_addr);
+  LONGS_EQUAL(base_addr + 0xa0000, end_addr);
 
   // Test using sceKernelMlock, see if anything merges.
   result = sceKernelMlock(base_addr, 0xa0000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   mem_scan();
 
   // Mappings remain separate.
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr, start_addr);
-  CHECK_EQUAL(base_addr + 0x20000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr, start_addr);
+  LONGS_EQUAL(base_addr + 0x20000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x20000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x20000, start_addr);
-  CHECK_EQUAL(base_addr + 0x40000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x20000, start_addr);
+  LONGS_EQUAL(base_addr + 0x40000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x40000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x40000, start_addr);
-  CHECK_EQUAL(base_addr + 0x60000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x40000, start_addr);
+  LONGS_EQUAL(base_addr + 0x60000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x60000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x60000, start_addr);
-  CHECK_EQUAL(base_addr + 0x80000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x60000, start_addr);
+  LONGS_EQUAL(base_addr + 0x80000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x80000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x80000, start_addr);
-  CHECK_EQUAL(base_addr + 0xa0000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x80000, start_addr);
+  LONGS_EQUAL(base_addr + 0xa0000, end_addr);
 
   // Unmap testing memory.
   result = unmap_func(base_addr, 0xa0000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   mem_scan();
 
@@ -3165,180 +3165,180 @@ TEST(MemoryTests, CoalescingTest) {
   CHECK(fd > 0);
 
   result = sceKernelFtruncate(fd, 0x80000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // file mmaps coalesce so long as MAP_SHARED is provided. Otherwise, they remain separate.
   // Start by testing without MAP_SHARED.
   addr   = base_addr;
   result = map_func(&addr, 0x4000, fd, 0x20000, 0x10);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   addr   = base_addr + 0x10000;
   result = map_func(&addr, 0x4000, fd, 0x30000, 0x10);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   addr   = base_addr + 0x4000;
   result = map_func(&addr, 0x4000, fd, 0x24000, 0x10);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   addr   = base_addr + 0xc000;
   result = map_func(&addr, 0x4000, fd, 0x2c000, 0x10);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   mem_scan();
 
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr, start_addr);
-  CHECK_EQUAL(base_addr + 0x4000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr, start_addr);
+  LONGS_EQUAL(base_addr + 0x4000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x4000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x4000, start_addr);
-  CHECK_EQUAL(base_addr + 0x8000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x4000, start_addr);
+  LONGS_EQUAL(base_addr + 0x8000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0xc000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0xc000, start_addr);
-  CHECK_EQUAL(base_addr + 0x10000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0xc000, start_addr);
+  LONGS_EQUAL(base_addr + 0x10000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x10000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x10000, start_addr);
-  CHECK_EQUAL(base_addr + 0x14000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x10000, start_addr);
+  LONGS_EQUAL(base_addr + 0x14000, end_addr);
 
   // Test making a mapping in between these other mappings.
   addr   = base_addr + 0x8000;
   result = map_func(&addr, 0x4000, fd, 0x28000, 0x10);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   mem_scan();
 
   // Mappings remain separate.
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr, start_addr);
-  CHECK_EQUAL(base_addr + 0x4000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr, start_addr);
+  LONGS_EQUAL(base_addr + 0x4000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x4000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x4000, start_addr);
-  CHECK_EQUAL(base_addr + 0x8000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x4000, start_addr);
+  LONGS_EQUAL(base_addr + 0x8000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x8000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x8000, start_addr);
-  CHECK_EQUAL(base_addr + 0xc000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x8000, start_addr);
+  LONGS_EQUAL(base_addr + 0xc000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0xc000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0xc000, start_addr);
-  CHECK_EQUAL(base_addr + 0x10000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0xc000, start_addr);
+  LONGS_EQUAL(base_addr + 0x10000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x10000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x10000, start_addr);
-  CHECK_EQUAL(base_addr + 0x14000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x10000, start_addr);
+  LONGS_EQUAL(base_addr + 0x14000, end_addr);
 
   // Test using sceKernelSetVirtualRangeName, see if that merges anything.
   result = sceKernelSetVirtualRangeName(base_addr, 0x14000, "Mapping");
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   mem_scan();
 
   // Mappings remain separate.
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr, start_addr);
-  CHECK_EQUAL(base_addr + 0x4000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr, start_addr);
+  LONGS_EQUAL(base_addr + 0x4000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x4000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x4000, start_addr);
-  CHECK_EQUAL(base_addr + 0x8000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x4000, start_addr);
+  LONGS_EQUAL(base_addr + 0x8000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x8000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x8000, start_addr);
-  CHECK_EQUAL(base_addr + 0xc000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x8000, start_addr);
+  LONGS_EQUAL(base_addr + 0xc000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0xc000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0xc000, start_addr);
-  CHECK_EQUAL(base_addr + 0x10000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0xc000, start_addr);
+  LONGS_EQUAL(base_addr + 0x10000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x10000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x10000, start_addr);
-  CHECK_EQUAL(base_addr + 0x14000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x10000, start_addr);
+  LONGS_EQUAL(base_addr + 0x14000, end_addr);
 
   // Test using sceKernelMprotect, see if anything merges.
   result = sceKernelMprotect(base_addr, 0x14000, 0x1);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   mem_scan();
 
   // Mappings remain separate, protection is applied to all.
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr, start_addr);
-  CHECK_EQUAL(base_addr + 0x4000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr, start_addr);
+  LONGS_EQUAL(base_addr + 0x4000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x4000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x4000, start_addr);
-  CHECK_EQUAL(base_addr + 0x8000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x4000, start_addr);
+  LONGS_EQUAL(base_addr + 0x8000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x8000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x8000, start_addr);
-  CHECK_EQUAL(base_addr + 0xc000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x8000, start_addr);
+  LONGS_EQUAL(base_addr + 0xc000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0xc000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0xc000, start_addr);
-  CHECK_EQUAL(base_addr + 0x10000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0xc000, start_addr);
+  LONGS_EQUAL(base_addr + 0x10000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x10000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x10000, start_addr);
-  CHECK_EQUAL(base_addr + 0x14000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x10000, start_addr);
+  LONGS_EQUAL(base_addr + 0x14000, end_addr);
 
   // Test using sceKernelMlock, see if anything merges.
   result = sceKernelMlock(base_addr, 0x14000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   mem_scan();
 
   // Mappings remain separate.
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr, start_addr);
-  CHECK_EQUAL(base_addr + 0x4000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr, start_addr);
+  LONGS_EQUAL(base_addr + 0x4000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x4000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x4000, start_addr);
-  CHECK_EQUAL(base_addr + 0x8000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x4000, start_addr);
+  LONGS_EQUAL(base_addr + 0x8000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x8000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x8000, start_addr);
-  CHECK_EQUAL(base_addr + 0xc000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x8000, start_addr);
+  LONGS_EQUAL(base_addr + 0xc000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0xc000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0xc000, start_addr);
-  CHECK_EQUAL(base_addr + 0x10000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0xc000, start_addr);
+  LONGS_EQUAL(base_addr + 0x10000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x10000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x10000, start_addr);
-  CHECK_EQUAL(base_addr + 0x14000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x10000, start_addr);
+  LONGS_EQUAL(base_addr + 0x14000, end_addr);
 
   // Unmap testing memory.
   result = unmap_func(base_addr, 0x14000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   mem_scan();
 
@@ -3346,48 +3346,48 @@ TEST(MemoryTests, CoalescingTest) {
   // Test with MAP_SHARED here.
   addr   = base_addr;
   result = map_func(&addr, 0x4000, fd, 0x20000, 0x11);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   addr   = base_addr + 0x10000;
   result = map_func(&addr, 0x4000, fd, 0x30000, 0x11);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   addr   = base_addr + 0x4000;
   result = map_func(&addr, 0x4000, fd, 0x24000, 0x11);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   addr   = base_addr + 0xc000;
   result = map_func(&addr, 0x4000, fd, 0x2c000, 0x11);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   mem_scan();
 
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr, start_addr);
-  CHECK_EQUAL(base_addr + 0x8000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr, start_addr);
+  LONGS_EQUAL(base_addr + 0x8000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0xc000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0xc000, start_addr);
-  CHECK_EQUAL(base_addr + 0x14000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0xc000, start_addr);
+  LONGS_EQUAL(base_addr + 0x14000, end_addr);
 
   // Test making a mapping in between these other mappings.
   addr   = base_addr + 0x8000;
   result = map_func(&addr, 0x4000, fd, 0x28000, 0x11);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   mem_scan();
 
   // Mappings all combine together.
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr, start_addr);
-  CHECK_EQUAL(base_addr + 0x14000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr, start_addr);
+  LONGS_EQUAL(base_addr + 0x14000, end_addr);
 
   // Unmap testing memory.
   result = unmap_func(base_addr, 0x14000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   mem_scan();
 
@@ -3395,48 +3395,48 @@ TEST(MemoryTests, CoalescingTest) {
   // This case also merges, like how MAP_SHARED behaves.
   addr   = base_addr;
   result = map_func(&addr, 0x4000, fd, 0x20000, 0x10, 0x1);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   addr   = base_addr + 0x10000;
   result = map_func(&addr, 0x4000, fd, 0x30000, 0x10, 0x1);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   addr   = base_addr + 0x4000;
   result = map_func(&addr, 0x4000, fd, 0x24000, 0x10, 0x1);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   addr   = base_addr + 0xc000;
   result = map_func(&addr, 0x4000, fd, 0x2c000, 0x10, 0x1);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   mem_scan();
 
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr, start_addr);
-  CHECK_EQUAL(base_addr + 0x8000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr, start_addr);
+  LONGS_EQUAL(base_addr + 0x8000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0xc000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0xc000, start_addr);
-  CHECK_EQUAL(base_addr + 0x14000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0xc000, start_addr);
+  LONGS_EQUAL(base_addr + 0x14000, end_addr);
 
   // Test making a mapping in between these other mappings.
   addr   = base_addr + 0x8000;
   result = map_func(&addr, 0x4000, fd, 0x28000, 0x10, 0x1);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   mem_scan();
 
   // Mappings all combine together.
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr, start_addr);
-  CHECK_EQUAL(base_addr + 0x14000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr, start_addr);
+  LONGS_EQUAL(base_addr + 0x14000, end_addr);
 
   // Unmap testing memory.
   result = unmap_func(base_addr, 0x14000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   sceKernelClose(fd);
 
@@ -3444,19 +3444,19 @@ TEST(MemoryTests, CoalescingTest) {
   // With this, even reserved memory will not coalesce.
   addr   = base_addr;
   result = map_func(&addr, 0x20000, -1, 0, 0x400111);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   addr   = base_addr + 0x80000;
   result = map_func(&addr, 0x20000, -1, 0, 0x400111);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   addr   = base_addr + 0x20000;
   result = map_func(&addr, 0x20000, -1, 0, 0x400111);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   addr   = base_addr + 0x60000;
   result = map_func(&addr, 0x20000, -1, 0, 0x400111);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   mem_scan();
 
@@ -3464,111 +3464,138 @@ TEST(MemoryTests, CoalescingTest) {
   // Due to the NoCoalesce flag, these won't combine
   memset(&info, 0, sizeof(info));
   result = sceKernelVirtualQuery(base_addr, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr, info.start);
-  CHECK_EQUAL(base_addr + 0x20000, info.end);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr, info.start);
+  LONGS_EQUAL(base_addr + 0x20000, info.end);
 
   memset(&info, 0, sizeof(info));
   result = sceKernelVirtualQuery(base_addr + 0x20000, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x20000, info.start);
-  CHECK_EQUAL(base_addr + 0x40000, info.end);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x20000, info.start);
+  LONGS_EQUAL(base_addr + 0x40000, info.end);
 
   memset(&info, 0, sizeof(info));
   result = sceKernelVirtualQuery(base_addr + 0x60000, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x60000, info.start);
-  CHECK_EQUAL(base_addr + 0x80000, info.end);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x60000, info.start);
+  LONGS_EQUAL(base_addr + 0x80000, info.end);
 
   memset(&info, 0, sizeof(info));
   result = sceKernelVirtualQuery(base_addr + 0x80000, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x80000, info.start);
-  CHECK_EQUAL(base_addr + 0xa0000, info.end);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x80000, info.start);
+  LONGS_EQUAL(base_addr + 0xa0000, info.end);
 
   // Test making a mapping in between these other mappings.
   // Omit the NoCoalesce flag, this still shouldn't coalesce due to the surrounding areas.
   addr   = base_addr + 0x40000;
   result = map_func(&addr, 0x20000, -1, 0, 0x111);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   mem_scan();
 
   // The mappings remain separate.
   memset(&info, 0, sizeof(info));
   result = sceKernelVirtualQuery(base_addr, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr, info.start);
-  CHECK_EQUAL(base_addr + 0x20000, info.end);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr, info.start);
+  LONGS_EQUAL(base_addr + 0x20000, info.end);
 
   memset(&info, 0, sizeof(info));
   result = sceKernelVirtualQuery(base_addr + 0x20000, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x20000, info.start);
-  CHECK_EQUAL(base_addr + 0x40000, info.end);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x20000, info.start);
+  LONGS_EQUAL(base_addr + 0x40000, info.end);
 
   memset(&info, 0, sizeof(info));
   result = sceKernelVirtualQuery(base_addr + 0x40000, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x40000, info.start);
-  CHECK_EQUAL(base_addr + 0x60000, info.end);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x40000, info.start);
+  LONGS_EQUAL(base_addr + 0x60000, info.end);
 
   memset(&info, 0, sizeof(info));
   result = sceKernelVirtualQuery(base_addr + 0x60000, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x60000, info.start);
-  CHECK_EQUAL(base_addr + 0x80000, info.end);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x60000, info.start);
+  LONGS_EQUAL(base_addr + 0x80000, info.end);
 
   memset(&info, 0, sizeof(info));
   result = sceKernelVirtualQuery(base_addr + 0x80000, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x80000, info.start);
-  CHECK_EQUAL(base_addr + 0xa0000, info.end);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x80000, info.start);
+  LONGS_EQUAL(base_addr + 0xa0000, info.end);
 
   // Test using sceKernelSetVirtualRangeName, see if that merges anything.
   result = sceKernelSetVirtualRangeName(base_addr, 0xa0000, "Mapping");
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   mem_scan();
 
   // Even there, mappings shouldn't coalesce.
   memset(&info, 0, sizeof(info));
   result = sceKernelVirtualQuery(base_addr, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr, info.start);
-  CHECK_EQUAL(base_addr + 0x20000, info.end);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr, info.start);
+  LONGS_EQUAL(base_addr + 0x20000, info.end);
 
   memset(&info, 0, sizeof(info));
   result = sceKernelVirtualQuery(base_addr + 0x20000, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x20000, info.start);
-  CHECK_EQUAL(base_addr + 0x40000, info.end);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x20000, info.start);
+  LONGS_EQUAL(base_addr + 0x40000, info.end);
 
   memset(&info, 0, sizeof(info));
   result = sceKernelVirtualQuery(base_addr + 0x40000, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x40000, info.start);
-  CHECK_EQUAL(base_addr + 0x60000, info.end);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x40000, info.start);
+  LONGS_EQUAL(base_addr + 0x60000, info.end);
 
   memset(&info, 0, sizeof(info));
   result = sceKernelVirtualQuery(base_addr + 0x60000, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x60000, info.start);
-  CHECK_EQUAL(base_addr + 0x80000, info.end);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x60000, info.start);
+  LONGS_EQUAL(base_addr + 0x80000, info.end);
 
   memset(&info, 0, sizeof(info));
   result = sceKernelVirtualQuery(base_addr + 0x80000, 0, &info, sizeof(info));
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x80000, info.start);
-  CHECK_EQUAL(base_addr + 0xa0000, info.end);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x80000, info.start);
+  LONGS_EQUAL(base_addr + 0xa0000, info.end);
 
   // Unmap testing memory.
   result = unmap_func(base_addr, 0xa0000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 }
 
 TEST(MemoryTests, ProtectTest) {
-  // Start by setting up a memory allocation to perform basic tests with.
+  // Set up some basic memory this test can use.
+  // Allocate a decent chunk of direct memory
+  int64_t  dmem_start = 0x100000;
+  uint64_t dmem_size  = 0x100000;
+  int64_t  dmem_phys_addr;
+  int32_t  result = sceKernelAllocateDirectMemory(dmem_start, dmem_start + dmem_size, dmem_size, 0, 0, &dmem_phys_addr);
+  LONGS_EQUAL(0, result);
+  // The elevated dmem_start should ensure this area is free, so dmem_phys_addr should equal dmem_start.
+  LONGS_EQUAL(dmem_start, dmem_phys_addr);
+
+  // Reserve a chunk of memory for testing with.
+  // Use a fixed base address that should be free, this is the same address utilized by the coalescing tests.
+  uint64_t vmem_start = 0x2000000000;
+  uint64_t vmem_size  = 0x1000000;
+  uint64_t addr       = vmem_start;
+  result              = sceKernelReserveVirtualRange(&addr, vmem_size, 0x10, 0);
+  LONGS_EQUAL(0, result);
+  // MAP_FIXED should ensure this is the same.
+  LONGS_EQUAL(vmem_start, addr);
+
+  // Memory reserved through sceKernelReserveVirtualRange (or mmap with MAP_VOID) restricts prot to 0.
+  // sceKernelMprotect will still succeed, but nothing will change in the vmem area.
+
+  // Clean up memory used.
+  result = sceKernelMunmap(addr, vmem_size);
+  LONGS_EQUAL(0, result);
+  result = sceKernelCheckedReleaseDirectMemory(dmem_start, dmem_size);
+  LONGS_EQUAL(0, result);
 }
 
 // These tests are from my old homebrew, I'll probably rewrite some later.
@@ -3605,38 +3632,38 @@ TEST(MemoryTests, ExecutableTests) {
   int64_t  phys_addr = 0;
   uint64_t size      = 0x100000;
   int32_t  result    = sceKernelAllocateDirectMemory(0, dmem_size, size, 0, 0, &phys_addr);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Using the physical addresses, map direct memory to a flexible address.
   uint64_t addr = 0;
   int32_t  prot = 0x37;
   // Direct memory mapping functions do not allow for assigning executable permissions. Test this edge case.
   result = sceKernelMapDirectMemory(&addr, size, prot, 0, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
 
   // Perform a successful direct memory mapping.
   prot   = 0x33;
   result = sceKernelMapDirectMemory(&addr, size, prot, 0, phys_addr, 0);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Run sceKernelQueryMemoryProtection to confirm the protection value assigned to this mapping.
   int32_t old_prot = 0;
   // We don't care about the other data, supply nullptrs for start and end.
   result = sceKernelQueryMemoryProtection(addr, nullptr, nullptr, &old_prot);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(prot, old_prot);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(prot, old_prot);
 
   // Use sceKernelMprotect to give the memory executable permissions.
   prot   = 0x37;
   result = sceKernelMprotect(addr, size, prot);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Direct memory never actually exposes execute permissions.
   // Confirm this behavior by running sceKernelQueryMemoryProtection again.
   int32_t new_prot = 0;
   result           = sceKernelQueryMemoryProtection(addr, nullptr, nullptr, &new_prot);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(old_prot, new_prot);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(old_prot, new_prot);
 
   // Write a basic function into memory that returns 256.
   uint8_t bytes[] = {0x48, 0xc7, 0xc0, 00, 01, 00, 00, 0xc3};
@@ -3644,35 +3671,35 @@ TEST(MemoryTests, ExecutableTests) {
   typedef uint64_t (*func)();
   func     test_func = reinterpret_cast<func>(addr);
   uint64_t res       = test_func();
-  CHECK_EQUAL(256, res);
+  LONGS_EQUAL(256, res);
 
   // Unmap the direct memory used for this test.
   result = sceKernelMunmap(addr, size);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Release direct memory allocated for this test.
   result = sceKernelReleaseDirectMemory(phys_addr, size);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Run a similar test utilizing flexible memory instead. Flexible memory allows and exposes executable permissions.
   addr   = 0;
   result = sceKernelMapFlexibleMemory(&addr, size, prot, 0);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Validate the protection given to the memory area
   result = sceKernelQueryMemoryProtection(addr, nullptr, nullptr, &old_prot);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(prot, old_prot);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(prot, old_prot);
 
   // Write a basic function into memory that returns 256.
   memcpy(reinterpret_cast<void*>(addr), bytes, 8);
   test_func = reinterpret_cast<func>(addr);
   res       = test_func();
-  CHECK_EQUAL(256, res);
+  LONGS_EQUAL(256, res);
 
   // Unmap the flexible memory used for this test.
   result = sceKernelMunmap(addr, size);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 }
 
 TEST(MemoryTests, ProtectTests) {
@@ -3683,7 +3710,7 @@ TEST(MemoryTests, ProtectTests) {
   int32_t  flags  = 0;
   int32_t  prot   = 0;
   int32_t  result = sceKernelMapFlexibleMemory(&addr, size, prot, flags);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Use sceKernelMprotect to protect the middle of this memory area.
   // For testing purposes, use misaligned address and size.
@@ -3691,7 +3718,7 @@ TEST(MemoryTests, ProtectTests) {
   uint64_t protect_size = 0x7D000;
   prot                  = 1;
   result                = sceKernelMprotect(protect_addr, protect_size, prot);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Verify permissions and alignment using sceKernelQueryMemoryProtection.
   // Address is expected to align down, while the size should align up.
@@ -3699,10 +3726,10 @@ TEST(MemoryTests, ProtectTests) {
   uint64_t end_addr;
   int32_t  out_prot;
   result = sceKernelQueryMemoryProtection(protect_addr, &start_addr, &end_addr, &out_prot);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(addr + 0x40000, start_addr);
-  CHECK_EQUAL(addr + 0xC0000, end_addr);
-  CHECK_EQUAL(prot, out_prot);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr + 0x40000, start_addr);
+  LONGS_EQUAL(addr + 0xC0000, end_addr);
+  LONGS_EQUAL(prot, out_prot);
 
   // Ensure we can read from this memory by calling TestZeroedMemory.
   // Ignore the return, all we care about is that reading doesn't crash.
@@ -3714,13 +3741,13 @@ TEST(MemoryTests, ProtectTests) {
   protect_size = 0x80000;
   prot         = 2;
   result       = sceKernelMprotect(protect_addr, protect_size, prot);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Validate returned protection, libkernel adds read protection to write-only pages.
   out_prot = 0;
   result   = sceKernelQueryMemoryProtection(protect_addr, nullptr, nullptr, &out_prot);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(3, out_prot);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(3, out_prot);
 
   // Call TestMemoryWrite to make sure writes work properly, then TestZeroedMemory to check reads.
   TestMemoryWrite(protect_addr, protect_size);
@@ -3729,12 +3756,12 @@ TEST(MemoryTests, ProtectTests) {
   // Use sceKernelMprotect to give the entire original mapping read permissions
   prot   = 1;
   result = sceKernelMprotect(addr, size, prot);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // Ensure prot applied properly.
   result = sceKernelQueryMemoryProtection(addr, nullptr, nullptr, &out_prot);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(prot, out_prot);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(prot, out_prot);
 
   // Ensure we can read from this memory by calling TestZeroedMemory.
   // Ignore the return, all we care about is that reading doesn't crash.
@@ -3742,5 +3769,5 @@ TEST(MemoryTests, ProtectTests) {
 
   // Unmap memory used for test.
   result = sceKernelMunmap(addr, size);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 }

@@ -24,39 +24,39 @@ TEST(MemoryTests, FW170Test) {
   // Null address with MAP_FIXED is now prohibited from the libkernel side.
   uint64_t addr = 0;
   result        = sceKernelMapDirectMemory(&addr, 0x4000, 3, 0x10, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   result = sceKernelMapNamedDirectMemory(&addr, 0x4000, 3, 0x10, phys_addr, 0, "name");
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   result = sceKernelMapFlexibleMemory(&addr, 0x4000, 3, 0x10);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   result = sceKernelMapNamedFlexibleMemory(&addr, 0x4000, 3, 0x10, "name");
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   result = sceKernelReserveVirtualRange(&addr, 0x4000, 0x10, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   result = sceKernelMapNamedSystemFlexibleMemory(&addr, 0x4000, 3, 0x10, "name");
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // Note: Pool 1 should match sceKernelMapDirectMemory behavior.
   result = sceKernelInternalMapDirectMemory(1, &addr, 0x4000, 3, 0x10, phys_addr, 0);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   result = sceKernelInternalMapNamedDirectMemory(1, &addr, 0x4000, 3, 0x10, phys_addr, 0, "name");
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   // mmap and sceKernelMemoryPoolReserve both still reach the mmap syscall, but error there like fw 1.00 does.
   result = sceKernelMmap(addr, 0x4000, 3, 0x1010, -1, 0, &addr);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   result = sceKernelMemoryPoolReserve(addr, 0x4000, 0, 0x10, &addr);
-  CHECK_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
+  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EINVAL, result);
 
   result = sceKernelReleaseDirectMemory(phys_addr, 0x4000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 }
 
 // Test behavior that changed in firmware 2.00, these differences should not be present here.
@@ -120,19 +120,19 @@ TEST(MemoryTests, FW200Test) {
   uint64_t base_addr = 0x2000000000;
   uint64_t addr      = base_addr;
   int32_t  result    = map_func(&addr, 0x20000, -1, 0x100000, 0x10);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   addr   = base_addr + 0x80000;
   result = map_func(&addr, 0x20000, -1, 0x180000, 0x10);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   addr   = base_addr + 0x20000;
   result = map_func(&addr, 0x20000, -1, 0x120000, 0x10);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   addr   = base_addr + 0x60000;
   result = map_func(&addr, 0x20000, -1, 0x160000, 0x10);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   mem_scan();
 
@@ -140,57 +140,57 @@ TEST(MemoryTests, FW200Test) {
   uint64_t start_addr;
   uint64_t end_addr;
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr, start_addr);
-  CHECK_EQUAL(base_addr + 0x20000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr, start_addr);
+  LONGS_EQUAL(base_addr + 0x20000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x20000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x20000, start_addr);
-  CHECK_EQUAL(base_addr + 0x40000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x20000, start_addr);
+  LONGS_EQUAL(base_addr + 0x40000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x60000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x60000, start_addr);
-  CHECK_EQUAL(base_addr + 0x80000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x60000, start_addr);
+  LONGS_EQUAL(base_addr + 0x80000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x80000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x80000, start_addr);
-  CHECK_EQUAL(base_addr + 0xa0000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x80000, start_addr);
+  LONGS_EQUAL(base_addr + 0xa0000, end_addr);
 
   // Test making a mapping in between these other mappings.
   addr   = base_addr + 0x40000;
   result = map_func(&addr, 0x20000, -1, 0x140000, 0x10);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 
   // There should now be 5 mappings.
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr, start_addr);
-  CHECK_EQUAL(base_addr + 0x20000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr, start_addr);
+  LONGS_EQUAL(base_addr + 0x20000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x20000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x20000, start_addr);
-  CHECK_EQUAL(base_addr + 0x40000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x20000, start_addr);
+  LONGS_EQUAL(base_addr + 0x40000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x40000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x40000, start_addr);
-  CHECK_EQUAL(base_addr + 0x60000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x40000, start_addr);
+  LONGS_EQUAL(base_addr + 0x60000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x60000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x60000, start_addr);
-  CHECK_EQUAL(base_addr + 0x80000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x60000, start_addr);
+  LONGS_EQUAL(base_addr + 0x80000, end_addr);
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x80000, &start_addr, &end_addr, nullptr);
-  CHECK_EQUAL(0, result);
-  CHECK_EQUAL(base_addr + 0x80000, start_addr);
-  CHECK_EQUAL(base_addr + 0xa0000, end_addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(base_addr + 0x80000, start_addr);
+  LONGS_EQUAL(base_addr + 0xa0000, end_addr);
 
   // Unmap testing memory.
   result = unmap_func(base_addr, 0xa0000);
-  CHECK_EQUAL(0, result);
+  LONGS_EQUAL(0, result);
 }
