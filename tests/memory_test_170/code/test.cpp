@@ -269,7 +269,7 @@ TEST(MemoryTests, FW200Test) {
   // Areas split due to changed prot
   result = sceKernelMtypeprotect(base_addr + 0x44000, 0x8000, 0, 0x3);
   UNSIGNED_INT_EQUALS(0, result);
-  
+
   mem_scan();
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x40000, &start_addr, &end_addr, nullptr);
