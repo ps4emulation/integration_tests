@@ -1,10 +1,6 @@
 #include "CppUTest/TestHarness.h"
 
-#define UNSIGNED_INT_EQUALS(expected, actual) _unsigned_int_equals(expected, actual);
-
-void _unsigned_int_equals(uint32_t expected, uint32_t actual) {
-  UNSIGNED_LONGS_EQUAL(expected, actual);
-}
+#define UNSIGNED_INT_EQUALS(expected, actual) UNSIGNED_LONGS_EQUAL_LOCATION((uint32_t)expected, (uint32_t)actual, NULLPTR, __FILE__, __LINE__)
 
 // Function definitions (with modified types to improve testability)
 extern "C" {
