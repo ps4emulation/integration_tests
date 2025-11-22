@@ -4052,3 +4052,136 @@ TEST(MemoryTests, ProtectTest) {
   result = sceKernelMprotect(vmem_start, vmem_size, 0x10);
   UNSIGNED_INT_EQUALS(0, result);
 }
+
+TEST(MemoryTests, TypeProtectTest) {
+  /**
+   * This function uses completely separate code from mprotect.
+   *
+   * Initial errors:
+   *  If mtype is greater than 10, returns EINVAL
+   *  If prot & 0xc8 != 0, returns EINVAL (invalid prot check? 0xc8 = 0x8 | 0x40 | 0x80)
+   *    Bits higher than that are simply ignored, so prot 0x100 results in protecting with prot 0.
+   *  If mtype == 10, and prot contains execute or write permissions, then returns EPERM.
+   *  Blockpool logic, like in most places, diverges part-way through here.
+   */
+
+  // Like with the mprotect tests, allocate a chunk of direct memory, and a chunk of virtual memory space for testing.
+  // Set up some basic memory this test can use.
+  // Allocate a decent chunk of direct memory, this area should be free, and isn't touched by other tests.
+  int64_t  dmem_start = 0x400000;
+  uint64_t dmem_size  = 0x100000;
+  int64_t  dmem_phys_addr;
+  int32_t  result = sceKernelAllocateDirectMemory(dmem_start, dmem_start + dmem_size, dmem_size, 0, 0, &dmem_phys_addr);
+  UNSIGNED_INT_EQUALS(0, result);
+  // The elevated dmem_start should ensure this area is free, so dmem_phys_addr should equal dmem_start.
+  LONGS_EQUAL(dmem_start, dmem_phys_addr);
+
+  // Reserve a chunk of memory for testing with.
+  // Use a fixed base address that should be free.
+  uint64_t vmem_start = 0x5000000000;
+  uint64_t vmem_size  = 0x1000000;
+  uint64_t addr       = vmem_start;
+  result              = sceKernelReserveVirtualRange(&addr, vmem_size, 0x10, 0);
+  UNSIGNED_INT_EQUALS(0, result);
+  // MAP_FIXED should ensure this is the same.
+  LONGS_EQUAL(vmem_start, addr);
+
+  // As a basic test case, perform a direct memory mapping, then mtypeprotect it.
+  addr   = vmem_start + 0x100000;
+  result = sceKernelMapDirectMemory(&addr, 0x10000, 0, 0x10, dmem_phys_addr, 0);
+  UNSIGNED_INT_EQUALS(0, result);
+  LONGS_EQUAL(vmem_start + 0x100000, addr);
+
+  struct OrbisKernelVirtualQueryInfo {
+    uint64_t start;
+    uint64_t end;
+    int64_t  offset;
+    int32_t  prot;
+    int32_t  memory_type;
+    uint8_t  is_flexible  : 1;
+    uint8_t  is_direct    : 1;
+    uint8_t  is_stack     : 1;
+    uint8_t  is_pooled    : 1;
+    uint8_t  is_committed : 1;
+    char     name[32];
+  };
+
+  // Verify the lack of protection.
+  OrbisKernelVirtualQueryInfo info = {};
+  result                           = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  UNSIGNED_INT_EQUALS(0, result);
+  LONGS_EQUAL(0, info.prot);
+  LONGS_EQUAL(0, info.memory_type);
+
+  // Perform both type-setting and prot setting here to ensure it fully functions.
+  result = sceKernelMtypeprotect(addr, 0x10000, 3, 0x3);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Both prot and type can be validated through sceKernelVirtualQuery calls.
+  info   = {};
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  UNSIGNED_INT_EQUALS(0, result);
+  LONGS_EQUAL(3, info.prot);
+  LONGS_EQUAL(3, info.memory_type);
+
+  // If the memory is now read-write, we can both write and read from it. Test this.
+  const char* test_str = "This is a test of memory writing";
+  strcpy((char*)addr, test_str);
+
+  // Reduce prot to read-only, change mtype again.
+  result = sceKernelMtypeprotect(addr, 0x10000, 0, 0x1);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  result = strcmp((char*)addr, test_str);
+  LONGS_EQUAL(0, result);
+
+  // Basic sanity check complete, now we can test the basic edge cases.
+
+  // For basic parameter testing, use the memory mapped in the prior test.
+  // Test invalid type parameters.
+  result = sceKernelMtypeprotect(addr, 0x10000, -1, 0x1);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_EINVAL, result);
+  result = sceKernelMtypeprotect(addr, 0x10000, 11, 0x1);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // Test type 10 with write prots
+  result = sceKernelMtypeprotect(addr, 0x10000, 10, 0x2);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_EACCES, result);
+  result = sceKernelMtypeprotect(addr, 0x10000, 10, 0x20);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_EACCES, result);
+
+  // Test invalid prot params?
+  result = sceKernelMtypeprotect(addr, 0x10000, 0, 0x8);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_EINVAL, result);
+  result = sceKernelMtypeprotect(addr, 0x10000, 0, 0x40);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_EINVAL, result);
+  result = sceKernelMtypeprotect(addr, 0x10000, 0, 0x80);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_EINVAL, result);
+
+  // Higher bits are ignored, protect still succeeds.
+  result = sceKernelMtypeprotect(addr, 0x10000, 0, 0x101);
+  UNSIGNED_INT_EQUALS(0, result);
+  info   = {};
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  UNSIGNED_INT_EQUALS(0, result);
+  LONGS_EQUAL(1, info.prot);
+  LONGS_EQUAL(0, info.memory_type);
+
+  // Try mtypeprotect to mtype 10, then mprotect to prot write.
+  result = sceKernelMtypeprotect(addr, 0x10000, 10, 0x1);
+  UNSIGNED_INT_EQUALS(0, result);
+  info   = {};
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  UNSIGNED_INT_EQUALS(0, result);
+  LONGS_EQUAL(1, info.prot);
+  LONGS_EQUAL(10, info.memory_type);
+
+  result = sceKernelMprotect(addr, 0x10000, 0x3);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_EACCES, result);
+
+  // Clean up memory used.
+  result = sceKernelMunmap(vmem_start, vmem_size);
+  UNSIGNED_INT_EQUALS(0, result);
+  result = sceKernelCheckedReleaseDirectMemory(dmem_start, dmem_size);
+  UNSIGNED_INT_EQUALS(0, result);
+}
