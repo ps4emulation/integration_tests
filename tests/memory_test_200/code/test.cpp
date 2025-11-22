@@ -60,9 +60,8 @@ TEST(MemoryTests, FW200Test) {
       uint8_t  is_committed : 1;
       char     name[32];
     };
-    OrbisKernelVirtualQueryInfo info;
-    memset(&info, 0, sizeof(info));
-    int32_t result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+    OrbisKernelVirtualQueryInfo info   = {};
+    int32_t                     result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
     if (info.is_direct == 1) {
       // Just release the direct memory, which will unmap for us.
       int64_t offset = (addr - info.start) + info.offset;
@@ -112,6 +111,120 @@ TEST(MemoryTests, FW200Test) {
   UNSIGNED_INT_EQUALS(0, result);
 
   // Mappings all merge together.
+  result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
+  UNSIGNED_INT_EQUALS(0, result);
+  LONGS_EQUAL(base_addr, start_addr);
+  LONGS_EQUAL(base_addr + 0xa0000, end_addr);
+
+  // Mappings split through mprotect and mtypeprotect can now re-coalesce.
+  result = sceKernelMprotect(base_addr + 0x20000, 0x40000, 0x3);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
+  UNSIGNED_INT_EQUALS(0, result);
+  LONGS_EQUAL(base_addr, start_addr);
+  LONGS_EQUAL(base_addr + 0x20000, end_addr);
+  result = sceKernelQueryMemoryProtection(base_addr + 0x20000, &start_addr, &end_addr, nullptr);
+  UNSIGNED_INT_EQUALS(0, result);
+  LONGS_EQUAL(base_addr + 0x20000, start_addr);
+  LONGS_EQUAL(base_addr + 0x60000, end_addr);
+  result = sceKernelQueryMemoryProtection(base_addr + 0x60000, &start_addr, &end_addr, nullptr);
+  UNSIGNED_INT_EQUALS(0, result);
+  LONGS_EQUAL(base_addr + 0x60000, start_addr);
+  LONGS_EQUAL(base_addr + 0xa0000, end_addr);
+
+  result = sceKernelMprotect(base_addr, 0xa0000, 0x33);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Mappings all merge together.
+  result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
+  UNSIGNED_INT_EQUALS(0, result);
+  LONGS_EQUAL(base_addr, start_addr);
+  LONGS_EQUAL(base_addr + 0xa0000, end_addr);
+
+  // Areas split from changed type too.
+  result = sceKernelMtypeprotect(base_addr + 0x20000, 0x40000, 3, 0x33);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Query memory protection doesn't report the splitting.
+  result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
+  UNSIGNED_INT_EQUALS(0, result);
+  LONGS_EQUAL(base_addr, start_addr);
+  LONGS_EQUAL(base_addr + 0xa0000, end_addr);
+
+  // sceKernelVirtualQuery does expose the split though.
+  struct OrbisKernelVirtualQueryInfo {
+    uint64_t start;
+    uint64_t end;
+    int64_t  offset;
+    int32_t  prot;
+    int32_t  memory_type;
+    uint8_t  is_flexible  : 1;
+    uint8_t  is_direct    : 1;
+    uint8_t  is_stack     : 1;
+    uint8_t  is_pooled    : 1;
+    uint8_t  is_committed : 1;
+    char     name[32];
+  };
+
+  OrbisKernelVirtualQueryInfo info = {};
+  result                           = sceKernelVirtualQuery(base_addr, 0, &info, sizeof(info));
+  UNSIGNED_INT_EQUALS(0, result);
+  LONGS_EQUAL(base_addr, info.start);
+  LONGS_EQUAL(base_addr + 0x20000, info.end);
+  LONGS_EQUAL(0x33, info.prot);
+  LONGS_EQUAL(0, info.memory_type);
+  result = sceKernelVirtualQuery(base_addr + 0x20000, 0, &info, sizeof(info));
+  UNSIGNED_INT_EQUALS(0, result);
+  LONGS_EQUAL(base_addr + 0x20000, info.start);
+  LONGS_EQUAL(base_addr + 0x60000, info.end);
+  LONGS_EQUAL(0x33, info.prot);
+  LONGS_EQUAL(3, info.memory_type);
+  result = sceKernelVirtualQuery(base_addr + 0x60000, 0, &info, sizeof(info));
+  UNSIGNED_INT_EQUALS(0, result);
+  LONGS_EQUAL(base_addr + 0x60000, info.start);
+  LONGS_EQUAL(base_addr + 0xa0000, info.end);
+  LONGS_EQUAL(0x33, info.prot);
+  LONGS_EQUAL(0, info.memory_type);
+
+  // Areas recombine.
+  result = sceKernelMtypeprotect(base_addr, 0xa0000, 0, 0x33);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
+  UNSIGNED_INT_EQUALS(0, result);
+  LONGS_EQUAL(base_addr, start_addr);
+  LONGS_EQUAL(base_addr + 0xa0000, end_addr);
+
+  info   = {};
+  result = sceKernelVirtualQuery(base_addr, 0, &info, sizeof(info));
+  UNSIGNED_INT_EQUALS(0, result);
+  LONGS_EQUAL(base_addr, info.start);
+  LONGS_EQUAL(base_addr + 0xa0000, info.end);
+  LONGS_EQUAL(0x33, info.prot);
+  LONGS_EQUAL(0, info.memory_type);
+
+  // Areas split due to changed prot
+  result = sceKernelMtypeprotect(base_addr + 0x20000, 0x40000, 0, 0x3);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
+  UNSIGNED_INT_EQUALS(0, result);
+  LONGS_EQUAL(base_addr, start_addr);
+  LONGS_EQUAL(base_addr + 0x20000, end_addr);
+  result = sceKernelQueryMemoryProtection(base_addr + 0x20000, &start_addr, &end_addr, nullptr);
+  UNSIGNED_INT_EQUALS(0, result);
+  LONGS_EQUAL(base_addr + 0x20000, start_addr);
+  LONGS_EQUAL(base_addr + 0x60000, end_addr);
+  result = sceKernelQueryMemoryProtection(base_addr + 0x60000, &start_addr, &end_addr, nullptr);
+  UNSIGNED_INT_EQUALS(0, result);
+  LONGS_EQUAL(base_addr + 0x60000, start_addr);
+  LONGS_EQUAL(base_addr + 0xa0000, end_addr);
+
+  // Areas recombine.
+  result = sceKernelMtypeprotect(base_addr, 0xa0000, 0, 0x33);
+  UNSIGNED_INT_EQUALS(0, result);
+
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
   UNSIGNED_INT_EQUALS(0, result);
   LONGS_EQUAL(base_addr, start_addr);

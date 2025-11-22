@@ -4124,6 +4124,21 @@ TEST(MemoryTests, TypeProtectTest) {
   LONGS_EQUAL(3, info.prot);
   LONGS_EQUAL(3, info.memory_type);
 
+  // Use sceKernelGetDirectMemoryType to confirm the type changing applied properly.
+  int32_t out_type;
+  int64_t out_start;
+  int64_t out_end;
+  result = sceKernelGetDirectMemoryType(dmem_phys_addr, &out_type, &out_start, &out_end);
+  UNSIGNED_INT_EQUALS(0, result);
+  LONGS_EQUAL(3, out_type);
+  LONGS_EQUAL(dmem_phys_addr, out_start);
+  LONGS_EQUAL(dmem_phys_addr + 0x10000, out_end);
+  result = sceKernelGetDirectMemoryType(dmem_phys_addr + 0x10000, &out_type, &out_start, &out_end);
+  UNSIGNED_INT_EQUALS(0, result);
+  LONGS_EQUAL(0, out_type);
+  LONGS_EQUAL(dmem_phys_addr + 0x10000, out_start);
+  LONGS_EQUAL(dmem_phys_addr + 0x100000, out_end);
+
   // If the memory is now read-write, we can both write and read from it. Test this.
   const char* test_str = "This is a test of memory writing";
   strcpy((char*)addr, test_str);
@@ -4183,6 +4198,102 @@ TEST(MemoryTests, TypeProtectTest) {
   // Type changing occurs before prot, so this succeeds.
   result = sceKernelMtypeprotect(addr, 0x10000, 0, 0x3);
   UNSIGNED_INT_EQUALS(0, result);
+  info   = {};
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  UNSIGNED_INT_EQUALS(0, result);
+  LONGS_EQUAL(3, info.prot);
+  LONGS_EQUAL(0, info.memory_type);
+
+  // Now for the "fun" stuff, try splitting direct memory by setting types.
+  // We can use the direct memory area we already have for this.
+  result = sceKernelMtypeprotect(addr + 0x4000, 0x8000, 3, 0x3);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // mem_scan to help visualize
+  mem_scan();
+
+  // With this, our 1 direct memory mapping should split into three.
+  info   = {};
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  UNSIGNED_INT_EQUALS(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + 0x4000, info.end);
+  LONGS_EQUAL(3, info.prot);
+  LONGS_EQUAL(0, info.memory_type);
+  info   = {};
+  result = sceKernelVirtualQuery(addr + 0x4000, 0, &info, sizeof(info));
+  UNSIGNED_INT_EQUALS(0, result);
+  LONGS_EQUAL(addr + 0x4000, info.start);
+  LONGS_EQUAL(addr + 0xc000, info.end);
+  LONGS_EQUAL(3, info.prot);
+  LONGS_EQUAL(3, info.memory_type);
+  info   = {};
+  result = sceKernelVirtualQuery(addr + 0xc000, 0, &info, sizeof(info));
+  UNSIGNED_INT_EQUALS(0, result);
+  LONGS_EQUAL(addr + 0xc000, info.start);
+  LONGS_EQUAL(addr + 0x10000, info.end);
+  LONGS_EQUAL(3, info.prot);
+  LONGS_EQUAL(0, info.memory_type);
+
+  // Additionally, there should be 3 dmem areas within this test's dmem range.
+  result = sceKernelGetDirectMemoryType(dmem_phys_addr, &out_type, &out_start, &out_end);
+  UNSIGNED_INT_EQUALS(0, result);
+  LONGS_EQUAL(0, out_type);
+  LONGS_EQUAL(dmem_phys_addr, out_start);
+  LONGS_EQUAL(dmem_phys_addr + 0x4000, out_end);
+  result = sceKernelGetDirectMemoryType(dmem_phys_addr + 0x4000, &out_type, &out_start, &out_end);
+  UNSIGNED_INT_EQUALS(0, result);
+  LONGS_EQUAL(3, out_type);
+  LONGS_EQUAL(dmem_phys_addr + 0x4000, out_start);
+  LONGS_EQUAL(dmem_phys_addr + 0xc000, out_end);
+  // physical areas coalesce when type-changing through mtypeprotect.
+  result = sceKernelGetDirectMemoryType(dmem_phys_addr + 0xc000, &out_type, &out_start, &out_end);
+  UNSIGNED_INT_EQUALS(0, result);
+  LONGS_EQUAL(0, out_type);
+  LONGS_EQUAL(dmem_phys_addr + 0xc000, out_start);
+  LONGS_EQUAL(dmem_phys_addr + 0x100000, out_end);
+
+  // Now try mtypeprotect over the whole area with type = 1
+  result = sceKernelMtypeprotect(addr, 0x10000, 1, 0x3);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // mem_scan to help visualize
+  mem_scan();
+
+  // With this, the areas should all receive the updated type, but won't remerge.
+  info   = {};
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  UNSIGNED_INT_EQUALS(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + 0x4000, info.end);
+  LONGS_EQUAL(3, info.prot);
+  LONGS_EQUAL(1, info.memory_type);
+  info   = {};
+  result = sceKernelVirtualQuery(addr + 0x4000, 0, &info, sizeof(info));
+  UNSIGNED_INT_EQUALS(0, result);
+  LONGS_EQUAL(addr + 0x4000, info.start);
+  LONGS_EQUAL(addr + 0xc000, info.end);
+  LONGS_EQUAL(3, info.prot);
+  LONGS_EQUAL(1, info.memory_type);
+  info   = {};
+  result = sceKernelVirtualQuery(addr + 0xc000, 0, &info, sizeof(info));
+  UNSIGNED_INT_EQUALS(0, result);
+  LONGS_EQUAL(addr + 0xc000, info.start);
+  LONGS_EQUAL(addr + 0x10000, info.end);
+  LONGS_EQUAL(3, info.prot);
+  LONGS_EQUAL(1, info.memory_type);
+
+  // All physical areas should coalese.
+  result = sceKernelGetDirectMemoryType(dmem_phys_addr, &out_type, &out_start, &out_end);
+  UNSIGNED_INT_EQUALS(0, result);
+  LONGS_EQUAL(1, out_type);
+  LONGS_EQUAL(dmem_phys_addr, out_start);
+  LONGS_EQUAL(dmem_phys_addr + 0x10000, out_end);
+  result = sceKernelGetDirectMemoryType(dmem_phys_addr + 0x10000, &out_type, &out_start, &out_end);
+  UNSIGNED_INT_EQUALS(0, result);
+  LONGS_EQUAL(0, out_type);
+  LONGS_EQUAL(dmem_phys_addr + 0x10000, out_start);
+  LONGS_EQUAL(dmem_phys_addr + 0x100000, out_end);
 
   // Clean up memory used.
   result = sceKernelMunmap(vmem_start, vmem_size);
