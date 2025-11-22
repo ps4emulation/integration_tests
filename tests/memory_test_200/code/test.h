@@ -1,3 +1,12 @@
+#include "CppUTest/TestHarness.h"
+
+#define UNSIGNED_INT_EQUALS(expected, actual) _unsigned_int_equals(expected, actual);
+
+void _unsigned_int_equals(uint32_t expected, uint32_t actual) {
+  UNSIGNED_LONGS_EQUAL(expected, actual);
+}
+
+// Function definitions (with modified types to improve testability)
 extern "C" {
 // Direct memory functions
 uint64_t sceKernelGetDirectMemorySize();
