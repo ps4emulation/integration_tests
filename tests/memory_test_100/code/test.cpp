@@ -3588,20 +3588,6 @@ TEST(MemoryTests, ProtectTest) {
   // MAP_FIXED should ensure this is the same.
   LONGS_EQUAL(vmem_start, addr);
 
-  /**
-   * Decompilation notes:
-   * Address and size are aligned to the nearest page. Address is aligned down, while size is aligned up.
-   * Technically size is aligned through the formula (addr & page_mask) + page_mask + size & page_mask.
-   * Due to the order of operations, this is effectively equivalent to aligning size up.
-   *
-   * If addr is less than the start of the vmem_map, it is set to the vmem_map start.
-   * If end is less than start, start is set to end.
-   *
-   * mprotect will split and coalesce memory areas as applicable, using the same simplify code tested in CoalescingTest.
-   * This means that most merging edge cases tested there are applicable here, though for the sake of brevity I will only test some necessary ones.
-   * mprotect will error if called on free memory?
-   */
-
   // Start with some "normal" behavior to ensure edge case tests are based on valid calls.
   // Map some direct memory, give it write permissions, write some test data, then protect with read and read that data back.
   // This will test basic functionality of mprotect.
@@ -3682,17 +3668,95 @@ TEST(MemoryTests, ProtectTest) {
   LONGS_EQUAL(0, result);
 
   info   = {};
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + 0x20000, info.end);
+  LONGS_EQUAL(0, info.prot);
+
+  info   = {};
   result = sceKernelVirtualQuery(addr + 0x20000, 0, &info, sizeof(info));
   LONGS_EQUAL(0, result);
   LONGS_EQUAL(addr + 0x20000, info.start);
   LONGS_EQUAL(addr + 0x40000, info.end);
   LONGS_EQUAL(0, info.prot);
 
+  info   = {};
+  result = sceKernelVirtualQuery(addr + 0x40000, 0, &info, sizeof(info));
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr + 0x40000, info.start);
+  LONGS_EQUAL(addr + vmem_size, info.end);
+  LONGS_EQUAL(0, info.prot);
+
   // Note: Attempting to give GPU protections to a reserved memory area causes a full system crash.
   // Only uncomment this if you're willing to unplug your PS4 just to get it to shut off
   // result = sceKernelMprotect(addr, 0x20000, 0x10);
 
-  // See if this re-coalesces the area?
+  // This should split the memory area up further.
+  result = sceKernelMprotect(addr + 0x28000, 0x10000, 0x7);
+  LONGS_EQUAL(0, result);
+
+  info   = {};
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + 0x20000, info.end);
+  LONGS_EQUAL(0, info.prot);
+
+  info   = {};
+  result = sceKernelVirtualQuery(addr + 0x20000, 0, &info, sizeof(info));
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr + 0x20000, info.start);
+  LONGS_EQUAL(addr + 0x28000, info.end);
+  LONGS_EQUAL(0, info.prot);
+
+  info   = {};
+  result = sceKernelVirtualQuery(addr + 0x28000, 0, &info, sizeof(info));
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr + 0x28000, info.start);
+  LONGS_EQUAL(addr + 0x38000, info.end);
+  LONGS_EQUAL(0, info.prot);
+
+  info   = {};
+  result = sceKernelVirtualQuery(addr + 0x38000, 0, &info, sizeof(info));
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr + 0x38000, info.start);
+  LONGS_EQUAL(addr + 0x40000, info.end);
+  LONGS_EQUAL(0, info.prot);
+
+  info   = {};
+  result = sceKernelVirtualQuery(addr + 0x40000, 0, &info, sizeof(info));
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr + 0x40000, info.start);
+  LONGS_EQUAL(addr + vmem_size, info.end);
+  LONGS_EQUAL(0, info.prot);
+
+  // This should re-merge the inner mappings
+  result = sceKernelMprotect(addr + 0x28000, 0x10000, 0x1);
+  LONGS_EQUAL(0, result);
+
+  info   = {};
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + 0x20000, info.end);
+  LONGS_EQUAL(0, info.prot);
+
+  info   = {};
+  result = sceKernelVirtualQuery(addr + 0x20000, 0, &info, sizeof(info));
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr + 0x20000, info.start);
+  LONGS_EQUAL(addr + 0x40000, info.end);
+  LONGS_EQUAL(0, info.prot);
+
+  info   = {};
+  result = sceKernelVirtualQuery(addr + 0x40000, 0, &info, sizeof(info));
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr + 0x40000, info.start);
+  LONGS_EQUAL(addr + vmem_size, info.end);
+  LONGS_EQUAL(0, info.prot);
+
+  // This mprotect will re-coalesce the full reservation.
   result = sceKernelMprotect(addr + 0x20000, 0x20000, 0x0);
   LONGS_EQUAL(0, result);
 
@@ -3703,190 +3767,288 @@ TEST(MemoryTests, ProtectTest) {
   LONGS_EQUAL(addr + vmem_size, info.end);
   LONGS_EQUAL(0, info.prot);
 
-  /**
-   * Other tests to perform:
-   * Make sure executable memory is handled properly
-   * Direct memory can't be mapped with executable prot, but you can protect it with executable prot.
-   * Protect on free memory
-   */
+  // This mprotect should do absolutely nothing.
+  result = sceKernelMprotect(addr + 0x28000, 0x10000, 0x0);
+  LONGS_EQUAL(0, result);
+
+  info   = {};
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + vmem_size, info.end);
+  LONGS_EQUAL(0, info.prot);
+
+  // Now test executable mappings. These are rarely seen in retail games, but utilized by some homebrew.
+  addr   = vmem_start + 0x100000;
+  result = sceKernelMapFlexibleMemory(&addr, 0x100000, 0x3, 0x10);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(vmem_start + 0x100000, addr);
+
+  info   = {};
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + 0x100000, info.end);
+  LONGS_EQUAL(3, info.prot);
+
+  // Write a basic function into memory that returns 256.
+  uint8_t bytes[] = {0x48, 0xc7, 0xc0, 00, 01, 00, 00, 0xc3};
+  memcpy(reinterpret_cast<void*>(addr), bytes, 8);
+  typedef int32_t (*func)();
+  func test_func = reinterpret_cast<func>(addr);
+
+  // Now use mprotect to turn this flexible mapping into an executable memory area.
+  result = sceKernelMprotect(addr, 0x100000, 0x4);
+  LONGS_EQUAL(0, result);
+
+  // Now run the function from memory, make sure it returns the expected value.
+  result = test_func();
+  LONGS_EQUAL(0x100, result);
+
+  // Replace mapped memory with a reserved area before proceeding.
+  addr   = vmem_start;
+  result = sceKernelReserveVirtualRange(&addr, vmem_size, 0x10, 0);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(vmem_start, addr);
+
+  // Now test direct memory behavior.
+  // As MapMemoryTest shows, direct memory mappings with executable protections aren't allowed.
+  // However, you can protect the direct memory, and it will be executable.
+  addr   = vmem_start + 0x100000;
+  result = sceKernelMapDirectMemory(&addr, 0x10000, 0x3, 0x10, dmem_start, 0);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(vmem_start + 0x100000, addr);
+
+  info   = {};
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + 0x10000, info.end);
+  LONGS_EQUAL(3, info.prot);
+
+  // Write a function into this memory.
+  memcpy(reinterpret_cast<void*>(addr), bytes, 8);
+  test_func = reinterpret_cast<func>(addr);
+
+  // Now use mprotect to turn this direct mapping into an executable area.
+  result = sceKernelMprotect(addr, 0x100000, 0x4);
+  LONGS_EQUAL(0, result);
+
+  info   = {};
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + 0x10000, info.end);
+  LONGS_EQUAL(0, info.prot);
+
+  // Now run the function from memory, make sure it returns the expected value.
+  result = test_func();
+  LONGS_EQUAL(0x100, result);
+
+  // Replace mapped memory with a reserved area before proceeding.
+  addr   = vmem_start;
+  result = sceKernelReserveVirtualRange(&addr, vmem_size, 0x10, 0);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(vmem_start, addr);
+
+  // In addition, we should be able to execute from files too.
+  // use sceKernelWrite to write our function to the file data, then mmap the file with execute protections and run the function.
+  int32_t fd = sceKernelOpen("/download0/test_file.txt", 0x602, 0666);
+  CHECK(fd > 0);
+
+  int64_t bytes_written = sceKernelWrite(fd, bytes, 8);
+  LONGS_EQUAL(8, bytes_written);
+
+  // The function should be at the start of the file.
+  // While the file mmap succeeds, the execute protection isn't applied.
+  result = sceKernelMmap(vmem_start, 0x4000, 0x7, 0x11, fd, 0, &addr);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(vmem_start, addr);
+
+  info   = {};
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + 0x4000, info.end);
+  LONGS_EQUAL(3, info.prot);
+
+  // Use mprotect to apply execute protection.
+  result = sceKernelMprotect(addr, 0x100000, 0x4);
+  LONGS_EQUAL(0, result);
+
+  info   = {};
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + 0x4000, info.end);
+  LONGS_EQUAL(0, info.prot);
+
+  // Run the function from memory. Since it's at the start of the file, it should be at the start of the memory area.
+  test_func = reinterpret_cast<func>(addr);
+  result    = test_func();
+  LONGS_EQUAL(0x100, result);
+
+  // Replace mapped memory with a reserved area before proceeding.
+  addr   = vmem_start;
+  result = sceKernelReserveVirtualRange(&addr, vmem_size, 0x10, 0);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(vmem_start, addr);
+
+  // Close the test file.
+  result = sceKernelClose(fd);
+  LONGS_EQUAL(0, result);
+
+  // If an mprotect call covers multiple memory areas, it will protect all of them.
+
+  // Start by splitting the reserved area up again.
+  for (int32_t i = 0; i < 0x10; i++) {
+    uint64_t test_addr = vmem_start + ((vmem_size / 0x10) * i);
+    // Do some weird arithmetic to ensure we never accidentally duplicate prots
+    // Since PS4 appends read to all write-only protections.
+    int32_t test_prot = ((i * 2) + 1) % 7;
+    result            = sceKernelMprotect(test_addr, vmem_size / 10, test_prot);
+    LONGS_EQUAL(0, result);
+  }
+
+  // Verify the splitting occurred as expected.
+  for (int32_t i = 0; i < 0x10; i++) {
+    uint64_t test_addr = vmem_start + ((vmem_size / 0x10) * i);
+    info               = {};
+    result             = sceKernelVirtualQuery(test_addr, 0, &info, sizeof(info));
+    LONGS_EQUAL(0, result);
+    LONGS_EQUAL(test_addr, info.start);
+    LONGS_EQUAL(0, info.prot);
+  }
+
+  // Perform an mprotect that will merge the whole area together.
+  // Include extra space in the call to ensure this behavior still happens if free areas are encountered.
+  result = sceKernelMprotect(vmem_start - vmem_size, vmem_size * 3, 0);
+  LONGS_EQUAL(0, result);
+  info   = {};
+  result = sceKernelVirtualQuery(vmem_start, 0, &info, sizeof(info));
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(vmem_start, info.start);
+  LONGS_EQUAL(vmem_start + vmem_size, info.end);
+  LONGS_EQUAL(0, info.prot);
+
+  // Finally, perform a flexible mapping, then protect the whole map and check it.
+  // The full map mprotect will include this mapping.
+  addr   = vmem_start + 0x100000;
+  result = sceKernelMapFlexibleMemory(&addr, 0x100000, 3, 0x10);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(vmem_start + 0x100000, addr);
+  info   = {};
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + 0x100000, info.end);
+  LONGS_EQUAL(3, info.prot);
+
+  // This does mark various mappings in the memory map with RWX prot.
+  // Not all mappings are marked though, so this needs further investigation.
+  result = sceKernelMprotect(0, 0x5000000000, 0x7);
+  LONGS_EQUAL(0, result);
+
+  info   = {};
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + 0x100000, info.end);
+  LONGS_EQUAL(7, info.prot);
+
+  // Replace mapped memory with a reserved area before proceeding.
+  addr   = vmem_start;
+  result = sceKernelReserveVirtualRange(&addr, vmem_size, 0x10, 0);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(vmem_start, addr);
+
+  // The PS4 appends read to all write only mappings.
+  result = sceKernelMapFlexibleMemory(&addr, 0x100000, 0, 0x10);
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(vmem_start, addr);
+  info   = {};
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + 0x100000, info.end);
+  LONGS_EQUAL(0, info.prot);
+
+  // Write-only protection.
+  result = sceKernelMprotect(addr, 0x10000, 0x2);
+  LONGS_EQUAL(0, result);
+  info   = {};
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + 0x10000, info.end);
+  // Read is appended.
+  LONGS_EQUAL(3, info.prot);
+
+  // Write | Execute protection.
+  result = sceKernelMprotect(addr, 0x10000, 0x6);
+  LONGS_EQUAL(0, result);
+  info   = {};
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + 0x10000, info.end);
+  // Read is appended.
+  LONGS_EQUAL(7, info.prot);
+
+  // Finally, test parameters.
+  // Start with the parameter alignment.
+  result = sceKernelMprotect(addr, 0xf000, 0x3);
+  LONGS_EQUAL(0, result);
+  info = {};
+  // Alignment should align size up to 0x10000
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + 0x10000, info.end);
+  LONGS_EQUAL(3, info.prot);
+
+  result = sceKernelMprotect(addr + 0x3000, 0x10000, 0x7);
+  LONGS_EQUAL(0, result);
+  info = {};
+  // Alignment should align addr + 0x3000 down to addr, and that offset means size is aligned up to 0x14000
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + 0x14000, info.end);
+  LONGS_EQUAL(7, info.prot);
+
+  // Because size rounding follows the formula (addr & page_mask) + page_mask + size & ~page_mask
+  // addr + 0x3000 is rounded down to addr, and size gets rounded up to 0x14000 here.
+  result = sceKernelMprotect(addr + 0x3000, 0xf000, 0x3);
+  LONGS_EQUAL(0, result);
+  info   = {};
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + 0x14000, info.end);
+  LONGS_EQUAL(3, info.prot);
+
+  // mprotect simply ignores invalid protection flags.
+  result = sceKernelMprotect(addr, 0x10000, 0xf);
+  LONGS_EQUAL(0, result);
+  info = {};
+  // Alignment should align addr down to 0x1000, size up to 0x10000
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  LONGS_EQUAL(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + 0x10000, info.end);
+  LONGS_EQUAL(7, info.prot);
 
   // Clean up memory used.
   result = sceKernelMunmap(vmem_start, vmem_size);
   LONGS_EQUAL(0, result);
   result = sceKernelCheckedReleaseDirectMemory(dmem_start, dmem_size);
   LONGS_EQUAL(0, result);
-}
 
-// These tests are from my old homebrew, I'll probably rewrite some later.
-static void TestMemoryWrite(uint64_t addr, uint64_t size) {
-  // This function writes 0's to the requested memory area.
-  void* test_addr = malloc(size);
-  memset(test_addr, 0, size);
-
-  // This memcpy will crash if the specified memory area isn't writable.
-  memcpy(reinterpret_cast<void*>(addr), test_addr, size);
-
-  // Free memory after testing
-  free(test_addr);
-}
-
-static bool TestZeroedMemory(uint64_t addr, uint64_t size) {
-  // This function reads 0's from the requested memory area, and compares them to an area full of zeros.
-  void* test_addr = malloc(size);
-  memset(test_addr, 0, size);
-
-  // This memcpy will crash if the specified memory area isn't writable.
-  bool succ = memcmp(reinterpret_cast<void*>(addr), test_addr, size) == 0;
-
-  // Free memory after testing
-  free(test_addr);
-
-  return succ;
-}
-
-TEST(MemoryTests, ExecutableTests) {
-  // This tests to make sure executable memory behaves properly.
-  // Allocate some direct memory for the direct memory tests
-  uint64_t dmem_size = sceKernelGetDirectMemorySize();
-  int64_t  phys_addr = 0;
-  uint64_t size      = 0x100000;
-  int32_t  result    = sceKernelAllocateDirectMemory(0, dmem_size, size, 0, 0, &phys_addr);
+  // At this point, the memory designated by vmem_start is free.
+  // mprotect succeeds on free memory, but does nothing to it (not that you can actually check for that)
+  result = sceKernelMprotect(vmem_start, vmem_size, 0x3);
   LONGS_EQUAL(0, result);
-
-  // Using the physical addresses, map direct memory to a flexible address.
-  uint64_t addr = 0;
-  int32_t  prot = 0x37;
-  // Direct memory mapping functions do not allow for assigning executable permissions. Test this edge case.
-  result = sceKernelMapDirectMemory(&addr, size, prot, 0, phys_addr, 0);
-  LONGS_EQUAL(ORBIS_KERNEL_ERROR_EACCES, result);
-
-  // Perform a successful direct memory mapping.
-  prot   = 0x33;
-  result = sceKernelMapDirectMemory(&addr, size, prot, 0, phys_addr, 0);
-  LONGS_EQUAL(0, result);
-
-  // Run sceKernelQueryMemoryProtection to confirm the protection value assigned to this mapping.
-  int32_t old_prot = 0;
-  // We don't care about the other data, supply nullptrs for start and end.
-  result = sceKernelQueryMemoryProtection(addr, nullptr, nullptr, &old_prot);
-  LONGS_EQUAL(0, result);
-  LONGS_EQUAL(prot, old_prot);
-
-  // Use sceKernelMprotect to give the memory executable permissions.
-  prot   = 0x37;
-  result = sceKernelMprotect(addr, size, prot);
-  LONGS_EQUAL(0, result);
-
-  // Direct memory never actually exposes execute permissions.
-  // Confirm this behavior by running sceKernelQueryMemoryProtection again.
-  int32_t new_prot = 0;
-  result           = sceKernelQueryMemoryProtection(addr, nullptr, nullptr, &new_prot);
-  LONGS_EQUAL(0, result);
-  LONGS_EQUAL(old_prot, new_prot);
-
-  // Write a basic function into memory that returns 256.
-  uint8_t bytes[] = {0x48, 0xc7, 0xc0, 00, 01, 00, 00, 0xc3};
-  memcpy(reinterpret_cast<void*>(addr), bytes, 8);
-  typedef uint64_t (*func)();
-  func     test_func = reinterpret_cast<func>(addr);
-  uint64_t res       = test_func();
-  LONGS_EQUAL(256, res);
-
-  // Unmap the direct memory used for this test.
-  result = sceKernelMunmap(addr, size);
-  LONGS_EQUAL(0, result);
-
-  // Release direct memory allocated for this test.
-  result = sceKernelReleaseDirectMemory(phys_addr, size);
-  LONGS_EQUAL(0, result);
-
-  // Run a similar test utilizing flexible memory instead. Flexible memory allows and exposes executable permissions.
-  addr   = 0;
-  result = sceKernelMapFlexibleMemory(&addr, size, prot, 0);
-  LONGS_EQUAL(0, result);
-
-  // Validate the protection given to the memory area
-  result = sceKernelQueryMemoryProtection(addr, nullptr, nullptr, &old_prot);
-  LONGS_EQUAL(0, result);
-  LONGS_EQUAL(prot, old_prot);
-
-  // Write a basic function into memory that returns 256.
-  memcpy(reinterpret_cast<void*>(addr), bytes, 8);
-  test_func = reinterpret_cast<func>(addr);
-  res       = test_func();
-  LONGS_EQUAL(256, res);
-
-  // Unmap the flexible memory used for this test.
-  result = sceKernelMunmap(addr, size);
-  LONGS_EQUAL(0, result);
-}
-
-TEST(MemoryTests, ProtectTests) {
-  // This tests potential edge cases involving mprotect.
-  // Start by mapping memory with no permissions
-  uint64_t addr   = 0;
-  uint64_t size   = 0x100000;
-  int32_t  flags  = 0;
-  int32_t  prot   = 0;
-  int32_t  result = sceKernelMapFlexibleMemory(&addr, size, prot, flags);
-  LONGS_EQUAL(0, result);
-
-  // Use sceKernelMprotect to protect the middle of this memory area.
-  // For testing purposes, use misaligned address and size.
-  uint64_t protect_addr = addr + 0x43000;
-  uint64_t protect_size = 0x7D000;
-  prot                  = 1;
-  result                = sceKernelMprotect(protect_addr, protect_size, prot);
-  LONGS_EQUAL(0, result);
-
-  // Verify permissions and alignment using sceKernelQueryMemoryProtection.
-  // Address is expected to align down, while the size should align up.
-  uint64_t start_addr;
-  uint64_t end_addr;
-  int32_t  out_prot;
-  result = sceKernelQueryMemoryProtection(protect_addr, &start_addr, &end_addr, &out_prot);
-  LONGS_EQUAL(0, result);
-  LONGS_EQUAL(addr + 0x40000, start_addr);
-  LONGS_EQUAL(addr + 0xC0000, end_addr);
-  LONGS_EQUAL(prot, out_prot);
-
-  // Ensure we can read from this memory by calling TestZeroedMemory.
-  // Ignore the return, all we care about is that reading doesn't crash.
-  TestZeroedMemory(addr + 0x40000, 0x80000);
-
-  // Use sceKernelMprotect to protect the middle of this memory area.
-  // For this test, only provide write protections.
-  protect_addr = addr + 0x40000;
-  protect_size = 0x80000;
-  prot         = 2;
-  result       = sceKernelMprotect(protect_addr, protect_size, prot);
-  LONGS_EQUAL(0, result);
-
-  // Validate returned protection, libkernel adds read protection to write-only pages.
-  out_prot = 0;
-  result   = sceKernelQueryMemoryProtection(protect_addr, nullptr, nullptr, &out_prot);
-  LONGS_EQUAL(0, result);
-  LONGS_EQUAL(3, out_prot);
-
-  // Call TestMemoryWrite to make sure writes work properly, then TestZeroedMemory to check reads.
-  TestMemoryWrite(protect_addr, protect_size);
-  CHECK(TestZeroedMemory(protect_addr, protect_size));
-
-  // Use sceKernelMprotect to give the entire original mapping read permissions
-  prot   = 1;
-  result = sceKernelMprotect(addr, size, prot);
-  LONGS_EQUAL(0, result);
-
-  // Ensure prot applied properly.
-  result = sceKernelQueryMemoryProtection(addr, nullptr, nullptr, &out_prot);
-  LONGS_EQUAL(0, result);
-  LONGS_EQUAL(prot, out_prot);
-
-  // Ensure we can read from this memory by calling TestZeroedMemory.
-  // Ignore the return, all we care about is that reading doesn't crash.
-  TestZeroedMemory(addr, size);
-
-  // Unmap memory used for test.
-  result = sceKernelMunmap(addr, size);
+  result = sceKernelMprotect(vmem_start, vmem_size, 0x10);
   LONGS_EQUAL(0, result);
 }
