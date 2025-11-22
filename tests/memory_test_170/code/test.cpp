@@ -194,6 +194,8 @@ TEST(MemoryTests, FW200Test) {
   result = sceKernelMprotect(base_addr + 0x4000, 0x8000, 0x3);
   UNSIGNED_INT_EQUALS(0, result);
 
+  mem_scan();
+
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
   UNSIGNED_INT_EQUALS(0, result);
   LONGS_EQUAL(base_addr, start_addr);
@@ -209,6 +211,8 @@ TEST(MemoryTests, FW200Test) {
 
   result = sceKernelMprotect(base_addr, 0x20000, 0x33);
   UNSIGNED_INT_EQUALS(0, result);
+
+  mem_scan();
 
   // Mappings remain separate.
   result = sceKernelQueryMemoryProtection(base_addr, &start_addr, &end_addr, nullptr);
@@ -228,6 +232,8 @@ TEST(MemoryTests, FW200Test) {
   result = sceKernelMtypeprotect(base_addr + 0x24000, 0x8000, 3, 0x33);
   UNSIGNED_INT_EQUALS(0, result);
 
+  mem_scan();
+
   result = sceKernelQueryMemoryProtection(base_addr + 0x20000, &start_addr, &end_addr, nullptr);
   UNSIGNED_INT_EQUALS(0, result);
   LONGS_EQUAL(base_addr + 0x20000, start_addr);
@@ -245,6 +251,8 @@ TEST(MemoryTests, FW200Test) {
   result = sceKernelMtypeprotect(base_addr + 0x20000, 0x20000, 0, 0x33);
   UNSIGNED_INT_EQUALS(0, result);
 
+  mem_scan();
+
   result = sceKernelQueryMemoryProtection(base_addr + 0x20000, &start_addr, &end_addr, nullptr);
   UNSIGNED_INT_EQUALS(0, result);
   LONGS_EQUAL(base_addr + 0x20000, start_addr);
@@ -261,6 +269,8 @@ TEST(MemoryTests, FW200Test) {
   // Areas split due to changed prot
   result = sceKernelMtypeprotect(base_addr + 0x44000, 0x8000, 0, 0x3);
   UNSIGNED_INT_EQUALS(0, result);
+  
+  mem_scan();
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x40000, &start_addr, &end_addr, nullptr);
   UNSIGNED_INT_EQUALS(0, result);
@@ -278,6 +288,8 @@ TEST(MemoryTests, FW200Test) {
   // Areas do not recombine.
   result = sceKernelMtypeprotect(base_addr + 0x40000, 0x20000, 0, 0x33);
   UNSIGNED_INT_EQUALS(0, result);
+
+  mem_scan();
 
   result = sceKernelQueryMemoryProtection(base_addr + 0x40000, &start_addr, &end_addr, nullptr);
   UNSIGNED_INT_EQUALS(0, result);
