@@ -4176,8 +4176,13 @@ TEST(MemoryTests, TypeProtectTest) {
   LONGS_EQUAL(1, info.prot);
   LONGS_EQUAL(10, info.memory_type);
 
+  // Mprotect fails since the physical memory has type 10, which can't be mapped with write perms.
   result = sceKernelMprotect(addr, 0x10000, 0x3);
   UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_EACCES, result);
+
+  // Type changing occurs before prot, so this succeeds.
+  result = sceKernelMtypeprotect(addr, 0x10000, 0, 0x3);
+  UNSIGNED_INT_EQUALS(0, result);
 
   // Clean up memory used.
   result = sceKernelMunmap(vmem_start, vmem_size);
