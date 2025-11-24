@@ -43,6 +43,7 @@ typedef struct FolderDirent {
 } // namespace OrbisInternals
 
 void RunTests(void);
+s32  TestMovements(const char* from, const char* to);
 bool TestRelatives(fs::path path, bool expected_mountpoint = false);
 bool CompareNormalVsPFS(fs::path path, fs::path leaf, s32 expected_normal_reclen = -1, s32 expected_pfs_reclen = -1);
 bool RegenerateDir(const char* path);

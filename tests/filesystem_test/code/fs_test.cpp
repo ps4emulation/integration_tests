@@ -351,6 +351,53 @@ void RunTests() {
             "app0: Resolved (whole path) name in uppercase", "( ", case_insensitive_path_app0_upper, " )");
   TEST_CASE(stat(case_insensitive_path_app0_upper_end, &st) == 0, "app0: Uppercase (app0 path) sensitivity passed",
             "app0: Can't resolve (app0 path) name in uppercase", "( ", case_insensitive_path_app0_upper_end, " )");
+
+  ///
+  /// Case sensitivity
+  ///
+
+  Log();
+  Log("\t<<<< Moving files >>>>");
+  Log();
+
+  const char* movingFileA = "/data/therapist/moves/fileA";
+  const char* movingFileB = "/data/therapist/moves/fileB";
+  const char* movingFileC = "/data/therapist/moves/fileC";
+
+  const char* movingDirectoryA = "/data/therapist/moves/dirA";
+  const char* movingDirectoryB = "/data/therapist/moves/dirB";
+  const char* movingDirectoryC = "/data/therapist/moves/dirC";
+  const char* movingDirectoryD = "/data/therapist/moves/dirC";
+
+  Obliterate("/data/therapist/moves");
+  sceKernelMkdir("/data/therapist/moves", 0777);
+  sceKernelMkdir(movingDirectoryA, 0777);
+  sceKernelMkdir(movingDirectoryB, 0777);
+  sceKernelMkdir(movingDirectoryC, 0777);
+  touch(movingFileA);
+  touch(movingFileB);
+  touch(movingFileC);
+
+  TEST_CASE(int status = sceKernelRename(movingFileA, movingFileB); status == 0, "Moved", "Not moved", "file->(existent)file:", status);
+  TEST_CASE(int status = sceKernelRename(movingFileC, "/data/therapist/moves/yeet"); status == 0, "Moved", "Not moved", "file->(nonexistent)file:", status);
+  TEST_CASE(int status = sceKernelRename(movingDirectoryA, movingDirectoryB); status == 0, "Moved", "Not moved", "dir->(existing)dir:", status);
+  TEST_CASE(int status = sceKernelRename(movingDirectoryC, "/data/therapist/moves/yeet_dir");
+            status == 0, "Moved", "Not moved", "dir->(nonexistent)dir:", status);
+  // no change in folder structure
+  TEST_CASE(int status = sceKernelRename("/data/therapist/moves/yeet", "/data/therapist/moves/yeet_dir");
+            errno == EISDIR, "Not moved", "Moved", "file->(existent)dir:", status);
+  // no change either
+  TEST_CASE(int status = sceKernelRename("/data/therapist/moves/yeet_dir", "/data/therapist/moves/yeet");
+            errno == ENOTDIR, "Not moved", "Moved", "dir->(existent)file:", status);
+  TEST_CASE(int status = sceKernelRename("/data/therapist/moves/yeet", "/data/therapist/moves/yeet_dir/yeeee");
+            status == 0, "Moved", "Not moved", "file->(into existent)dir:", status);
+  // move empty to not empty dir, no change
+  sceKernelMkdir(movingDirectoryD, 0777);
+  TEST_CASE(int status = sceKernelRename(movingDirectoryD, "/data/therapist/moves/yeet_dir");
+            errno == ENOTEMPTY, "Not moved", "Moved", "empty dir->not empty dir:", status);
+  // not empty to empty, changed
+  TEST_CASE(int status = sceKernelRename("/data/therapist/moves/yeet_dir", movingDirectoryD);
+            status == 0, "Moved", "Not moved", "not empty dir->empty dir:", status);
 }
 
 bool TestFileOps(const char* path) {
