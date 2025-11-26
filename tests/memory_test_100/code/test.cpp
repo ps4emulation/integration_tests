@@ -4295,6 +4295,56 @@ TEST(MemoryTests, TypeProtectTest) {
   LONGS_EQUAL(dmem_phys_addr + 0x10000, out_start);
   LONGS_EQUAL(dmem_phys_addr + 0x100000, out_end);
 
+  // Test Mtypeprotect with memory that is not direct.
+  // Overwrite the direct memory mapping with flexible memory
+  result = sceKernelMapFlexibleMemory(&addr, 0x10000, 0x0, 0x10);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // mtype check occurs first, so this fails.
+  result = sceKernelMtypeprotect(addr, 0x10000, 10, 0x33);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_EACCES, result);
+
+  // Mtypeprotect succeeds on memory that isn't direct.
+  result = sceKernelMtypeprotect(addr, 0x10000, 0, 0x3);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  info   = {};
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  UNSIGNED_INT_EQUALS(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + 0x10000, info.end);
+  LONGS_EQUAL(3, info.prot);
+  LONGS_EQUAL(0, info.memory_type);
+
+  // Verify that writing works.
+  memset((void*)addr, 0, 0x10000);
+
+  // Mtypeprotect succeeds on memory that isn't direct.
+  result = sceKernelMtypeprotect(addr, 0x10000, 10, 0x0);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  info   = {};
+  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
+  UNSIGNED_INT_EQUALS(0, result);
+  LONGS_EQUAL(addr, info.start);
+  LONGS_EQUAL(addr + 0x10000, info.end);
+  LONGS_EQUAL(0, info.prot);
+  LONGS_EQUAL(0, info.memory_type);
+
+  result = sceKernelReserveVirtualRange(&addr, 0x10000, 0x10, 0);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Mtypeprotect on reserved memory does nothing
+  result = sceKernelMtypeprotect(addr, 0x10000, 10, 0x3);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  result = sceKernelMunmap(addr, 0x10000);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Mtypeprotect on free memory does nothing.
+  result = sceKernelMtypeprotect(addr, 0x10000, 10, 0x3);
+  UNSIGNED_INT_EQUALS(0, result);
+
   // Clean up memory used.
   result = sceKernelMunmap(vmem_start, vmem_size);
   UNSIGNED_INT_EQUALS(0, result);
