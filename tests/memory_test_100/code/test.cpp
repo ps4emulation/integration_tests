@@ -4304,46 +4304,27 @@ TEST(MemoryTests, TypeProtectTest) {
   result = sceKernelMtypeprotect(addr, 0x10000, 10, 0x33);
   UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_EACCES, result);
 
-  // Mtypeprotect succeeds on memory that isn't direct.
+  // Mtypeprotect fails on memory that isn't direct.
   result = sceKernelMtypeprotect(addr, 0x10000, 0, 0x3);
-  UNSIGNED_INT_EQUALS(0, result);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ENOTSUP, result);
 
-  info   = {};
-  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
-  UNSIGNED_INT_EQUALS(0, result);
-  LONGS_EQUAL(addr, info.start);
-  LONGS_EQUAL(addr + 0x10000, info.end);
-  LONGS_EQUAL(3, info.prot);
-  LONGS_EQUAL(0, info.memory_type);
-
-  // Verify that writing works.
-  memset((void*)addr, 0, 0x10000);
-
-  // Mtypeprotect succeeds on memory that isn't direct.
+  // Mtypeprotect fails on memory that isn't direct.
   result = sceKernelMtypeprotect(addr, 0x10000, 10, 0x0);
-  UNSIGNED_INT_EQUALS(0, result);
-
-  info   = {};
-  result = sceKernelVirtualQuery(addr, 0, &info, sizeof(info));
-  UNSIGNED_INT_EQUALS(0, result);
-  LONGS_EQUAL(addr, info.start);
-  LONGS_EQUAL(addr + 0x10000, info.end);
-  LONGS_EQUAL(0, info.prot);
-  LONGS_EQUAL(0, info.memory_type);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ENOTSUP, result);
 
   result = sceKernelReserveVirtualRange(&addr, 0x10000, 0x10, 0);
   UNSIGNED_INT_EQUALS(0, result);
 
-  // Mtypeprotect on reserved memory does nothing
+  // Mtypeprotect on reserved memory fails
   result = sceKernelMtypeprotect(addr, 0x10000, 10, 0x3);
-  UNSIGNED_INT_EQUALS(0, result);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_EACCES, result);
 
   result = sceKernelMunmap(addr, 0x10000);
   UNSIGNED_INT_EQUALS(0, result);
 
-  // Mtypeprotect on free memory does nothing.
+  // Mtypeprotect on free memory fails
   result = sceKernelMtypeprotect(addr, 0x10000, 10, 0x3);
-  UNSIGNED_INT_EQUALS(0, result);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_EACCES, result);
 
   // Clean up memory used.
   result = sceKernelMunmap(vmem_start, vmem_size);
