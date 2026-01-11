@@ -87,7 +87,7 @@ jobs:
       - name: Configure project
         run: |
           echo "::add-matcher::.github/matchers/cmake.json"
-          cmake -S. -Bbuild -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-19 -DCMAKE_CXX_COMPILER=clang++-19 -DOO_PS4_LINKER_SUFFIX=-19 -DOO_PS4_NOPKG=${{ 'OFF' }}
+          cmake -S. -Bbuild -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang-19 -DCMAKE_CXX_COMPILER=clang++-19 -DOO_PS4_LINKER_SUFFIX=-19 -DOO_PS4_NOPKG=${{ 'OFF' } -DCMAKE_TOOLCHAIN_FILE=OpenOrbis-tc.cmake}
 
       - name: Build project
         env:
