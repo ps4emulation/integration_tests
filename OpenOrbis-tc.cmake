@@ -6,9 +6,10 @@ if(NOT DEFINED ENV{OO_PS4_TOOLCHAIN})
     message(STATUS "Downloading openOrbis")
     FetchContent_Declare(
       openorbis
-      URL https://github.com/ps4emulation/OpenOrbis-PS4-Toolchain/releases/download/0.5.4-2/v0.5.4-2.tar.gz
-      URL_HASH SHA256=85cc12f388d06268873401ad80b42e2a059468063156180491c60821c0ff6568 # optional, hash of zip
+      URL https://github.com/ps4emulation/OpenOrbis-PS4-Toolchain/releases/download/0.5.4-4/v0.5.4-4.tar.gz
+      URL_HASH SHA256=53fcaa7d25c200738968bb55b9a99ac03718c38713efd7261845ab2c45641b18 # optional, hash of zip
     )
+
     FetchContent_MakeAvailable(openorbis)
 
     set(OO_PS4_TOOLCHAIN ${openorbis_SOURCE_DIR}/PS4Toolchain)
