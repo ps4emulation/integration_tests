@@ -40,15 +40,10 @@ function(create_pkg pkg_title_id fw_major fw_minor src_files)
     COMMAND ${CMAKE_COMMAND} -E copy
     ${CMAKE_SOURCE_DIR}/app_data/param.sfo
     $<TARGET_FILE_DIR:${pkg_title_id}>/param.sfo
-    # COMMAND ${CMAKE_COMMAND} -E copy_directory
-    # ${CMAKE_CURRENT_SOURCE_DIR}/assets
-    # $<TARGET_FILE_DIR:${pkg_title_id}>/sce_sys
-    # COMMAND ${CMAKE_COMMAND} -E copy_directory
-    # ${CMAKE_SOURCE_DIR}/app_data/sce_module
-    # $<TARGET_FILE_DIR:${pkg_title_id}>/sce_module
-    # COMMAND ${CMAKE_COMMAND} -E copy_directory
-    # ${CMAKE_SOURCE_DIR}/app_data/sce_sys
-    # $<TARGET_FILE_DIR:${pkg_title_id}>/sce_sys
+  )
+
+  target_compile_definitions(${pkg_title_id}
+    PRIVATE FW_VER_MAJOR=${fw_major} FW_VER_MINOR=${fw_minor}
   )
 
   add_dependencies(${pkg_title_id} CppUTest)
