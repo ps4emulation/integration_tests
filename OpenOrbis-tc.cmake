@@ -2,7 +2,17 @@ if(NOT DEFINED ENV{OO_PS4_TOOLCHAIN})
   if(DEFINED OO_PS4_TOOLCHAIN)
     set(ENV{OO_PS4_TOOLCHAIN} ${OO_PS4_TOOLCHAIN})
   else()
-    message(FATAL_ERROR "Missing OpenOrbis toolchain environment variable!")
+    # # Get toolchain before project
+    message(STATUS "Downloading openOrbis")
+    FetchContent_Declare(
+      openorbis
+      URL https://github.com/ps4emulation/OpenOrbis-PS4-Toolchain/releases/download/0.5.4-2/v0.5.4-2.tar.gz
+      URL_HASH SHA256=85cc12f388d06268873401ad80b42e2a059468063156180491c60821c0ff6568 # optional, hash of zip
+    )
+    FetchContent_MakeAvailable(openorbis)
+
+    set(OO_PS4_TOOLCHAIN ${openorbis_SOURCE_DIR}/PS4Toolchain)
+    set(ENV{OO_PS4_TOOLCHAIN} ${OO_PS4_TOOLCHAIN})
   endif()
 endif()
 
@@ -36,21 +46,21 @@ else()
 endif()
 
 function(OpenOrbisPackage_PreProject)
-	if(TARGET ${PKG_TITLE_ID})
-		message(FATAL_ERROR "Test name collision detected: ${PKG_TITLE_ID}.")
-	endif()
+  if(TARGET ${PKG_TITLE_ID})
+    message(FATAL_ERROR "Test name collision detected: ${PKG_TITLE_ID}.")
+  endif()
 endfunction()
 
-function(OpenOrbisPackage_PostProject)
-	set_target_properties(${PKG_TITLE_ID} PROPERTIES OUTPUT_NAME "eboot" SUFFIX ".elf" PREFIX "")
+function(OpenOrbisPackage_PostProject path_bin)
+  set_target_properties(${PKG_TITLE_ID} PROPERTIES OUTPUT_NAME "eboot" SUFFIX ".elf" PREFIX "")
 
-	if(CMAKE_HOST_WIN32)
-		set(ORBIS_BIN_PATH ${OO_PS4_TOOLCHAIN}/bin/windows)
-	elseif(CMAKE_HOST_LINUX)
-		set(ORBIS_BIN_PATH ${OO_PS4_TOOLCHAIN}/bin/linux)
-	else()
-		message(FATAL_ERROR "Unsupported OS")
-	endif()
+  if(CMAKE_HOST_WIN32)
+    set(ORBIS_BIN_PATH ${OO_PS4_TOOLCHAIN}/bin/windows)
+  elseif(CMAKE_HOST_LINUX)
+    set(ORBIS_BIN_PATH ${OO_PS4_TOOLCHAIN}/bin/linux)
+  else()
+    message(FATAL_ERROR "Unsupported OS")
+  endif()
 
   if(OO_PS4_NOPKG)
     set(PKG_SHOULDBUILD "nopkg")
@@ -60,15 +70,41 @@ function(OpenOrbisPackage_PostProject)
 
   math(EXPR OO_FWVER "${PKG_SYSVER} * 65536")
 
-	# Create eboot.bin from generated elf file
-	add_custom_command(TARGET ${PKG_TITLE_ID} POST_BUILD COMMAND
-		${CMAKE_COMMAND} -E env "OO_PS4_TOOLCHAIN=${OO_PS4_TOOLCHAIN}"
-		${ORBIS_BIN_PATH}/create-fself -in "${CMAKE_CURRENT_BINARY_DIR}/eboot.elf"
-		--out "${CMAKE_CURRENT_BINARY_DIR}/eboot.oelf" --eboot "${CMAKE_CURRENT_SOURCE_DIR}/eboot.bin" --paid 0x3800000000000011 --sdkver "${PKG_SYSVER}" --fwversion "${OO_FWVER}"
-	)
+  # Create eboot.bin from generated elf file
+  add_custom_command(TARGET ${PKG_TITLE_ID} POST_BUILD COMMAND
+    ${CMAKE_COMMAND} -E env "OO_PS4_TOOLCHAIN=${OO_PS4_TOOLCHAIN}"
+    ${ORBIS_BIN_PATH}/create-fself -in ${path_eboot} "${path_bin}/eboot.elf"
+    --out "${path_bin}/eboot.oelf" --eboot "${path_bin}/eboot.bin" --paid 0x3800000000000011 --sdkver "${PKG_SYSVER}" --fwversion "${OO_FWVER}"
+  )
+  get_filename_component(CURRENT_FOLDER_NAME ${CMAKE_CURRENT_SOURCE_DIR} NAME)
+  set(install_dir "${CMAKE_INSTALL_PREFIX}/${CURRENT_FOLDER_NAME}/${PKG_TITLE_ID}")
 
-	# Create param.sfo and pkg file
-	if(CMAKE_HOST_WIN32)
+  # install
+  install(FILES ${path_bin}/eboot.bin
+    DESTINATION "${install_dir}"
+  )
+
+  install(DIRECTORY
+    ${CMAKE_SOURCE_DIR}/app_data/sce_sys
+    DESTINATION "${install_dir}"
+  )
+
+  install(DIRECTORY
+    ${CMAKE_SOURCE_DIR}/app_data/sce_module
+    DESTINATION "${install_dir}"
+  )
+
+  install(DIRECTORY
+    ${CMAKE_CURRENT_SOURCE_DIR}/assets
+    DESTINATION "${install_dir}"
+  )
+
+  install(FILES ${path_bin}/param.sfo
+    DESTINATION "${install_dir}/sce_sys"
+  )
+
+  # Create param.sfo
+  if(CMAKE_HOST_WIN32)
     string(REPLACE "^" "^^" ESCAPED_PKG_TITLE "${PKG_TITLE}")
     string(REPLACE "&" "^&" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
     string(REPLACE "|" "^|" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
@@ -84,22 +120,33 @@ function(OpenOrbisPackage_PostProject)
     string(REPLACE "\n" "^n" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
     string(REPLACE " " "^ " ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
 
-		add_custom_command(TARGET ${PKG_TITLE_ID} POST_BUILD
-			COMMAND ${CMAKE_COMMAND} -E env "OO_PS4_TOOLCHAIN=${OO_PS4_TOOLCHAIN}"
-			cmd /c ${INTEST_SOURCE_ROOT}/package.bat
-			"${ESCAPED_PKG_TITLE}"
-			"${PKG_VERSION}"
-			"${PKG_TITLE_ID}"
-			"${PKG_CONTENT_ID}"
-			"${PKG_DOWNLOADSIZE}"
-			"${PKG_SYSVER}"
-			"${PKG_ATTRIBS1}"
-			"${PKG_ATTRIBS2}"
-			"${PKG_SHOULDBUILD}"
-			WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-			COMMENT "Running package.bat..."
-		)
-	elseif(CMAKE_HOST_LINUX)
+    add_custom_command(TARGET ${PKG_TITLE_ID} POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E env "OO_PS4_TOOLCHAIN=${OO_PS4_TOOLCHAIN}"
+      cmd /c ${INTEST_SOURCE_ROOT}/patch_param.bat
+      "${ESCAPED_PKG_TITLE}"
+      "${PKG_VERSION}"
+      "${PKG_TITLE_ID}"
+      "${PKG_CONTENT_ID}"
+      "${PKG_DOWNLOADSIZE}"
+      "${PKG_SYSVER}"
+      "${PKG_ATTRIBS1}"
+      "${PKG_ATTRIBS2}"
+      "${PKG_SHOULDBUILD}"
+      WORKING_DIRECTORY "${path_bin}"
+      COMMENT "Patching param.sfo..."
+    )
+
+    if(NOT OO_PS4_NOPKG)
+      # create pkg
+      install(CODE "
+          execute_process(
+              COMMAND \"${INTEST_SOURCE_ROOT}/package.bat\" \"${PKG_CONTENT_ID}\" \"${OO_PS4_TOOLCHAIN}\"
+              WORKING_DIRECTORY \"${install_dir}\"
+          )
+          message(STATUS \"Creating GP4 file\")
+      ")
+    endif()
+  elseif(CMAKE_HOST_LINUX)
     string(REPLACE "\t" "\\t" ESCAPED_PKG_TITLE "${PKG_TITLE}")
     string(REPLACE "\"" "\\\"" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
     string(REPLACE "'" "\\'" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
@@ -124,48 +171,33 @@ function(OpenOrbisPackage_PostProject)
     string(REPLACE "~" "\\~" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
     string(REPLACE "\n" "\\n" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
 
-		add_custom_command(TARGET ${PKG_TITLE_ID} POST_BUILD
-			COMMAND ${CMAKE_COMMAND} -E env "OO_PS4_TOOLCHAIN=${OO_PS4_TOOLCHAIN}"
-			"${INTEST_SOURCE_ROOT}/package.sh"
-			"${ESCAPED_PKG_TITLE}"
-			"${PKG_VERSION}"
-			"${PKG_TITLE_ID}"
-			"${PKG_CONTENT_ID}"
-			"${PKG_DOWNLOADSIZE}"
-			"${PKG_SYSVER}"
-			"${PKG_ATTRIBS1}"
-			"${PKG_ATTRIBS2}"
-			"${PKG_SHOULDBUILD}"
-			WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
-			COMMENT "Running package.sh..."
-		)
-	else()
-		message(FATAL_ERROR "Unsupported OS")
-	endif()
+    add_custom_command(TARGET ${PKG_TITLE_ID} POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E env "OO_PS4_TOOLCHAIN=${OO_PS4_TOOLCHAIN}"
+      "${INTEST_SOURCE_ROOT}/patch_param.sh"
+      "${ESCAPED_PKG_TITLE}"
+      "${PKG_VERSION}"
+      "${PKG_TITLE_ID}"
+      "${PKG_CONTENT_ID}"
+      "${PKG_DOWNLOADSIZE}"
+      "${PKG_SYSVER}"
+      "${PKG_ATTRIBS1}"
+      "${PKG_ATTRIBS2}"
+      "${PKG_SHOULDBUILD}"
+      WORKING_DIRECTORY "${path_bin}"
+      COMMENT "Patching param.sfo..."
+    )
 
-	get_filename_component(CURRENT_FOLDER_NAME ${CMAKE_CURRENT_SOURCE_DIR} NAME)
-
-	if(NOT OO_PS4_NOPKG)
-		install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/${PKG_CONTENT_ID}.pkg
-			DESTINATION ${CMAKE_INSTALL_PREFIX}/${CURRENT_FOLDER_NAME})
-	endif()
-
-	# install
-	install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/eboot.bin
-		DESTINATION ${CMAKE_INSTALL_PREFIX}/${CURRENT_FOLDER_NAME})
-
-	install(DIRECTORY
-		${CMAKE_CURRENT_SOURCE_DIR}/sce_sys
-		DESTINATION ${CMAKE_INSTALL_PREFIX}/${CURRENT_FOLDER_NAME}
-	)
-
-	install(DIRECTORY
-		${CMAKE_CURRENT_SOURCE_DIR}/sce_module
-		DESTINATION ${CMAKE_INSTALL_PREFIX}/${CURRENT_FOLDER_NAME}
-	)
-
-	install(DIRECTORY
-		${CMAKE_CURRENT_SOURCE_DIR}/assets
-		DESTINATION ${CMAKE_INSTALL_PREFIX}/${CURRENT_FOLDER_NAME}
-	)
+    if(NOT OO_PS4_NOPKG)
+      # create pkg
+      install(CODE "
+          execute_process(
+              COMMAND \"${INTEST_SOURCE_ROOT}/package.sh\" \"${PKG_CONTENT_ID}\" \"${OO_PS4_TOOLCHAIN}\"
+              WORKING_DIRECTORY \"${install_dir}\"
+          )
+          message(STATUS \"Creating GP4 file\")
+      ")
+    endif()
+  else()
+    message(FATAL_ERROR "Unsupported OS")
+  endif()
 endfunction()

@@ -10,21 +10,6 @@ include(ExternalProject)
 
 project(integration_tests_super NONE)
 
-# # Get toolchain before project
-if(NOT DEFINED ENV{OO_PS4_TOOLCHAIN})
-message(STATUS "Downloading openOrbis")
-  FetchContent_Declare(
-    openorbis
-    URL https://github.com/ps4emulation/OpenOrbis-PS4-Toolchain/releases/download/0.5.4-2/v0.5.4-2.tar.gz
-    URL_HASH SHA256=85cc12f388d06268873401ad80b42e2a059468063156180491c60821c0ff6568 # optional, hash of zip
-  )
-  FetchContent_MakeAvailable(openorbis)
-
-  set(OO_PS4_TOOLCHAIN ${openorbis_SOURCE_DIR}/PS4Toolchain)
-else()
-  STRING(REGEX REPLACE "\\\\" "/" OO_PS4_TOOLCHAIN "$ENV{OO_PS4_TOOLCHAIN}")
-endif()
-
 # # project
 ExternalProject_Add(
   integration_tests

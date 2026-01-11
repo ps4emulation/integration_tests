@@ -23,4 +23,4 @@ add_executable(${PKG_TITLE_ID}
 target_link_libraries(${PKG_TITLE_ID} PRIVATE SceSystemService)
 add_dependencies(${PKG_TITLE_ID} CppUTest)
 
-OpenOrbisPackage_PostProject()
+OpenOrbisPackage_PostProject(${CMAKE_CURRENT_BINARY_DIR})
