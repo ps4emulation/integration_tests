@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.24)
 
 include(FetchContent)
 include(ExternalProject)
+include(ps4_package.cmake)
 
 project(integration_tests LANGUAGES C CXX)
 
