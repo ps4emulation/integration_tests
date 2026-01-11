@@ -6,3 +6,4 @@ build/
 .*
 !.github
 !.vscode
+!tests/app_data/param.sfo
