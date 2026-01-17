@@ -1,3 +1,6 @@
+@echo off
+SETLOCAL EnableDelayedExpansion
+
 set PKG_CONTENT_ID=%1
 
 Rem Get a list of assets for packaging
