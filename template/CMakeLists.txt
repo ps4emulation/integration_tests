@@ -1,4 +1,4 @@
-project(template_test VERSION 0.0.1)
+project(template_test LANGUAGES CXX)
 
 link_libraries(SceSystemService)
 

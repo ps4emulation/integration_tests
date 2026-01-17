@@ -3,12 +3,17 @@ cmake_minimum_required(VERSION 3.24)
 include(FetchContent)
 include(ExternalProject)
 
-project(integration_tests LANGUAGES C CXX)
+project(integration_tests LANGUAGES CXX)
 
 set(CPPUTEST_EXTENSIONS ON CACHE BOOL "")
 set(CPPUTEST_STD_C_LIB_DISABLED OFF CACHE BOOL "")
 set(CPPUTEST_STD_CPP_LIB_DISABLED OFF CACHE BOOL "")
 set(CPPUTEST_BUILD_TESTING OFF CACHE BOOL "")
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+add_compile_definitions(CPPUTEST_USE_NEW_MACROS=0) # won't build otherwise
 
 FetchContent_Declare(
   CppUTest
@@ -18,7 +23,6 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(CppUTest)
 
 include_directories(BEFORE ${cpputest_SOURCE_DIR}/include)
-include_directories(BEFORE ${openorbis_SOURCE_DIR}/include)
 link_libraries(CppUTest::CppUTest)
 
 include(ps4_package.cmake)
