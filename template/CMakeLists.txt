@@ -1,26 +1,11 @@
-cmake_minimum_required(VERSION 3.24)
+project(template_test LANGUAGES CXX)
 
-set(PKG_TITLE "PS4 Unit Test")
-set(PKG_VERSION "1.0")
-set(PKG_TITLE_ID "ITES00001") # Should be unique across all tests in project
-set(PKG_CONTENT_ID "IV0000-${PKG_TITLE_ID}_00-PS4SUBSYS0000000")
-set(PKG_DOWNLOADSIZE 0)
-set(PKG_SYSVER 16777297)
-set(PKG_ATTRIBS1 0) # Known sfo attributes are stored in template/code/sfoparams.h
-set(PKG_ATTRIBS2 0)
+link_libraries(SceSystemService)
 
-OpenOrbisPackage_PreProject()
-
-project(${PKG_TITLE_ID} VERSION 0.0.1) # DO NOT change the project name!
-
-add_subdirectory(code)
-
-add_executable(${PKG_TITLE_ID}
-  $<TARGET_OBJECTS:${PKG_TITLE_ID}_obj>
-  ${OO_PS4_TOOLCHAIN}/lib/crt1.o
+set(SRC_FILES
+  code/main.cpp
+  code/test.cpp
 )
 
-target_link_libraries(${PKG_TITLE_ID} PRIVATE SceSystemService)
-add_dependencies(${PKG_TITLE_ID} CppUTest)
-
-OpenOrbisPackage_PostProject()
+create_pkg("TEMT00350" 3 50 ${SRC_FILES})
+create_pkg("TEMT00550" 5 50 ${SRC_FILES})

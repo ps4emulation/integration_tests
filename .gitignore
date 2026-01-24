@@ -1,8 +1,9 @@
 build/
-tests/*/*.bin
-tests/*/*.pkg
-tests/*/*.gp4
-tests/*/sce_sys/*.sfo
-.*
+**.bin
+**.pkg
+**.gp4
+**.sfo
+.*/
 !.github
 !.vscode
+!tests/app_data/param.sfo
