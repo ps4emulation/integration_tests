@@ -24,8 +24,17 @@ function(create_pkg pkg_title_id fw_major fw_minor src_files)
     message(FATAL_ERROR "create_pkg: minor SDK version either empty or too long")
   endif()
 
-  set(FW_VERSION_HEX_STR "0x${FW_MAJOR_PADDED}${FW_MINOR_PADDED}0000")
-  math(EXPR FW_VERSION_HEX "${FW_VERSION_HEX_STR}")
+  # SDK version cheat sheet:
+  # MMmmmppp
+  # M - Major
+  # m - Minor
+  # p - Patch
+  # We do not set the third nibble of minor version since we don't really
+  # need it for SDK version specification. This variable should be changed
+  # if we actually need third nibble of the the minor component of the
+  # version in the future. The condition for checking minor version length
+  # should be adjusted accordingly too.
+  math(EXPR FW_VERSION_HEX "0x${FW_MAJOR_PADDED}${FW_MINOR_PADDED}0000")
 
   # Set variables for the package
   string(SUBSTRING "${pkg_title_id}" 0 4 title)
