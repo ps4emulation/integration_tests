@@ -1,10 +1,8 @@
 #include "test.h"
 
-#include "CppUTest/TestHarness.h"
-
+#include <CppUTest/TestHarness.h>
+#include <cstdio>
 #include <list>
-#include <stdio.h>
-#include <string>
 
 TEST_GROUP (MemoryTests) {
   void setup() { // Before each test, call mem_scan to print out memory map information.
