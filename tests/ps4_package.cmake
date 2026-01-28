@@ -5,19 +5,23 @@ function(create_pkg pkg_title_id fw_major fw_minor src_files)
   # Pad FW_MAJOR to 2 digits.
   string(LENGTH ${fw_major} FW_MAJOR_STRLEN)
 
-  if(${FW_MAJOR_STRLEN} LESS 2)
+  if(${FW_MAJOR_STRLEN} EQUAL 1)
     set(FW_MAJOR_PADDED "0${fw_major}")
-  else()
+  elseif(${FW_MAJOR_STRLEN} EQUAL 2)
     set(FW_MAJOR_PADDED "${fw_major}")
+  else()
+    message(FATAL_ERROR "create_pkg: major SDK version either empty or too long")
   endif()
 
   # Pad FW_MINOR to 2 digits
   string(LENGTH ${fw_minor} FW_MINOR_STRLEN)
 
-  if(${FW_MINOR_STRLEN} LESS 2)
+  if(${FW_MINOR_STRLEN} EQUAL 1)
     set(FW_MINOR_PADDED "0${fw_minor}")
-  else()
+  elseif(${FW_MINOR_STRLEN} EQUAL 2)
     set(FW_MINOR_PADDED "${fw_minor}")
+  else()
+    message(FATAL_ERROR "create_pkg: minor SDK version either empty or too long")
   endif()
 
   set(FW_VERSION_HEX_STR "0x${FW_MAJOR_PADDED}${FW_MINOR_PADDED}0000")
