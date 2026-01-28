@@ -1,14 +1,26 @@
 function(create_pkg pkg_title_id fw_major fw_minor src_files)
+  set(FW_MAJOR_PADDED 0 PARENT_SCOPE)
   set(FW_MINOR_PADDED 0 PARENT_SCOPE)
 
+  # Pad FW_MAJOR to 2 digits.
+  string(LENGTH ${fw_major} FW_MAJOR_STRLEN)
+
+  if(${FW_MAJOR_STRLEN} LESS 2)
+    set(FW_MAJOR_PADDED "0${fw_major}")
+  else()
+    set(FW_MAJOR_PADDED "${fw_major}")
+  endif()
+
   # Pad FW_MINOR to 2 digits
-  if(${fw_minor} LESS 10)
+  string(LENGTH ${fw_minor} FW_MINOR_STRLEN)
+
+  if(${FW_MINOR_STRLEN} LESS 2)
     set(FW_MINOR_PADDED "0${fw_minor}")
   else()
     set(FW_MINOR_PADDED "${fw_minor}")
   endif()
 
-  set(FW_VERSION_HEX_STR "0x${fw_major}${FW_MINOR_PADDED}00000")
+  set(FW_VERSION_HEX_STR "0x${FW_MAJOR_PADDED}${FW_MINOR_PADDED}0000")
   math(EXPR FW_VERSION_HEX "${FW_VERSION_HEX_STR}")
 
   # Set variables for the package
