@@ -4,6 +4,8 @@
 #include <orbis/SystemService.h>
 #include <sstream>
 
+IMPORT_TEST_GROUP(MemoryTests);
+
 int main(int ac, char** av) {
   // No buffering
   setvbuf(stdout, NULL, _IONBF, 0);
