@@ -1,15 +1,15 @@
 function(create_pkg pkg_title_id fw_major fw_minor src_files)
-  # Create fw version
-  set(fw_major_hex "0x${fw_major}")
-  set(fw_minor_hex "0x${fw_minor}")
+  set(FW_MINOR_PADDED 0 PARENT_SCOPE)
 
-  math(EXPR FW_VERSION_INT "(${fw_major_hex} << 24) | ${fw_minor_hex} << 16")
+  # Pad FW_MINOR to 2 digits
+  if(${fw_minor} LESS 10)
+    set(FW_MINOR_PADDED "0${fw_minor}")
+  else()
+    set(FW_MINOR_PADDED "${fw_minor}")
+  endif()
 
-  execute_process(
-    COMMAND printf "0x%08X" ${FW_VERSION_INT}
-    OUTPUT_VARIABLE FW_VERSION_INT_HEX
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-  )
+  set(FW_VERSION_HEX_STR "0x${fw_major}${FW_MINOR_PADDED}00000")
+  math(EXPR FW_VERSION_HEX "${FW_VERSION_HEX_STR}")
 
   # Set variables for the package
   string(SUBSTRING "${pkg_title_id}" 0 4 title)
@@ -19,7 +19,7 @@ function(create_pkg pkg_title_id fw_major fw_minor src_files)
   set(PKG_VERSION "1.0")
   set(PKG_CONTENT_ID "IV0000-${pkg_title_id}_00-PS4SUBSYS0000000")
   set(PKG_DOWNLOADSIZE 0x100)
-  set(PKG_SYSVER ${FW_VERSION_INT_HEX})
+  set(PKG_SYSVER ${FW_VERSION_HEX})
   set(PKG_ATTRIBS1 0)
   set(PKG_ATTRIBS2 0)
 
