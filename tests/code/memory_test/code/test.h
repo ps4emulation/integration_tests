@@ -163,7 +163,7 @@ enum OrbisError : int32_t {
 
 #define mem_scan() _mem_scan(__FILE__, __LINE__)
 
-void _mem_scan(const char* file, int line) {
+static inline void _mem_scan(const char* file, int line) {
   // Helper method from red_prig for printing out memory map information.
   const char* _F = "_F";
   const char* _D = "_D";
