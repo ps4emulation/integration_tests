@@ -1,15 +1,40 @@
 function(create_pkg pkg_title_id fw_major fw_minor src_files)
-  # Create fw version
-  set(fw_major_hex "0x${fw_major}")
-  set(fw_minor_hex "0x${fw_minor}")
+  set(FW_MAJOR_PADDED 0 PARENT_SCOPE)
+  set(FW_MINOR_PADDED 0 PARENT_SCOPE)
 
-  math(EXPR FW_VERSION_INT "(${fw_major_hex} << 24) | ${fw_minor_hex} << 16")
+  # Pad FW_MAJOR to 2 digits.
+  string(LENGTH ${fw_major} FW_MAJOR_STRLEN)
 
-  execute_process(
-    COMMAND printf "0x%08X" ${FW_VERSION_INT}
-    OUTPUT_VARIABLE FW_VERSION_INT_HEX
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-  )
+  if(${FW_MAJOR_STRLEN} EQUAL 1)
+    set(FW_MAJOR_PADDED "0${fw_major}")
+  elseif(${FW_MAJOR_STRLEN} EQUAL 2)
+    set(FW_MAJOR_PADDED "${fw_major}")
+  else()
+    message(FATAL_ERROR "create_pkg: major SDK version either empty or too long")
+  endif()
+
+  # Pad FW_MINOR to 2 digits
+  string(LENGTH ${fw_minor} FW_MINOR_STRLEN)
+
+  if(${FW_MINOR_STRLEN} EQUAL 1)
+    set(FW_MINOR_PADDED "0${fw_minor}")
+  elseif(${FW_MINOR_STRLEN} EQUAL 2)
+    set(FW_MINOR_PADDED "${fw_minor}")
+  else()
+    message(FATAL_ERROR "create_pkg: minor SDK version either empty or too long")
+  endif()
+
+  # SDK version cheat sheet:
+  # MMmmmppp
+  # M - Major
+  # m - Minor
+  # p - Patch
+  # We do not set the third nibble of minor version since we don't really
+  # need it for SDK version specification. This variable should be changed
+  # if we actually need third nibble of the the minor component of the
+  # version in the future. The condition for checking minor version length
+  # should be adjusted accordingly too.
+  math(EXPR FW_VERSION_HEX "0x${FW_MAJOR_PADDED}${FW_MINOR_PADDED}0000")
 
   # Set variables for the package
   string(SUBSTRING "${pkg_title_id}" 0 4 title)
@@ -19,7 +44,7 @@ function(create_pkg pkg_title_id fw_major fw_minor src_files)
   set(PKG_VERSION "1.0")
   set(PKG_CONTENT_ID "IV0000-${pkg_title_id}_00-PS4SUBSYS0000000")
   set(PKG_DOWNLOADSIZE 0x100)
-  set(PKG_SYSVER ${FW_VERSION_INT_HEX})
+  set(PKG_SYSVER ${FW_VERSION_HEX})
   set(PKG_ATTRIBS1 0)
   set(PKG_ATTRIBS2 0)
 

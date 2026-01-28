@@ -12,6 +12,7 @@ set(CPPUTEST_BUILD_TESTING OFF CACHE BOOL "")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_CXX_SCAN_FOR_MODULES 0)
 
 add_compile_definitions(CPPUTEST_USE_NEW_MACROS=0) # won't build otherwise
 
@@ -34,17 +35,20 @@ MACRO(SUBDIRLIST result resultLibs curdir)
   FILE(GLOB children RELATIVE ${curdir} ${curdir}/*)
   SET(dirlist)
   SET(liblist)
+
   FOREACH(child ${children})
     IF(IS_DIRECTORY ${curdir}/${child} AND NOT child STREQUAL "template")
       LIST(APPEND dirlist ${child})
       LIST(APPEND liblist ${child})
     ENDIF()
   ENDFOREACH()
+
   SET(${result} ${dirlist})
   SET(${resultLibs} ${liblist})
 ENDMACRO()
 
 SUBDIRLIST(SUBDIRS SUBDIR_RESULT ${CMAKE_CURRENT_SOURCE_DIR}/code)
+
 FOREACH(subdir ${SUBDIRS})
   message(STATUS "Added ${subdir}")
   ADD_SUBDIRECTORY(code/${subdir})
