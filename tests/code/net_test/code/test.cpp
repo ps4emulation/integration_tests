@@ -155,7 +155,7 @@ void LogMessage(const char* fmt, u64 log_res) {
   sprintf(send_buf, fmt, log_res);
   result = sceNetSend(stream_sock, send_buf, strlen(send_buf), 0);
   CHECK(result > 0);
-  
+
   sceNetSocketClose(stream_sock);
   sceNetEpollDestroy(log_epoll);
 }
