@@ -204,23 +204,51 @@ TEST(NetTest, Test) {
   // These will serve as a way of testing behavior all in one application, hopefully.
   pthread_attr_t thread_attr {};
   result = pthread_attr_init(&thread_attr);
-  g_active_logger = new NBIOStreamLogger(true);
   UNSIGNED_INT_EQUALS(0, result);
 
   pthread_t server_tid {};
-  result = pthread_create(&server_tid, &thread_attr, ServerThread, nullptr);
-  printf("Server thread created, pthread_create returns 0x%08x\n", result);
   pthread_t client_tid {};
-  result = pthread_create(&client_tid, &thread_attr, ClientThread, nullptr);
-  printf("Client thread created, pthread_create returns 0x%08x\n", result);
 
-  // Wait for all threads to exit
+  // Run these tests each with a different logger, the tests mostly serve as a way for testers to confirm the loggers work.
+  printf("Main: Running first round of tests\n");
+  // Run with no logging, this will test for basic blocking stream socket behavior without interference.
+  result = pthread_create(&server_tid, &thread_attr, ServerThread, nullptr);
+  result = pthread_create(&client_tid, &thread_attr, ClientThread, nullptr);
   result = pthread_join(server_tid, nullptr);
   result = pthread_join(client_tid, nullptr);
 
+  printf("Main: Running second round of tests\n");
+  // Run tests with a logger built around blocking stream sockets.
+  g_active_logger = new BIOStreamLogger();
+  result          = pthread_create(&server_tid, &thread_attr, ServerThread, nullptr);
+  result          = pthread_create(&client_tid, &thread_attr, ClientThread, nullptr);
+  result          = pthread_join(server_tid, nullptr);
+  result          = pthread_join(client_tid, nullptr);
   delete (g_active_logger);
+
+  printf("Main: Running third round of tests\n");
+  // Run tests with a logger built around non-blocking stream sockets running synchronously
+  g_active_logger = new NBIOStreamLogger(false);
+  result          = pthread_create(&server_tid, &thread_attr, ServerThread, nullptr);
+  result          = pthread_create(&client_tid, &thread_attr, ClientThread, nullptr);
+  result          = pthread_join(server_tid, nullptr);
+  result          = pthread_join(client_tid, nullptr);
+  delete (g_active_logger);
+
+  printf("Main: Running fourth round of tests\n");
+  // Run tests with a logger built around non-blocking stream sockets running asynchronously
+  g_active_logger = new NBIOStreamLogger(true);
+  result          = pthread_create(&server_tid, &thread_attr, ServerThread, nullptr);
+  result          = pthread_create(&client_tid, &thread_attr, ClientThread, nullptr);
+  result          = pthread_join(server_tid, nullptr);
+  result          = pthread_join(client_tid, nullptr);
+  delete (g_active_logger);
+
+  // Logger behavior is demonstrated through logged messages, errors will log if the logger behaves differently from real hardware.
+  // The server and client threads here log errors through the current logging backend, but also run Cpputest macros to validate behavior.
+  printf("Main: Test suite completed\n");
 
   // Terminate libSceNet
   result = sceNetTerm();
-  printf("sceNetTerm returns 0x%08x\n", result);
+  UNSIGNED_INT_EQUALS(0, result);
 }
