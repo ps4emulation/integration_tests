@@ -17,6 +17,9 @@ void NBIOStreamLogger::LogMessage(const char* fmt, const u64 log_res) {
   // Creates a thread that performs the logging
   std::scoped_lock lk {logger_mutex};
 
+  // Make a copy of log_res to make sure that data isn't destroyed
+  const u64 result_to_log = log_res;
+
   pthread_t      client_tid {};
   pthread_attr_t thread_attr {};
   s32            result = pthread_attr_init(&thread_attr);
@@ -40,7 +43,7 @@ void NBIOStreamLogger::LogMessage(const char* fmt, const u64 log_res) {
   }
 
   // For the user args, submit both arguments through a struct
-  ClientArgs user_args {fmt, log_res};
+  ClientArgs user_args {fmt, result_to_log};
   result = pthread_create(&client_tid, &thread_attr, LoggingClientThread, &user_args);
   if (result < 0) {
     printf("NBIOStreamLogger unable to send message, pthread_create failed with 0x%08x\n", result);
@@ -368,8 +371,6 @@ NBIOStreamLogger::NBIOStreamLogger(bool async) {
   while (!logger_ready) {
     sceKernelUsleep(10000);
   }
-
-  printf("NBIOStreamLogger initialized successfully\n");
 }
 
 NBIOStreamLogger::~NBIOStreamLogger() {
@@ -394,6 +395,4 @@ NBIOStreamLogger::~NBIOStreamLogger() {
   client_tids.clear();
   // Manually destruct vector, as memory leaks otherwise.
   client_tids.~vector();
-
-  printf("NBIOStreamLogger terminated successfully\n");
 }
