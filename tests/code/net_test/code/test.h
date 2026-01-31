@@ -241,4 +241,6 @@ u16 sceNetHtons(u16 host16);
 s32 sceNetInetPton(s32 af, const char* src, void* dst);
 
 s32 sceKernelUsleep(u32 micros);
+
+void pthread_set_name_np(pthread_t tid, const char* name);
 }

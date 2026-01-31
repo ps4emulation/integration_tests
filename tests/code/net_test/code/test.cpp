@@ -1,163 +1,21 @@
 #include "test.h"
 
 #include "CppUTest/TestHarness.h"
+#include "logger.h"
+#include "nbio_stream_logger.h"
 
 TEST_GROUP (NetTest) {
   void setup() {}
   void teardown() {}
 };
 
-static constexpr u16 g_test_port    = 8080;
-static constexpr u16 g_log_port     = 8181;
-static bool          g_server_ready = false;
-static bool          g_cond         = false;
-static bool          g_logging_init = false;
+static constexpr u16 g_test_port     = 8080;
+static bool          g_server_ready  = false;
+static bool          g_cond          = false;
+static Logger*       g_active_logger = nullptr;
 
-void* LoggingThread(void* user_arg) {
-  // To continue in the lovely steps of this test suite, this logger server will be built on socket communication.
-  s32 stream_sock = sceNetSocket("LoggerServer", ORBIS_NET_AF_INET, ORBIS_NET_SOCK_STREAM, 0);
-  CHECK(stream_sock > 0);
-
-  // Use setsockopt to ensure it uses specified addr and port
-  s32 opt    = 1;
-  s32 result = sceNetSetsockopt(stream_sock, ORBIS_NET_SOL_SOCKET, ORBIS_NET_SO_REUSEADDR, &opt, sizeof(opt));
-  UNSIGNED_INT_EQUALS(0, result);
-  opt    = 1;
-  result = sceNetSetsockopt(stream_sock, ORBIS_NET_SOL_SOCKET, ORBIS_NET_SO_REUSEPORT, &opt, sizeof(opt));
-  UNSIGNED_INT_EQUALS(0, result);
-
-  // Bind this socket to a specific address and port
-  OrbisNetSockaddrIn in_addr {};
-  in_addr.sin_family      = ORBIS_NET_AF_INET;
-  in_addr.sin_addr.s_addr = ORBIS_NET_INADDR_ANY;
-  in_addr.sin_port        = sceNetHtons(g_log_port);
-  result                  = sceNetBind(stream_sock, (OrbisNetSockaddr*)&in_addr, sizeof(in_addr));
-  UNSIGNED_INT_EQUALS(0, result);
-
-  // Set to non-blocking
-  opt    = 1;
-  result = sceNetSetsockopt(stream_sock, ORBIS_NET_SOL_SOCKET, ORBIS_NET_SO_NBIO, &opt, sizeof(opt));
-  UNSIGNED_INT_EQUALS(0, result);
-
-  result = sceNetListen(stream_sock, 3);
-  UNSIGNED_INT_EQUALS(0, result);
-
-  // Socket is ready, mark server as initialized.
-  g_logging_init = true;
-
-  // For the remainder of this test, this thread will run a loop.
-  while (g_logging_init) {
-    // Use accept to wait for, then connect with a client
-    u32 addr_len = sizeof(in_addr);
-    s32 log_sock = sceNetAccept(stream_sock, (OrbisNetSockaddr*)&in_addr, &addr_len);
-    if (!g_logging_init) {
-      // Logger terminated
-      if (log_sock > 0) {
-        sceNetSocketClose(log_sock);
-      }
-      break;
-    } else if (log_sock == ORBIS_NET_ERROR_EAGAIN) {
-      // Not ready for client, wait then loop.
-      sceKernelUsleep(10000);
-      continue;
-    }
-
-    CHECK(log_sock > 0);
-
-    // Create an epoll
-    s32 log_epoll = sceNetEpollCreate("LoggerMessageEpoll", 0);
-    CHECK(log_epoll > 0);
-
-    // Add the new socket to the epoll
-    OrbisNetEpollEvent epoll_event {};
-    epoll_event.events = ORBIS_NET_EPOLLIN;
-    OrbisNetEpollData epoll_data {};
-    epoll_data.fd    = log_sock;
-    epoll_event.data = epoll_data;
-    result           = sceNetEpollControl(log_epoll, ORBIS_NET_EPOLL_CTL_ADD, log_sock, &epoll_event);
-    UNSIGNED_INT_EQUALS(0, result);
-
-    // Perform an epoll_wait with indefinite timeout
-    OrbisNetEpollEvent epoll_ev_out {};
-    result = sceNetEpollWait(log_epoll, &epoll_ev_out, 1, -1);
-    UNSIGNED_INT_EQUALS(1, result);
-
-    // If epoll_wait returned a positive number of fds, then this socket is ready for reading.
-    if (result > 0) {
-      char log_buf[0x1000];
-      memset(log_buf, 0, sizeof(log_buf));
-      result = sceNetRecv(log_sock, log_buf, sizeof(log_buf), 0);
-      CHECK(result > 0);
-      printf("%s", log_buf);
-    }
-
-    // Destroy the epoll and close the socket
-    sceNetEpollDestroy(log_epoll);
-    sceNetSocketClose(log_sock);
-  }
-  sceNetSocketClose(stream_sock);
-  return nullptr;
-}
-
-void LogMessage(const char* fmt, u64 log_res) {
-  CHECK(g_logging_init);
-
-  // Because I want to make everything extraordinarily difficult, this creates a socket, connects to logging socket, sends message, closes socket.
-  s32 stream_sock = sceNetSocket("LoggerClientSocket", ORBIS_NET_AF_INET, ORBIS_NET_SOCK_STREAM, 0);
-  CHECK(stream_sock > 0);
-
-  OrbisNetSockaddrIn in_addr {};
-  in_addr.sin_family = ORBIS_NET_AF_INET;
-  in_addr.sin_port   = sceNetHtons(g_log_port);
-  s32 result         = sceNetInetPton(ORBIS_NET_AF_INET, "127.0.0.1", &in_addr.sin_addr);
-  UNSIGNED_INT_EQUALS(1, result);
-
-  // Set to non-blocking
-  s32 opt = 1;
-  result  = sceNetSetsockopt(stream_sock, ORBIS_NET_SOL_SOCKET, ORBIS_NET_SO_NBIO, &opt, sizeof(opt));
-  UNSIGNED_INT_EQUALS(0, result);
-
-  result = sceNetConnect(stream_sock, (OrbisNetSockaddr*)&in_addr, sizeof(in_addr));
-  while (result != 0) {
-    if (result == ORBIS_NET_ERROR_EINPROGRESS || result == ORBIS_NET_ERROR_EAGAIN) {
-      // Connection is incomplete, wait, then retry.
-      sceKernelUsleep(10000);
-      result = sceNetConnect(stream_sock, (OrbisNetSockaddr*)&in_addr, sizeof(in_addr));
-      continue;
-    } else if (result == ORBIS_NET_ERROR_EISCONN) {
-      // Connection finished, break out of loop.
-      break;
-    }
-    // Should never reach here, if we did, then connect returned an unexpected error.
-    UNSIGNED_INT_EQUALS(0, result);
-  }
-
-  // Create an epoll, use it to wait until socket is ready for writing.
-  s32 log_epoll = sceNetEpollCreate("LoggerMessageEpoll", 0);
-  CHECK(log_epoll > 0);
-
-  // Add the new socket to the epoll
-  OrbisNetEpollEvent epoll_event {};
-  epoll_event.events = ORBIS_NET_EPOLLOUT;
-  OrbisNetEpollData epoll_data {};
-  epoll_data.fd    = stream_sock;
-  epoll_event.data = epoll_data;
-  result           = sceNetEpollControl(log_epoll, ORBIS_NET_EPOLL_CTL_ADD, stream_sock, &epoll_event);
-  UNSIGNED_INT_EQUALS(0, result);
-
-  // Perform an epoll_wait with indefinite timeout
-  OrbisNetEpollEvent epoll_ev_out {};
-  result = sceNetEpollWait(log_epoll, &epoll_ev_out, 1, -1);
-  UNSIGNED_INT_EQUALS(1, result);
-
-  char send_buf[0x1000];
-  memset(send_buf, 0, sizeof(send_buf));
-  sprintf(send_buf, fmt, log_res);
-  result = sceNetSend(stream_sock, send_buf, strlen(send_buf), 0);
-  CHECK(result > 0);
-
-  sceNetSocketClose(stream_sock);
-  sceNetEpollDestroy(log_epoll);
+void LogMessage(const char* msg, const u64 log_res) {
+  g_active_logger->LogMessage(msg, log_res);
 }
 
 void* ServerThread(void* user_arg) {
@@ -302,14 +160,7 @@ TEST(NetTest, Test) {
   result = pthread_attr_init(&thread_attr);
   printf("pthread_attr_init returns 0x%08x\n", result);
 
-  pthread_t logger_tid {};
-  result = pthread_create(&logger_tid, &thread_attr, LoggingThread, nullptr);
-  printf("Logger thread created, pthread_create returns 0x%08x\n", result);
-
-  // Wait for logging to initialize
-  while (!g_logging_init) {
-    sceKernelUsleep(10000);
-  }
+  g_active_logger = new NBIOStreamLogger(true);
 
   pthread_t server_tid {};
   result = pthread_create(&server_tid, &thread_attr, ServerThread, nullptr);
@@ -322,10 +173,7 @@ TEST(NetTest, Test) {
   result = pthread_join(server_tid, nullptr);
   result = pthread_join(client_tid, nullptr);
 
-  // Terminate logger thread
-  g_logging_init = false;
-  result         = pthread_join(logger_tid, nullptr);
-  printf("All threads exited, tests complete\n");
+  delete (g_active_logger);
 
   // Terminate libSceNet
   result = sceNetTerm();
