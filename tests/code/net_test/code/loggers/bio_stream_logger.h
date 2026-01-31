@@ -1,5 +1,5 @@
-#include "logger.h"
 #include "../test.h"
+#include "logger.h"
 
 #include <mutex>
 #include <vector>
