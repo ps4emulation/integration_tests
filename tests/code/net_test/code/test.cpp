@@ -16,6 +16,9 @@ static bool          g_cond          = false;
 static Logger*       g_active_logger = nullptr;
 
 void LogMessage(const char* msg, const u64 log_res) {
+  if (!g_active_logger) {
+    return;
+  }
   g_active_logger->LogMessage(msg, log_res);
 }
 
@@ -24,14 +27,17 @@ void* ServerThread(void* user_arg) {
   // Create a stream socket
   s32 stream_sock = sceNetSocket("TestStreamServer", ORBIS_NET_AF_INET, ORBIS_NET_SOCK_STREAM, 0);
   LogMessage("Server: socket(AF_INET, SOCK_STREAM, 0) returns 0x%08x\n", stream_sock);
+  CHECK(stream_sock > 0);
 
   // Use setsockopt to ensure it uses specified addr and port
   s32 opt    = 1;
   s32 result = sceNetSetsockopt(stream_sock, ORBIS_NET_SOL_SOCKET, ORBIS_NET_SO_REUSEADDR, &opt, sizeof(opt));
   LogMessage("Server: setsockopt(SOL_SOCKET, SO_REUSEADDR) returns 0x%08x\n", result);
+  UNSIGNED_INT_EQUALS(0, result);
   opt    = 1;
   result = sceNetSetsockopt(stream_sock, ORBIS_NET_SOL_SOCKET, ORBIS_NET_SO_REUSEPORT, &opt, sizeof(opt));
   LogMessage("Server: setsockopt(SOL_SOCKET, SO_REUSEPORT) returns 0x%08x\n", result);
+  UNSIGNED_INT_EQUALS(0, result);
 
   // Bind this socket to a specific address and port
   OrbisNetSockaddrIn in_addr {};
@@ -40,10 +46,12 @@ void* ServerThread(void* user_arg) {
   in_addr.sin_port        = sceNetHtons(g_test_port);
   result                  = sceNetBind(stream_sock, (OrbisNetSockaddr*)&in_addr, sizeof(in_addr));
   LogMessage("Server: bind returns 0x%08x\n", result);
+  UNSIGNED_INT_EQUALS(0, result);
 
   // Mark the socket as passive
   result = sceNetListen(stream_sock, 3);
   LogMessage("Server: listen returns 0x%08x\n", result);
+  UNSIGNED_INT_EQUALS(0, result);
 
   // Mark server as ready, so client knows to try connecting.
   g_server_ready = true;
@@ -52,21 +60,27 @@ void* ServerThread(void* user_arg) {
   u32 addr_len       = sizeof(in_addr);
   s32 connected_sock = sceNetAccept(stream_sock, (OrbisNetSockaddr*)&in_addr, &addr_len);
   LogMessage("Server: accept returns 0x%08x\n", connected_sock);
+  CHECK(connected_sock > 0);
 
   // Send a message to the client thread
   const char* message = "This is a test message coming from the server";
   result              = sceNetSend(connected_sock, message, strlen(message), 0);
   LogMessage("Server: send returns 0x%08x\n", result);
+  UNSIGNED_INT_EQUALS(strlen(message), result);
 
   // Receive a message from the client thread
-  char buffer[1024];
+  const char* expected_message = "This is a test message coming from the client";
+  char        buffer[1024];
   memset(buffer, 0, sizeof(buffer));
   result = sceNetRecv(connected_sock, buffer, sizeof(buffer), 0);
   LogMessage("Server: recv returns 0x%08x\n", result);
+  UNSIGNED_INT_EQUALS(strlen(expected_message), result);
+  STRCMP_EQUAL(expected_message, buffer);
 
   // Create an epoll, these are primarily used to wait for a file descriptor
   s32 epoll = sceNetEpollCreate("ServerEpoll", 0);
   LogMessage("Server: epoll_create returns 0x%08x\n", epoll);
+  CHECK(epoll > 0);
 
   // These can take any "s32", and an "event" describing what to wait on.
   OrbisNetEpollEvent epoll_event {};
@@ -78,6 +92,7 @@ void* ServerThread(void* user_arg) {
   epoll_event.data = epoll_data;
   result           = sceNetEpollControl(epoll, ORBIS_NET_EPOLL_CTL_ADD, connected_sock, &epoll_event);
   LogMessage("Server: epoll_ctl returns 0x%08x\n", result);
+  UNSIGNED_INT_EQUALS(0, result);
 
   // Perform an epoll_wait with no timeout.
   OrbisNetEpollEvent epoll_ev_out {};
@@ -85,6 +100,7 @@ void* ServerThread(void* user_arg) {
   // epoll_wait returns number of ready FDs that were polled.
   // Until client thread sends a message, this should be 0.
   LogMessage("Server: epoll_wait returns 0x%08x\n", result);
+  UNSIGNED_INT_EQUALS(0, result);
 
   // Tell client to send data over the socket
   g_cond = true;
@@ -93,15 +109,31 @@ void* ServerThread(void* user_arg) {
   // -1 timeout indicates no timeout.
   result = sceNetEpollWait(epoll, &epoll_ev_out, 1, -1);
   LogMessage("Server: epoll_wait returns 0x%08x\n", result);
+  UNSIGNED_INT_EQUALS(1, result);
 
   // Now it should be safe to read from the socket.
   memset(buffer, 0, sizeof(buffer));
   result = sceNetRecv(connected_sock, buffer, sizeof(buffer), 0);
   LogMessage("Server: recv returns 0x%08x\n", result);
+  UNSIGNED_INT_EQUALS(strlen(expected_message), result);
+  STRCMP_EQUAL(expected_message, buffer);
 
   // Close the epoll
   result = sceNetEpollDestroy(epoll);
   LogMessage("Server: epoll_destroy returns 0x%08x\n", result);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Close sockets
+  result = sceNetSocketClose(connected_sock);
+  LogMessage("Server: socket_close returns 0x%08x\n", result);
+  UNSIGNED_INT_EQUALS(0, result);
+  result = sceNetSocketClose(stream_sock);
+  LogMessage("Server: socket_close returns 0x%08x\n", result);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Update globals used for testing.
+  g_server_ready = false;
+  g_cond         = false;
 
   return nullptr;
 }
@@ -116,6 +148,7 @@ void* ClientThread(void* user_arg) {
   // Create a stream socket
   s32 stream_sock = sceNetSocket("TestStreamSocket", ORBIS_NET_AF_INET, ORBIS_NET_SOCK_STREAM, 0);
   LogMessage("Client: socket(AF_INET, SOCK_STREAM, 0) returns 0x%08x\n", stream_sock);
+  CHECK(stream_sock > 0);
 
   // Connect the socket to the server thread's socket
   OrbisNetSockaddrIn in_addr {};
@@ -123,19 +156,25 @@ void* ClientThread(void* user_arg) {
   in_addr.sin_port   = sceNetHtons(g_test_port);
   s32 result         = sceNetInetPton(ORBIS_NET_AF_INET, "127.0.0.1", &in_addr.sin_addr);
   LogMessage("Client: inet_pton(ORBIS_NET_AF_INET) returns 0x%08x\n", result);
+  UNSIGNED_INT_EQUALS(1, result);
   result = sceNetConnect(stream_sock, (OrbisNetSockaddr*)&in_addr, sizeof(in_addr));
   LogMessage("Client: connect returns 0x%08x\n", result);
+  UNSIGNED_INT_EQUALS(0, result);
 
   // Read a message through the connected socket
-  char buffer[1024];
+  const char* expected_message = "This is a test message coming from the server";
+  char        buffer[1024];
   memset(buffer, 0, sizeof(buffer));
   result = sceNetRecv(stream_sock, buffer, sizeof(buffer), 0);
   LogMessage("Client: recv returns 0x%08x\n", result);
+  UNSIGNED_INT_EQUALS(strlen(expected_message), result);
+  STRCMP_EQUAL(expected_message, buffer);
 
   // Send a message to the server through this socket
   const char* message = "This is a test message coming from the client";
   result              = sceNetSend(stream_sock, message, strlen(message), 0);
   LogMessage("Client: send returns 0x%08x\n", result);
+  UNSIGNED_INT_EQUALS(strlen(message), result);
 
   // Wait for g_cond to be true, this will serve as a signal to test epoll behavior
   while (!g_cond) {
@@ -146,6 +185,12 @@ void* ClientThread(void* user_arg) {
   // Server wants to test epoll behavior, send data over the socket
   result = sceNetSend(stream_sock, message, strlen(message), 0);
   LogMessage("Client: send returns 0x%08x\n", result);
+  UNSIGNED_INT_EQUALS(strlen(message), result);
+
+  // Close socket to conclude tests
+  result = sceNetSocketClose(stream_sock);
+  LogMessage("Client: socket_close returns 0x%08x\n", result);
+  UNSIGNED_INT_EQUALS(0, result);
 
   return nullptr;
 }
@@ -153,15 +198,14 @@ void* ClientThread(void* user_arg) {
 TEST(NetTest, Test) {
   // Init libSceNet
   s32 result = sceNetInit();
-  printf("sceNetInit returns 0x%08x\n", result);
+  UNSIGNED_INT_EQUALS(0, result);
 
   // Create a server and client thread.
   // These will serve as a way of testing behavior all in one application, hopefully.
   pthread_attr_t thread_attr {};
   result = pthread_attr_init(&thread_attr);
-  printf("pthread_attr_init returns 0x%08x\n", result);
-
   g_active_logger = new NBIOStreamLogger(true);
+  UNSIGNED_INT_EQUALS(0, result);
 
   pthread_t server_tid {};
   result = pthread_create(&server_tid, &thread_attr, ServerThread, nullptr);
