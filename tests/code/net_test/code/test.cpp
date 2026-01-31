@@ -1,8 +1,9 @@
 #include "test.h"
 
 #include "CppUTest/TestHarness.h"
-#include "logger.h"
-#include "nbio_stream_logger.h"
+#include "loggers/bio_stream_logger.h"
+#include "loggers/logger.h"
+#include "loggers/nbio_stream_logger.h"
 
 TEST_GROUP (NetTest) {
   void setup() {}

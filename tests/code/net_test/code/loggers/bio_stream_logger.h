@@ -1,15 +1,15 @@
 #include "logger.h"
-#include "test.h"
+#include "../test.h"
 
 #include <mutex>
 #include <vector>
 
 #pragma once
 
-class NBIOStreamLogger: public Logger {
+class BIOStreamLogger: public Logger {
   public:
-  NBIOStreamLogger(bool async);
-  ~NBIOStreamLogger() override;
+  BIOStreamLogger();
+  ~BIOStreamLogger() override;
 
   void LogMessage(const char* fmt, const u64 log_res) override;
 

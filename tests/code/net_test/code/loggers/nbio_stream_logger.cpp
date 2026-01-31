@@ -1,7 +1,5 @@
 #include "nbio_stream_logger.h"
 
-#include "test.h"
-
 static constexpr u16          log_port     = 8181;
 static constexpr s32          max_clients  = 10;
 static bool                   logger_ready = false;
@@ -51,7 +49,7 @@ void NBIOStreamLogger::LogMessage(const char* fmt, const u64 log_res) {
 
   char thread_name[128];
   memset(thread_name, 0, sizeof(thread_name));
-  sprintf(thread_name, "LoggerThread0x%08lx", client_tid);
+  sprintf(thread_name, "NBIOStreamLoggerThread0x%08lx", client_tid);
   pthread_set_name_np(client_tid, thread_name);
 
   if (async_logging) {
@@ -68,7 +66,7 @@ void NBIOStreamLogger::LogMessage(const char* fmt, const u64 log_res) {
 
 void* NBIOStreamLogger::LoggingServerThread(void* user_arg) {
   // To continue in the lovely steps of this test suite, this logger server will be built on socket communication.
-  s32 stream_sock = sceNetSocket("LoggerServer", ORBIS_NET_AF_INET, ORBIS_NET_SOCK_STREAM, 0);
+  s32 stream_sock = sceNetSocket("NBIOStreamLoggerServerSocket", ORBIS_NET_AF_INET, ORBIS_NET_SOCK_STREAM, 0);
   if (stream_sock <= 0) {
     printf("NBIOStreamLogger unable to initialize, socket creation failed with 0x%08x\n", stream_sock);
     return nullptr;
@@ -145,7 +143,7 @@ void* NBIOStreamLogger::LoggingServerThread(void* user_arg) {
     }
 
     // Create an epoll
-    s32 log_epoll = sceNetEpollCreate("LoggerMessageEpoll", 0);
+    s32 log_epoll = sceNetEpollCreate("NBIOStreamLoggerServerEpoll", 0);
     if (log_epoll <= 0) {
       // Log errors
       printf("NBIOStreamLogger: Unexpected error 0x%08x while creating epoll\n", log_epoll);
@@ -227,7 +225,7 @@ void* NBIOStreamLogger::LoggingClientThread(void* user_arg) {
   const u64   log_res = argp->log_res;
 
   // Because I want to make everything extraordinarily difficult, this creates a socket, connects to logging socket, sends message, closes socket.
-  s32 stream_sock = sceNetSocket("LoggerClientSocket", ORBIS_NET_AF_INET, ORBIS_NET_SOCK_STREAM, 0);
+  s32 stream_sock = sceNetSocket("NBIOStreamLoggerClientSocket", ORBIS_NET_AF_INET, ORBIS_NET_SOCK_STREAM, 0);
   if (stream_sock <= 0) {
     printf("NBIOStreamLogger: Failed to create client socket, error 0x%08x\n", stream_sock);
     return nullptr;
@@ -275,7 +273,7 @@ void* NBIOStreamLogger::LoggingClientThread(void* user_arg) {
   }
 
   // Create an epoll, use it to wait until socket is ready for writing.
-  s32 log_epoll = sceNetEpollCreate("LoggerMessageEpoll", 0);
+  s32 log_epoll = sceNetEpollCreate("NBIOStreamLoggerClientEpoll", 0);
   if (log_epoll <= 0) {
     printf("NBIOStreamLogger: Unexpected error while creating epoll, error 0x%08x\n", log_epoll);
     sceNetSocketClose(stream_sock);
@@ -311,21 +309,31 @@ void* NBIOStreamLogger::LoggingClientThread(void* user_arg) {
     return nullptr;
   }
 
+  // Prepare message to send
   char send_buf[0x1000];
   memset(send_buf, 0, sizeof(send_buf));
   sprintf(send_buf, fmt, log_res);
-  result = sceNetSend(stream_sock, send_buf, strlen(send_buf), 0);
-  if (result < 0) {
-    printf("NBIOStreamLogger: Unexpected error while sending data to logger server, error 0x%08x\n", result);
-  } else if (result == 0) {
-    printf("NBIOStreamLogger: Failed to send data to logging server?\n");
+
+  // To ensure the full message sends, we use a loop here.
+  u64 send_len = strlen(send_buf);
+  char* cur_buf_ptr = send_buf;
+  while (send_len > 0) {
+    // Send the requested log message to the server
+    result = sceNetSend(stream_sock, cur_buf_ptr, send_len, 0);
+    if (result < 0) {
+      printf("NBIOStreamLogger: Unexpected error while sending data to logger server, error 0x%08x\n", result);
+      break;
+    }
+    // Adjust remaining length and pointer in string based on the bytes sceNetSend returned.
+    send_len -= result;
+    cur_buf_ptr += result;
   }
 
+  // Clean up epoll and socket now that connection is complete.
   result = sceNetEpollDestroy(log_epoll);
   if (result < 0) {
     printf("NBIOStreamLogger: Failed to destroy logger epoll, error 0x%08x\n", result);
   }
-
   result = sceNetSocketClose(stream_sock);
   if (result < 0) {
     printf("NBIOStreamLogger: Failed to close logger socket, error 0x%08x\n", result);
