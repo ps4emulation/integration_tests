@@ -15,7 +15,7 @@ struct ClientArgs {
 
 void NBIOStreamLogger::LogMessage(const char* fmt, const u64 log_res) {
   // Creates a thread that performs the logging
-  std::scoped_lock<std::mutex> lk {logger_mutex};
+  std::scoped_lock lk {logger_mutex};
 
   pthread_t      client_tid {};
   pthread_attr_t thread_attr {};
@@ -49,7 +49,7 @@ void NBIOStreamLogger::LogMessage(const char* fmt, const u64 log_res) {
 
   char thread_name[128];
   memset(thread_name, 0, sizeof(thread_name));
-  sprintf(thread_name, "NBIOStreamLoggerThread0x%08lx", client_tid);
+  sprintf(thread_name, "NBIOStreamLoggerClientThread0x%08lx", client_tid);
   pthread_set_name_np(client_tid, thread_name);
 
   if (async_logging) {
@@ -65,7 +65,7 @@ void NBIOStreamLogger::LogMessage(const char* fmt, const u64 log_res) {
 }
 
 void* NBIOStreamLogger::LoggingServerThread(void* user_arg) {
-  // To continue in the lovely steps of this test suite, this logger server will be built on socket communication.
+  // Create a socket to serve as the logger server
   s32 stream_sock = sceNetSocket("NBIOStreamLoggerServerSocket", ORBIS_NET_AF_INET, ORBIS_NET_SOCK_STREAM, 0);
   if (stream_sock <= 0) {
     printf("NBIOStreamLogger unable to initialize, socket creation failed with 0x%08x\n", stream_sock);
@@ -224,13 +224,14 @@ void* NBIOStreamLogger::LoggingClientThread(void* user_arg) {
   const char* fmt     = argp->fmt;
   const u64   log_res = argp->log_res;
 
-  // Because I want to make everything extraordinarily difficult, this creates a socket, connects to logging socket, sends message, closes socket.
+  // Create a socket to connect to the logger server
   s32 stream_sock = sceNetSocket("NBIOStreamLoggerClientSocket", ORBIS_NET_AF_INET, ORBIS_NET_SOCK_STREAM, 0);
   if (stream_sock <= 0) {
     printf("NBIOStreamLogger: Failed to create client socket, error 0x%08x\n", stream_sock);
     return nullptr;
   }
 
+  // Retrieve loopback address to connect to
   OrbisNetSockaddrIn in_addr {};
   in_addr.sin_family = ORBIS_NET_AF_INET;
   in_addr.sin_port   = sceNetHtons(log_port);
@@ -250,6 +251,7 @@ void* NBIOStreamLogger::LoggingClientThread(void* user_arg) {
     return nullptr;
   }
 
+  // Connect to the server
   result = sceNetConnect(stream_sock, (OrbisNetSockaddr*)&in_addr, sizeof(in_addr));
   while (result != 0) {
     if (!logger_ready) {
@@ -315,7 +317,7 @@ void* NBIOStreamLogger::LoggingClientThread(void* user_arg) {
   sprintf(send_buf, fmt, log_res);
 
   // To ensure the full message sends, we use a loop here.
-  u64 send_len = strlen(send_buf);
+  u64   send_len    = strlen(send_buf);
   char* cur_buf_ptr = send_buf;
   while (send_len > 0) {
     // Send the requested log message to the server
@@ -360,7 +362,7 @@ NBIOStreamLogger::NBIOStreamLogger(bool async) {
     return;
   }
 
-  pthread_set_name_np(logger_server_tid, "LoggerServerThread");
+  pthread_set_name_np(logger_server_tid, "NBIOStreamLoggerServerThread");
 
   // Block until logger thread finishes initializing
   while (!logger_ready) {
