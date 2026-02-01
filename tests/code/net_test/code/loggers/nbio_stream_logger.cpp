@@ -18,7 +18,7 @@ void NBIOStreamLogger::LogMessage(const char* fmt, const u64 log_res) {
   std::scoped_lock lk {logger_mutex};
 
   // Make copies of both parameters to ensure data is not destroyed
-  ClientArgs data_to_pass{};
+  ClientArgs data_to_pass {};
   memset(&data_to_pass, 0, sizeof(data_to_pass));
   data_to_pass.log_res = log_res;
   strncpy(data_to_pass.fmt, fmt, strlen(fmt) + 1);
@@ -234,9 +234,9 @@ void* NBIOStreamLogger::LoggingServerThread(void* user_arg) {
 void* NBIOStreamLogger::LoggingClientThread(void* user_arg) {
   // user_arg here is a ClientArgs struct
   ClientArgs* user_argp = (ClientArgs*)user_arg;
-    
+
   // To ensure async logging doesn't break, we need to copy data from user args to a local variable.
-  ClientArgs argp{};
+  ClientArgs argp {};
   memcpy(&argp, user_arg, sizeof(ClientArgs));
   const char* fmt     = argp.fmt;
   const u64   log_res = argp.log_res;
