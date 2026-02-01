@@ -9,17 +9,22 @@ static std::vector<pthread_t> client_tids {};
 static bool                   async_logging = false;
 
 struct ClientArgs {
-  const char* fmt;
-  const u64   log_res;
+  u64  log_res;
+  char fmt[1024];
+  bool copied;
 };
 
 void NBIOStreamLogger::LogMessage(const char* fmt, const u64 log_res) {
-  // Creates a thread that performs the logging
   std::scoped_lock lk {logger_mutex};
 
-  // Make a copy of log_res to make sure that data isn't destroyed
-  const u64 result_to_log = log_res;
+  // Make copies of both parameters to ensure data is not destroyed
+  ClientArgs data_to_pass{};
+  memset(&data_to_pass, 0, sizeof(data_to_pass));
+  data_to_pass.log_res = log_res;
+  strncpy(data_to_pass.fmt, fmt, strlen(fmt) + 1);
+  data_to_pass.copied = false;
 
+  // Creates a thread that performs the logging
   pthread_t      client_tid {};
   pthread_attr_t thread_attr {};
   s32            result = pthread_attr_init(&thread_attr);
@@ -43,17 +48,22 @@ void NBIOStreamLogger::LogMessage(const char* fmt, const u64 log_res) {
   }
 
   // For the user args, submit both arguments through a struct
-  ClientArgs user_args {fmt, result_to_log};
-  result = pthread_create(&client_tid, &thread_attr, LoggingClientThread, &user_args);
+  result = pthread_create(&client_tid, &thread_attr, LoggingClientThread, &data_to_pass);
   if (result < 0) {
     printf("NBIOStreamLogger unable to send message, pthread_create failed with 0x%08x\n", result);
     return;
   }
 
+  // Give the created thread a name
   char thread_name[128];
   memset(thread_name, 0, sizeof(thread_name));
   sprintf(thread_name, "NBIOStreamLoggerClientThread0x%08lx", client_tid);
   pthread_set_name_np(client_tid, thread_name);
+
+  // Wait for logging client thread to indicate that data was properly copied before continuing.
+  while (!data_to_pass.copied) {
+    sceKernelUsleep(10000);
+  }
 
   if (async_logging) {
     // Add new client thread id to vector, to be exited on-demand or in destructor
@@ -222,10 +232,17 @@ void* NBIOStreamLogger::LoggingServerThread(void* user_arg) {
 }
 
 void* NBIOStreamLogger::LoggingClientThread(void* user_arg) {
-  // user_arg here is the ClientArgs struct, unpack args before continuing
-  ClientArgs* argp    = (ClientArgs*)user_arg;
-  const char* fmt     = argp->fmt;
-  const u64   log_res = argp->log_res;
+  // user_arg here is a ClientArgs struct
+  ClientArgs* user_argp = (ClientArgs*)user_arg;
+    
+  // To ensure async logging doesn't break, we need to copy data from user args to a local variable.
+  ClientArgs argp{};
+  memcpy(&argp, user_arg, sizeof(ClientArgs));
+  const char* fmt     = argp.fmt;
+  const u64   log_res = argp.log_res;
+
+  // Update args to state data was copied.
+  user_argp->copied = true;
 
   // Create a socket to connect to the logger server
   s32 stream_sock = sceNetSocket("NBIOStreamLoggerClientSocket", ORBIS_NET_AF_INET, ORBIS_NET_SOCK_STREAM, 0);
