@@ -86,12 +86,7 @@ function(OpenOrbisPackage_PostProject path_bin)
   )
 
   install(DIRECTORY
-    ${CMAKE_SOURCE_DIR}/app_data/sce_sys
-    DESTINATION "${install_dir}"
-  )
-
-  install(DIRECTORY
-    ${CMAKE_SOURCE_DIR}/app_data/sce_module
+    ${CMAKE_SOURCE_DIR}/app_data/
     DESTINATION "${install_dir}"
   )
 

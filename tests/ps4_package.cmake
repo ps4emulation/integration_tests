@@ -63,14 +63,8 @@ function(create_pkg pkg_title_id fw_major fw_minor src_files)
     RUNTIME_OUTPUT_DIRECTORY ${out_dir}
   )
 
-  add_custom_command(TARGET ${pkg_title_id} POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy
-    ${CMAKE_SOURCE_DIR}/app_data/param.sfo
-    $<TARGET_FILE_DIR:${pkg_title_id}>/param.sfo
-  )
-
   target_compile_definitions(${pkg_title_id}
-    PRIVATE FW_VER_MAJOR=${fw_major} FW_VER_MINOR=${fw_minor}
+    PRIVATE FW_VER_MAJOR=${fw_major} FW_VER_MINOR=${fw_minor} FW_VER="${PKG_SYSVER}u"
   )
 
   add_dependencies(${pkg_title_id} CppUTest)
