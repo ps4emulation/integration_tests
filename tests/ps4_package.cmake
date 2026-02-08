@@ -1,3 +1,36 @@
+function(create_lib work_dir work_lib_name src_files fw_version inst_path out_lib_name)
+  add_library(${work_lib_name} SHARED ${src_files} ${OO_PS4_TOOLCHAIN}/lib/crtlib.o)
+  OpenOrbis_AddFSelfCommand(${work_lib_name} ${work_dir} ${work_lib_name} ${fw_version})
+  install(FILES ${work_dir}/${work_lib_name}.prx
+    DESTINATION "${inst_path}"
+    RENAME "${out_lib_name}"
+  )
+endfunction()
+
+function(internal_create_stub_libs out_dir fw_version)
+  get_filename_component(curr_folder ${CMAKE_CURRENT_SOURCE_DIR} NAME)
+  set(install_dir "${CMAKE_INSTALL_PREFIX}/${curr_folder}/${PKG_TITLE_ID}")
+
+  # Generate libc.prx stub
+  if(NOT TARGET "c${fw_version}")
+    create_lib(${out_dir} "c${fw_version}" "${OO_PS4_TOOLCHAIN}/src/modules/libc/libc/lib.c" ${fw_version} "${install_dir}/sce_module" "libc.prx")
+  endif()
+
+  # Generate libSceFios2.prx
+  if(NOT TARGET "fios${fw_version}")
+    create_lib(${out_dir} "fios${fw_version}" "${OO_PS4_TOOLCHAIN}/src/modules/libSceFios2/libSceFios2/lib.c" ${fw_version} "${install_dir}/sce_module" "libSceFios2.prx")
+  endif()
+
+  # Generate right.sprx
+  if(NOT TARGET "right${fw_version}")
+    create_lib(${out_dir} "right${fw_version}" "${OO_PS4_TOOLCHAIN}/src/modules/right/right/lib.c" ${fw_version} "${install_dir}/sce_sys/about" "right.sprx")
+    target_link_options("right${fw_version}" PRIVATE "-Wl,--version-script=${OO_PS4_TOOLCHAIN}/src/modules/right/right/right.version")
+  endif()
+
+  unset(install_dir)
+  unset(curr_folder)
+endfunction()
+
 function(create_pkg pkg_title_id fw_major fw_minor src_files)
   set(FW_MAJOR_PADDED 0 PARENT_SCOPE)
   set(FW_MINOR_PADDED 0 PARENT_SCOPE)
@@ -67,7 +100,11 @@ function(create_pkg pkg_title_id fw_major fw_minor src_files)
     PRIVATE FW_VER_MAJOR=${fw_major} FW_VER_MINOR=${fw_minor} FW_VER="${PKG_SYSVER}u"
   )
 
+  target_link_options(${pkg_title_id} PRIVATE -pie)
+
   add_dependencies(${pkg_title_id} CppUTest)
+
+  internal_create_stub_libs(${CMAKE_CURRENT_BINARY_DIR} ${PKG_SYSVER})
 
   OpenOrbisPackage_PostProject(${out_dir})
 endfunction(create_pkg)
