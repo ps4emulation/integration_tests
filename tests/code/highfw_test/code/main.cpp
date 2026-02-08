@@ -11,7 +11,7 @@ int main(int ac, char** av) {
 
   int32_t user = ORBIS_USER_SERVICE_USER_ID_INVALID;
   sceUserServiceGetInitialUser(&user);
-  uint32_t sdk;
+  uint32_t sdk = ~0u;
   sceKernelGetCompiledSdkVersion(&sdk);
 
   printf("My firmware: %x\nInit user: %d\n", sdk, user);

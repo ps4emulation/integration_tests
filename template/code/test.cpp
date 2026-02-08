@@ -1,4 +1,4 @@
-#include "CppUTest/TestHarness.h"
+#include <CppUTest/TestHarness.h>
 
 TEST_GROUP (ClassName) {
   void setup() {}
