@@ -120,6 +120,14 @@ function(OpenOrbisPackage_PostProject pkg_title_id pkg_fw_version_hex)
 endfunction()
 
 function(OpenOrbisPackage_FinalizeProject pkg_title_id)
+  get_target_property(pkg_finalized ${pkg_title_id} OO_PKG_FINALIZED)
+
+  if(pkg_finalized)
+    message(FATAL_ERROR "Target ${pkg_title_id} is already finalized!")
+  endif()
+
+  set_target_properties(${pkg_title_id} PROPERTIES OO_PKG_FINALIZED TRUE)
+
   set(BASE_SCRIPT [=[
     set(ENV{OO_PS4_TOOLCHAIN} "${orbis_path}")
 
@@ -167,7 +175,7 @@ function(OpenOrbisPackage_FinalizeProject pkg_title_id)
   endif()
 
   get_target_property(pkg_root ${pkg_title_id} OO_PKG_ROOT)
-  get_target_property(pkg_fw_version_hex ${pkg_title_id} OOO_PKG_SDKVERT)
+  get_target_property(pkg_fw_version_hex ${pkg_title_id} OO_PKG_SDKVER)
   get_target_property(pkg_title ${pkg_title_id} OO_PKG_TITLE)
   get_target_property(pkg_content_id ${pkg_title_id} OO_PKG_CONTENTID)
   get_target_property(pkg_appver ${pkg_title_id} OO_PKG_APPVER)
