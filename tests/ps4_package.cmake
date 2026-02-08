@@ -2,7 +2,7 @@
 # This function creates an OpenOrbis prx library with specified parameters.
 #
 # params:
-# work_lib_name - Name for the library CMake project
+# work_lib_name - Name for the library target in CMake project
 # src_files - List of files/objects to compile into this prx lib
 # fw_version - Firmware version of the library, it is recommended to use the same version as pkg version to avoid linking problems
 # pkg_title_id - Package CMake target where to install this library
