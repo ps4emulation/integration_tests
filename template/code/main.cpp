@@ -1,8 +1,5 @@
-#include "CppUTest/CommandLineTestRunner.h"
-
-#include <cstdint>
+#include <CppUTest/CommandLineTestRunner.h>
 #include <orbis/SystemService.h>
-#include <sstream>
 
 IMPORT_TEST_GROUP(ClassName);
 
