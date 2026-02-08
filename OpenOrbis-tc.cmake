@@ -106,6 +106,7 @@ function(OpenOrbisPackage_PostProject path_bin)
   install(DIRECTORY
     ${CMAKE_CURRENT_SOURCE_DIR}/assets
     DESTINATION "${install_dir}"
+    OPTIONAL
   )
 
   install(FILES ${path_bin}/param.sfo

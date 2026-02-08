@@ -1,31 +1,29 @@
-function(create_lib work_dir work_lib_name src_files fw_version inst_path out_lib_name)
-  add_library(${work_lib_name} SHARED ${src_files} ${OO_PS4_TOOLCHAIN}/lib/crtlib.o)
-  OpenOrbis_AddFSelfCommand(${work_lib_name} ${work_dir} ${work_lib_name} ${fw_version})
-  install(FILES ${work_dir}/${work_lib_name}.prx
-    DESTINATION "${inst_path}"
-    RENAME "${out_lib_name}"
-  )
+function(create_lib work_lib_name src_files fw_version inst_path out_lib_name)
+  if(NOT TARGET ${work_lib_name})
+    add_library(${work_lib_name} SHARED ${src_files} ${OO_PS4_TOOLCHAIN}/lib/crtlib.o)
+    OpenOrbis_AddFSelfCommand(${work_lib_name} ${CMAKE_CURRENT_BINARY_DIR} ${work_lib_name} ${fw_version})
+
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${work_lib_name}.prx
+      DESTINATION "${inst_path}"
+      RENAME "${out_lib_name}"
+    )
+  endif()
 endfunction()
 
-function(internal_create_stub_libs out_dir fw_version)
+# TODO Fix spam with similar libraries? Need to figure out how to reuse already compiled ones across all test projects
+function(internal_create_stub_libs fw_version)
   get_filename_component(curr_folder ${CMAKE_CURRENT_SOURCE_DIR} NAME)
   set(install_dir "${CMAKE_INSTALL_PREFIX}/${curr_folder}/${PKG_TITLE_ID}")
 
   # Generate libc.prx stub
-  if(NOT TARGET "c${fw_version}")
-    create_lib(${out_dir} "c${fw_version}" "${OO_PS4_TOOLCHAIN}/src/modules/libc/libc/lib.c" ${fw_version} "${install_dir}/sce_module" "libc.prx")
-  endif()
+  create_lib("${PKG_TITLE_ID}c${fw_version}" "${OO_PS4_TOOLCHAIN}/src/modules/libc/libc/lib.c" ${fw_version} "${install_dir}/sce_module" "libc.prx")
 
   # Generate libSceFios2.prx
-  if(NOT TARGET "fios${fw_version}")
-    create_lib(${out_dir} "fios${fw_version}" "${OO_PS4_TOOLCHAIN}/src/modules/libSceFios2/libSceFios2/lib.c" ${fw_version} "${install_dir}/sce_module" "libSceFios2.prx")
-  endif()
+  create_lib("${PKG_TITLE_ID}fios${fw_version}" "${OO_PS4_TOOLCHAIN}/src/modules/libSceFios2/libSceFios2/lib.c" ${fw_version} "${install_dir}/sce_module" "libSceFios2.prx")
 
   # Generate right.sprx
-  if(NOT TARGET "right${fw_version}")
-    create_lib(${out_dir} "right${fw_version}" "${OO_PS4_TOOLCHAIN}/src/modules/right/right/lib.c" ${fw_version} "${install_dir}/sce_sys/about" "right.sprx")
-    target_link_options("right${fw_version}" PRIVATE "-Wl,--version-script=${OO_PS4_TOOLCHAIN}/src/modules/right/right/right.version")
-  endif()
+  create_lib("${PKG_TITLE_ID}right${fw_version}" "${OO_PS4_TOOLCHAIN}/src/modules/right/right/lib.c" ${fw_version} "${install_dir}/sce_sys/about" "right.sprx")
+  target_link_options("${PKG_TITLE_ID}right${fw_version}" PRIVATE "-Wl,--version-script=${OO_PS4_TOOLCHAIN}/src/modules/right/right/right.version")
 endfunction()
 
 function(create_pkg pkg_title_id fw_major fw_minor src_files)
@@ -101,7 +99,7 @@ function(create_pkg pkg_title_id fw_major fw_minor src_files)
 
   add_dependencies(${pkg_title_id} CppUTest)
 
-  internal_create_stub_libs(${CMAKE_CURRENT_BINARY_DIR} ${PKG_SYSVER})
+  internal_create_stub_libs(${PKG_SYSVER})
 
   OpenOrbisPackage_PostProject(${out_dir})
 endfunction(create_pkg)
