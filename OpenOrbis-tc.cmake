@@ -152,7 +152,7 @@ function(OpenOrbisPackage_FinalizeProject pkg_title_id)
 
       # create pkg
       execute_process(
-        COMMAND "${PackageCommand}" "${pkg_content_id}" "${OO_PS4_TOOLCHAIN}"
+        COMMAND "${PackageCommand}" "${pkg_content_id}"
         WORKING_DIRECTORY "${pkg_root}"
       )
     endif()
@@ -178,6 +178,7 @@ function(OpenOrbisPackage_FinalizeProject pkg_title_id)
     set(pkg_title "${pkg_title}")
     set(pkg_title_id "${pkg_title_id}")
     set(pkg_content_id "${pkg_content_id}")
+    set(pkg_fw_version_hex "${pkg_fw_version_hex}")
     set(pkg_appver "${pkg_appver}")
     set(pkg_attribs1 "${pkg_attribs1}")
     set(pkg_attribs2 "${pkg_attribs2}")
