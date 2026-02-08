@@ -21,6 +21,7 @@ STRING(REGEX REPLACE "\\\\" "/" OO_PS4_TOOLCHAIN "$ENV{OO_PS4_TOOLCHAIN}")
 
 define_property(TARGET PROPERTY OO_FSELF_PATH BRIEF_DOCS "This property reports a ready-to use binary, should never be edited manually")
 define_property(TARGET PROPERTY OO_PKG_ROOT BRIEF_DOCS "This property reports a path where pkg file will be created, should never be edited manually")
+define_property(TARGET PROPERTY OO_PKG_SDKVER BRIEF_DOCS "This property reports the SDK version used by package, should never be edited manually")
 define_property(TARGET PROPERTY OO_PKG_FINALIZED BRIEF_DOCS "This property reports whether package was finalized or not, should never be edited manually")
 define_property(TARGET PROPERTY OO_PKG_TITLE BRIEF_DOCS "This property specifies TITLE for generated param.sfo file, can be edited between create and finalize blocks")
 define_property(TARGET PROPERTY OO_PKG_APPVER BRIEF_DOCS "This property specifies APPVER for generated param.sfo file, can be edited between create and finalize blocks")
@@ -97,6 +98,7 @@ function(OpenOrbisPackage_PostProject pkg_title_id pkg_fw_version_hex)
   set(install_dir "${CMAKE_INSTALL_PREFIX}/${curr_folder}/${pkg_title_id}")
   set_target_properties(${pkg_title_id} PROPERTIES
     OO_PKG_ROOT "${install_dir}"
+    OO_PKG_SDKVER "${pkg_fw_version_hex}"
     OO_PKG_FINALIZED FALSE
   )
 
@@ -165,6 +167,7 @@ function(OpenOrbisPackage_FinalizeProject pkg_title_id)
   endif()
 
   get_target_property(pkg_root ${pkg_title_id} OO_PKG_ROOT)
+  get_target_property(pkg_fw_version_hex ${pkg_title_id} OOO_PKG_SDKVERT)
   get_target_property(pkg_title ${pkg_title_id} OO_PKG_TITLE)
   get_target_property(pkg_content_id ${pkg_title_id} OO_PKG_CONTENTID)
   get_target_property(pkg_appver ${pkg_title_id} OO_PKG_APPVER)
