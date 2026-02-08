@@ -33,6 +33,8 @@ define_property(TARGET PROPERTY OO_PKG_ATTRIBS2 BRIEF_DOCS "This property specif
 set(CMAKE_SYSTEM_NAME FreeBSD CACHE STRING "" FORCE)
 set(CMAKE_C_COMPILER_TARGET "x86_64-pc-freebsd12-elf" CACHE STRING "" FORCE)
 set(CMAKE_CXX_COMPILER_TARGET "${CMAKE_C_COMPILER_TARGET}" CACHE STRING "" FORCE)
+set(CMAKE_C_FLAGS "-nostdinc")
+set(CMAKE_CXX_FLAGS "-nostdinc++")
 set(CMAKE_TRY_COMPILE_TARGET_TYPE "STATIC_LIBRARY" CACHE STRING "" FORCE)
 set(CMAKE_SYSROOT "${OO_PS4_TOOLCHAIN}" CACHE PATH "" FORCE)
 
@@ -55,7 +57,7 @@ link_directories(BEFORE
 
 add_link_options(-nostartfiles -nodefaultlibs -lc -lc++ -lkernel -fuse-ld=lld${OO_PS4_LINKER_SUFFIX} -Wl,-m,elf_x86_64 -Wl,--eh-frame-hdr "-Wl,--script,${OO_PS4_TOOLCHAIN}/link.x")
 
-add_compile_options(-nostdinc++ -nostdinc -fPIC -funwind-tables -fshort-wchar)
+add_compile_options(-fPIC -funwind-tables -fshort-wchar)
 
 add_compile_definitions(STBI_NO_SIMD=1)
 
@@ -199,6 +201,4 @@ function(OpenOrbisPackage_FinalizeProject pkg_title_id)
   ]=] install_code)
 
   install(CODE "${install_code}")
-
-  # message(FATAL_ERROR ${install_code})
 endfunction()
