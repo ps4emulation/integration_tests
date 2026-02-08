@@ -29,8 +29,8 @@ function(internal_create_stub_libs out_dir fw_version)
 endfunction()
 
 function(create_pkg pkg_title_id fw_major fw_minor src_files)
-  set(FW_MAJOR_PADDED 0 PARENT_SCOPE)
-  set(FW_MINOR_PADDED 0 PARENT_SCOPE)
+  set(FW_MAJOR_PADDED 0)
+  set(FW_MINOR_PADDED 0)
 
   # Pad FW_MAJOR to 2 digits.
   string(LENGTH ${fw_major} FW_MAJOR_STRLEN)

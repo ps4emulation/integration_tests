@@ -73,10 +73,6 @@ function(OpenOrbis_AddFSelfCommand TargetProject WorkDir FSelfName TargetSDKVer)
     ${OO_BINARIES_PATH}/create-fself -in "${WorkDir}/${FSelfName}.elf"
     --out "${WorkDir}/${FSelfName}.oelf" "--${OUT_TYPE}" "${WorkDir}/${FSelfName}.${OUT_EXT}" --paid 0x3800000000000011 --sdkver "${TargetSDKVer}" --fwversion "${OO_FWVER}"
   )
-
-  unset(OUT_TYPE)
-  unset(OUT_EXT)
-  unset(OO_FWVER)
 endfunction()
 
 function(OpenOrbisPackage_PreProject)
@@ -213,6 +209,4 @@ function(OpenOrbisPackage_PostProject path_bin)
   else()
     message(FATAL_ERROR "Unsupported OS")
   endif()
-
-  unset(install_dir)
 endfunction()
