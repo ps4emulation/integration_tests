@@ -22,7 +22,7 @@ Rem Create param.sfo
 %OO_PS4_TOOLCHAIN%\bin\windows\PkgTool.Core.exe sfo_setentry param.sfo APP_TYPE --type Integer --maxsize 4 --value 1
 %OO_PS4_TOOLCHAIN%\bin\windows\PkgTool.Core.exe sfo_setentry param.sfo APP_VER --type Utf8 --maxsize 8 --value %PKG_VERSION%
 %OO_PS4_TOOLCHAIN%\bin\windows\PkgTool.Core.exe sfo_setentry param.sfo ATTRIBUTE --type Integer --maxsize 4 --value %PKG_ATTRIBS1%
-if NOT "%PKG_ATTRIBS2%"=="0" %OO_PS4_TOOLCHAIN%\bin\windows\PkgTool.Core.exe sfo_setentry param.sfo ATTRIBUTE2 --type Integer --maxsize 4 --value %PKG_ATTRIBS2%
+if NOT %PKG_ATTRIBS2%=="0" %OO_PS4_TOOLCHAIN%\bin\windows\PkgTool.Core.exe sfo_setentry param.sfo ATTRIBUTE2 --type Integer --maxsize 4 --value %PKG_ATTRIBS2%
 %OO_PS4_TOOLCHAIN%\bin\windows\PkgTool.Core.exe sfo_setentry param.sfo CATEGORY --type Utf8 --maxsize 4 --value "gd"
 %OO_PS4_TOOLCHAIN%\bin\windows\PkgTool.Core.exe sfo_setentry param.sfo CONTENT_ID --type Utf8 --maxsize 48 --value %PKG_CONTENT_ID%
 %OO_PS4_TOOLCHAIN%\bin\windows\PkgTool.Core.exe sfo_setentry param.sfo DOWNLOAD_DATA_SIZE --type Integer --maxsize 4 --value %PKG_DOWNLOADSIZE%

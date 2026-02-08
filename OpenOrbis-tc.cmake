@@ -119,6 +119,8 @@ endfunction()
 
 function(OpenOrbisPackage_FinalizeProject pkg_title_id)
   set(BASE_SCRIPT [=[
+    set(ENV{OO_PS4_TOOLCHAIN} "${orbis_path}")
+
     # Create param.sfo
     if(CMAKE_HOST_WIN32)
       set(PatchParamSfoCommand "${prj_root}/patch_param.bat")
@@ -170,6 +172,7 @@ function(OpenOrbisPackage_FinalizeProject pkg_title_id)
   get_target_property(pkg_attribs2 ${pkg_title_id} OO_PKG_ATTRIBS2)
   get_target_property(pkg_downsize ${pkg_title_id} OO_PKG_DOWNSIZE)
   string(CONFIGURE [=[
+    set(orbis_path "${OO_PS4_TOOLCHAIN}")
     set(prj_root "${INTEST_SOURCE_ROOT}")
     set(pkg_root "${pkg_root}")
     set(pkg_title "${pkg_title}")
