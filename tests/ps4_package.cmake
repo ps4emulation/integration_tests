@@ -26,9 +26,6 @@ function(internal_create_stub_libs out_dir fw_version)
     create_lib(${out_dir} "right${fw_version}" "${OO_PS4_TOOLCHAIN}/src/modules/right/right/lib.c" ${fw_version} "${install_dir}/sce_sys/about" "right.sprx")
     target_link_options("right${fw_version}" PRIVATE "-Wl,--version-script=${OO_PS4_TOOLCHAIN}/src/modules/right/right/right.version")
   endif()
-
-  unset(install_dir)
-  unset(curr_folder)
 endfunction()
 
 function(create_pkg pkg_title_id fw_major fw_minor src_files)
