@@ -1,6 +1,66 @@
-function(create_pkg pkg_title_id fw_major fw_minor src_files)
-  set(FW_MAJOR_PADDED 0 PARENT_SCOPE)
-  set(FW_MINOR_PADDED 0 PARENT_SCOPE)
+# description:
+# This function creates an OpenOrbis prx library with specified parameters.
+#
+# params:
+# work_lib_name - Name for the library target in CMake project
+# src_files - List of files/objects to compile into this prx lib
+# fw_version - Firmware version of the library, it is recommended to use the same version as pkg version to avoid linking problems
+# pkg_title_id - Package CMake target where to install this library
+# inst_path - Relative to project install directory path where to install the library, i.e. "sce_module" to put it in /app0/sce_module
+# out_lib_name - Final library name, the one it will be installed with to the `inst_path`
+# reuse_existing - Boolean argument, if set to true it will not error on CMake target name collision, already compiled lib will be installed to the specified directory
+#
+# result:
+# This function sets ${prx_first_occur} variable in parent scope to TRUE if library with specified parameters was just built the first time.
+# The function always sets this variable to TRUE if reuse_existing set to FALSE.
+function(create_lib work_lib_name src_files fw_version pkg_title_id inst_path out_lib_name reuse_existing)
+  if(NOT ${reuse_existing} AND TARGET ${work_lib_name})
+    message(FATAL_ERROR "Library name collision detected: ${work_lib_name}.")
+  endif()
+
+  if(NOT TARGET ${pkg_title_id})
+    message(FATAL_ERROR "Specified target (${pkg_title_id}) does not exist, I don't know where to install the library.")
+  endif()
+
+  get_target_property(install_dir ${pkg_title_id} OO_PKG_ROOT)
+
+  if(TARGET ${work_lib_name})
+    get_target_property(prx_file ${work_lib_name} OO_FSELF_PATH)
+    install(FILES ${prx_file}
+      DESTINATION "${install_dir}/${inst_path}"
+      RENAME "${out_lib_name}"
+    )
+    set(prx_first_occur FALSE PARENT_SCOPE)
+  else()
+    add_library(${work_lib_name} SHARED ${src_files} ${OO_PS4_TOOLCHAIN}/lib/crtlib.o)
+    OpenOrbis_AddFSelfCommand(${work_lib_name} ${CMAKE_CURRENT_BINARY_DIR} ${work_lib_name} ${fw_version})
+
+    install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${work_lib_name}.prx
+      DESTINATION "${install_dir}/${inst_path}"
+      RENAME "${out_lib_name}"
+    )
+    set(prx_first_occur TRUE PARENT_SCOPE)
+  endif()
+endfunction()
+
+function(internal_create_stub_libs pkg_title_id fw_version)
+  # Generate libc.prx stub
+  create_lib("c${fw_version}" "${OO_PS4_TOOLCHAIN}/src/modules/libc/libc/lib.c" ${fw_version} ${pkg_title_id} "sce_module" "libc.prx" TRUE)
+
+  # Generate libSceFios2.prx
+  create_lib("fios${fw_version}" "${OO_PS4_TOOLCHAIN}/src/modules/libSceFios2/libSceFios2/lib.c" ${fw_version} ${pkg_title_id} "sce_module" "libSceFios2.prx" TRUE)
+
+  # Generate right.sprx
+  create_lib("right${fw_version}" "${OO_PS4_TOOLCHAIN}/src/modules/right/right/lib.c" ${fw_version} ${pkg_title_id} "sce_sys/about" "right.sprx" TRUE)
+
+  if(${prx_first_occur}) # No need to re-set this option every time
+    target_link_options("right${fw_version}" PRIVATE "-Wl,--version-script=${OO_PS4_TOOLCHAIN}/src/modules/right/right/right.version")
+  endif()
+endfunction()
+
+function(create_pkg title_id fw_major fw_minor src_files)
+  set(FW_MAJOR_PADDED 0)
+  set(FW_MINOR_PADDED 0)
 
   # Pad FW_MAJOR to 2 digits.
   string(LENGTH ${fw_major} FW_MAJOR_STRLEN)
@@ -34,40 +94,40 @@ function(create_pkg pkg_title_id fw_major fw_minor src_files)
   # if we actually need third nibble of the the minor component of the
   # version in the future. The condition for checking minor version length
   # should be adjusted accordingly too.
-  math(EXPR FW_VERSION_HEX "0x${FW_MAJOR_PADDED}${FW_MINOR_PADDED}0000")
-
-  # Set variables for the package
-  string(SUBSTRING "${pkg_title_id}" 0 4 title)
-  set(PKG_TITLE "PS4 ${title} (FW ${fw_major}.${fw_minor})")
-
-  set(PKG_TITLE_ID "${pkg_title_id}")
-  set(PKG_VERSION "1.0")
-  set(PKG_CONTENT_ID "IV0000-${pkg_title_id}_00-PS4SUBSYS0000000")
-  set(PKG_DOWNLOADSIZE 0x100)
-  set(PKG_SYSVER ${FW_VERSION_HEX})
-  set(PKG_ATTRIBS1 0)
-  set(PKG_ATTRIBS2 0)
+  math(EXPR fw_version_hex "0x${FW_MAJOR_PADDED}${FW_MINOR_PADDED}0000")
 
   # Print debug info if needed
-  message(STATUS "Creating package ${PKG_TITLE} id:${PKG_TITLE_ID} fw:${PKG_SYSVER}")
+  message(STATUS "Creating package id:${title_id} fw:${fw_version_hex}")
 
-  OpenOrbisPackage_PreProject()
-
-  add_executable(${pkg_title_id}
+  add_executable(${title_id}
     ${src_files}
     ${OO_PS4_TOOLCHAIN}/lib/crt1.o
   )
 
-  set(out_dir "${CMAKE_CURRENT_BINARY_DIR}/${pkg_title_id}")
-  set_target_properties(${pkg_title_id} PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${out_dir}
+  string(SUBSTRING "${title_id}" 0 4 default_title)
+  set_target_properties(${title_id} PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${title_id}"
+    OO_PKG_TITLE "PS4 ${default_title} (FW ${fw_major}.${fw_minor})"
+    OO_PKG_CONTENTID "IV0000-${title_id}_00-PS4INTEST0000000"
+    OO_PKG_APPVER "1.0"
+    OO_PKG_DOWNSIZE 0x100
+    OO_PKG_ATTRIBS1 0
+    OO_PKG_ATTRIBS2 0
   )
 
-  target_compile_definitions(${pkg_title_id}
-    PRIVATE FW_VER_MAJOR=${fw_major} FW_VER_MINOR=${fw_minor} FW_VER="${PKG_SYSVER}u"
+  target_compile_definitions(${title_id}
+    PRIVATE FW_VER_MAJOR=${fw_major} FW_VER_MINOR=${fw_minor} FW_VER="${fw_version_hex}u"
   )
 
-  add_dependencies(${pkg_title_id} CppUTest)
+  target_link_options(${title_id} PRIVATE -pie)
 
-  OpenOrbisPackage_PostProject(${out_dir})
+  add_dependencies(${title_id} CppUTest)
+
+  OpenOrbisPackage_PostProject(${title_id} ${fw_version_hex})
+
+  internal_create_stub_libs(${title_id} ${fw_version_hex})
 endfunction(create_pkg)
+
+function(finalize_pkg pkg_title_id)
+  OpenOrbisPackage_FinalizeProject(${pkg_title_id})
+endfunction(finalize_pkg)
