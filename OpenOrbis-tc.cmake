@@ -19,6 +19,8 @@ endif()
 
 STRING(REGEX REPLACE "\\\\" "/" OO_PS4_TOOLCHAIN "$ENV{OO_PS4_TOOLCHAIN}")
 
+define_property(TARGET PROPERTY OO_FSELF_PATH BRIEF_DOCS "This property automatically added to all fself targets and it points to a ready-to use binary")
+
 set(CMAKE_SYSTEM_NAME FreeBSD CACHE STRING "" FORCE)
 set(CMAKE_C_COMPILER_TARGET "x86_64-pc-freebsd12-elf" CACHE STRING "" FORCE)
 set(CMAKE_CXX_COMPILER_TARGET "${CMAKE_C_COMPILER_TARGET}" CACHE STRING "" FORCE)
@@ -66,13 +68,16 @@ function(OpenOrbis_AddFSelfCommand TargetProject WorkDir FSelfName TargetSDKVer)
   endif()
 
   math(EXPR OO_FWVER "${TargetSDKVer} * 65536")
+  set(OUT_ABS_PATH "${WorkDir}/${FSelfName}.${OUT_EXT}")
 
   # Create object from generated elf file
   add_custom_command(TARGET ${TargetProject} POST_BUILD COMMAND
     ${CMAKE_COMMAND} -E env "OO_PS4_TOOLCHAIN=${OO_PS4_TOOLCHAIN}"
     ${OO_BINARIES_PATH}/create-fself -in "${WorkDir}/${FSelfName}.elf"
-    --out "${WorkDir}/${FSelfName}.oelf" "--${OUT_TYPE}" "${WorkDir}/${FSelfName}.${OUT_EXT}" --paid 0x3800000000000011 --sdkver "${TargetSDKVer}" --fwversion "${OO_FWVER}"
+    --out "${WorkDir}/${FSelfName}.oelf" "--${OUT_TYPE}" "${OUT_ABS_PATH}" --paid 0x3800000000000011 --sdkver "${TargetSDKVer}" --fwversion "${OO_FWVER}"
   )
+
+  set_target_properties(${TargetProject} PROPERTIES OO_FSELF_PATH "${OUT_ABS_PATH}")
 endfunction()
 
 function(OpenOrbisPackage_PreProject)
