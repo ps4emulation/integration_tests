@@ -119,6 +119,10 @@ function(OpenOrbisPackage_PostProject pkg_title_id pkg_fw_version_hex)
     DESTINATION "${install_dir}"
     OPTIONAL
   )
+
+  get_property(list GLOBAL PROPERTY OO_PRJ_LIST)
+  list(APPEND list "${pkg_title_id}")
+  set_property(GLOBAL PROPERTY OO_PRJ_LIST "${list}")
 endfunction()
 
 function(OpenOrbisPackage_FinalizeProject pkg_title_id)
@@ -201,4 +205,16 @@ function(OpenOrbisPackage_FinalizeProject pkg_title_id)
   ]=] install_code)
 
   install(CODE "${install_code}")
+endfunction()
+
+function(OpenOrbisPackage_Validate)
+  get_property(list GLOBAL PROPERTY OO_PRJ_LIST)
+
+  foreach(Target ${list})
+    get_target_property(IsFinalized ${Target} OO_PKG_FINALIZED)
+
+    if(NOT ${IsFinalized})
+      message(FATAL_ERROR "Missing finalize call for ${Target}")
+    endif()
+  endforeach()
 endfunction()
