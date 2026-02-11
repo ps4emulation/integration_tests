@@ -9,7 +9,7 @@ set(SRC_FILES
 
 create_pkg(TEMT00350 3 50 ${SRC_FILES})
 set_target_properties(TEMT00350 PROPERTIES OO_PKG_TITLE "PS4 test template for SDK 3.50")
-finalize_pkg(TEMT00350)
+finalize_pkg(TEMT00350) # This call should be done after EVERY create_pkg call, will cause fatal error otherwise
 
 create_pkg(TEMT00550 5 50 ${SRC_FILES})
 set_target_properties(TEMT00550 PROPERTIES OO_PKG_TITLE "PS4 test template for SDK 5.50")
