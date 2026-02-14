@@ -444,8 +444,39 @@ TEST(EventTest, Test) {
   result = handle->waitFlipEvent(&ev, &count, &timeout);
   UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ETIMEDOUT, result);
 
-  // Now for the slightly messy part, we need to test EOP flips.
-  // These are GPU driven flips, which work alongside the CPU driven flips tested earlier.
+  // Now test EOP flips
+  result = handle->submitAndFlip(0x1000);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Print status
+  memset(&status, 0, sizeof(status));
+  result = handle->getStatus(&status);
+  UNSIGNED_INT_EQUALS(0, result);
+  PrintFlipStatus(&status);
+
+  // Wait for EOP flip to occur.
+  memset(&ev, 0, sizeof(ev));
+  count  = 0;
+  result = handle->waitFlipEvent(&ev, &count, nullptr);
+  UNSIGNED_INT_EQUALS(0, result);
+  CHECK_EQUAL(1, count);
+
+  PrintEventData(&ev);
+  // CHECK_EQUAL(0x6000000000000, ev.ident);
+  CHECK_EQUAL(-13, ev.filter);
+  CHECK_EQUAL(32, ev.flags);
+  CHECK_EQUAL(0, ev.fflags);
+  CHECK(ev.data != 0);
+  ev_data = *reinterpret_cast<VideoOutEventData*>(&ev.data);
+  // Counter is how many times the event was triggered.
+  CHECK_EQUAL(1, ev_data.counter);
+  CHECK_EQUAL(0x1000, ev_data.flip_arg);
+
+  // Print status again.
+  memset(&status, 0, sizeof(status));
+  result = handle->getStatus(&status);
+  UNSIGNED_INT_EQUALS(0, result);
+  PrintFlipStatus(&status);
 
   // Clean up after test
   delete (handle);

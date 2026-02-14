@@ -11,8 +11,8 @@ class VideoOut {
   s32                              height {0};
   std::vector<std::pair<s64, u64>> phys_bufs {};
   OrbisKernelEqueue                flip_queue {nullptr};
-  bool flip_event = false;
-  s32 current_buf = -1;
+  bool                             flip_event  = false;
+  s32                              current_buf = -1;
 
   public:
   VideoOut(s32 width, s32 height) {
@@ -49,11 +49,9 @@ class VideoOut {
       UNSIGNED_INT_EQUALS(0, result);
     }
     phys_bufs.~vector();
-  }
+  };
 
-  s32 getStatus(OrbisVideoOutFlipStatus* status) {
-    return sceVideoOutGetFlipStatus(handle, status);
-  }
+  s32 getStatus(OrbisVideoOutFlipStatus* status) { return sceVideoOutGetFlipStatus(handle, status); };
 
   s32 flipFrame(s64 flip_arg) {
     s32 result = sceVideoOutSubmitFlip(handle, current_buf, 1, flip_arg);
@@ -61,7 +59,33 @@ class VideoOut {
       current_buf = -1;
     }
     return result;
-  }
+  };
+
+  s32 submitAndFlip(s64 flip_arg) {
+    s64 cmd_dmem_ptr = 0;
+    s32 result       = sceKernelAllocateMainDirectMemory(0x4000, 0x4000, 0, &cmd_dmem_ptr);
+    UNSIGNED_INT_EQUALS(0, result);
+
+    void* cmd_ptr = nullptr;
+    result        = sceKernelMapDirectMemory(&cmd_ptr, 0x4000, 0x33, 0, cmd_dmem_ptr, 0x4000);
+    UNSIGNED_INT_EQUALS(0, result);
+
+    // Write GPU init packet to the pointer.
+    u32* cmds       = (u32*)cmd_ptr;
+    cmds += sceGnmDrawInitDefaultHardwareState350(cmds, 0x100);
+
+    // Write a flip packet to the pointer.
+    cmds[0] = 0xc03e1000;
+    cmds[1] = 0x68750777;
+    cmds += 64;
+    u32 stream_size = (u32)((u64)cmds - (u64)cmd_ptr);
+
+    result = sceGnmSubmitAndFlipCommandBuffers(1, &cmd_ptr, &stream_size, nullptr, nullptr, handle, current_buf, 1, flip_arg);
+    if (++current_buf == phys_bufs.size()) {
+      current_buf = -1;
+    }
+    return result;
+  };
 
   s32 addBuffer() {
     // Create a buffer attribute
@@ -111,7 +135,5 @@ class VideoOut {
     return result;
   };
 
-  s32 waitFlipEvent(OrbisKernelEvent* ev, s32* out, u32* timeout) {
-    return sceKernelWaitEqueue(flip_queue, ev, 1, out, timeout);
-  };
+  s32 waitFlipEvent(OrbisKernelEvent* ev, s32* out, u32* timeout) { return sceKernelWaitEqueue(flip_queue, ev, 1, out, timeout); };
 };
