@@ -459,7 +459,6 @@ TEST(EventTest, FlipEventTest) {
   do {
     memset(&status, 0, sizeof(status));
     result = handle->getStatus(&status);
-    PrintFlipStatus(&status);
     UNSIGNED_INT_EQUALS(0, result);
 
     sceKernelUsleep(10000);
