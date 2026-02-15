@@ -249,12 +249,15 @@ TEST(EventTest, FlipEventTest) {
   VideoOut* handle = new VideoOut(1920, 1080);
 
   // Register buffers
-  handle->addBuffer();
-  handle->addBuffer();
-  handle->addBuffer();
+  s32 result = handle->addBuffer();
+  UNSIGNED_INT_EQUALS(0, result);
+  result = handle->addBuffer();
+  UNSIGNED_INT_EQUALS(1, result);
+  result = handle->addBuffer();
+  UNSIGNED_INT_EQUALS(2, result);
 
   OrbisVideoOutFlipStatus status {};
-  s32                     result = handle->getStatus(&status);
+                          result = handle->getStatus(&status);
   UNSIGNED_INT_EQUALS(0, result);
 
   // Create a flip event

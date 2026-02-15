@@ -156,7 +156,7 @@ class VideoOut {
     // Register buffer
     s32 result = sceVideoOutRegisterBuffers(handle, buf_count, &buf_addr, 1, &attr);
 
-    if (result == 0) {
+    if (result >= 0) {
       // Buffer registered successfully, increment buffers count.
       buf_count++;
     }
