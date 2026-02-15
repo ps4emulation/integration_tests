@@ -258,7 +258,8 @@ TEST(EventTest, FlipEventTest) {
   UNSIGNED_INT_EQUALS(0, result);
 
   // Create a flip event
-  result = handle->addFlipEvent(nullptr);
+  u64 num = 1;
+  result = handle->addFlipEvent(&num);
   UNSIGNED_INT_EQUALS(0, result);
 
   // Not sure what we're dealing with, so from here, start logging info.
@@ -272,7 +273,7 @@ TEST(EventTest, FlipEventTest) {
   OrbisKernelEvent ev {};
   memset(&ev, 0, sizeof(ev));
   s32 count = 0;
-  result    = handle->waitFlipEvent(&ev, &count, nullptr);
+  result    = handle->waitFlipEvent(&ev, 1, &count, nullptr);
   UNSIGNED_INT_EQUALS(0, result);
   CHECK_EQUAL(1, count);
 
@@ -284,6 +285,8 @@ TEST(EventTest, FlipEventTest) {
   CHECK_EQUAL(0, ev.fflags);
   CHECK(ev.data != 0);
   VideoOutEventData ev_data = *reinterpret_cast<VideoOutEventData*>(&ev.data);
+  CHECK(ev.user_data != 0);
+  CHECK_EQUAL(1, *(u64*)ev.user_data);
   CHECK_EQUAL(1, ev_data.counter);
   CHECK_EQUAL(0x100, ev_data.flip_arg);
 
@@ -291,7 +294,7 @@ TEST(EventTest, FlipEventTest) {
   memset(&ev, 0, sizeof(ev));
   count       = 0;
   u32 timeout = 1000;
-  result      = handle->waitFlipEvent(&ev, &count, &timeout);
+  result      = handle->waitFlipEvent(&ev, 1, &count, &timeout);
   UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ETIMEDOUT, result);
 
   // Check flip status
@@ -308,18 +311,17 @@ TEST(EventTest, FlipEventTest) {
   // Now we can wait on the flip event equeue prepared earlier.
   memset(&ev, 0, sizeof(ev));
   count  = 0;
-  result = handle->waitFlipEvent(&ev, &count, nullptr);
+  result = handle->waitFlipEvent(&ev, 1, &count, nullptr);
   UNSIGNED_INT_EQUALS(0, result);
   CHECK_EQUAL(1, count);
 
   // Check returned data
   PrintEventData(&ev);
-  CHECK_EQUAL(0x6000000000000, ev.ident);
-  CHECK_EQUAL(-13, ev.filter);
-  CHECK_EQUAL(32, ev.flags);
   CHECK_EQUAL(0, ev.fflags);
   CHECK(ev.data != 0);
   ev_data = *reinterpret_cast<VideoOutEventData*>(&ev.data);
+  CHECK(ev.user_data != 0);
+  CHECK_EQUAL(1, *(u64*)ev.user_data);
   CHECK_EQUAL(1, ev_data.counter);
   CHECK_EQUAL(0x200, ev_data.flip_arg);
 
@@ -327,7 +329,7 @@ TEST(EventTest, FlipEventTest) {
   memset(&ev, 0, sizeof(ev));
   count   = 0;
   timeout = 1000;
-  result  = handle->waitFlipEvent(&ev, &count, &timeout);
+  result  = handle->waitFlipEvent(&ev, 1, &count, &timeout);
   UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ETIMEDOUT, result);
 
   // Check flip status
@@ -355,16 +357,12 @@ TEST(EventTest, FlipEventTest) {
   // Now we can wait on the flip event equeue prepared earlier.
   memset(&ev, 0, sizeof(ev));
   count  = 0;
-  result = handle->waitFlipEvent(&ev, &count, nullptr);
+  result = handle->waitFlipEvent(&ev, 1, &count, nullptr);
   UNSIGNED_INT_EQUALS(0, result);
   CHECK_EQUAL(1, count);
 
   // Check returned data
   PrintEventData(&ev);
-  CHECK_EQUAL(0x6000000000000, ev.ident);
-  CHECK_EQUAL(-13, ev.filter);
-  CHECK_EQUAL(32, ev.flags);
-  CHECK_EQUAL(0, ev.fflags);
   CHECK(ev.data != 0);
   ev_data = *reinterpret_cast<VideoOutEventData*>(&ev.data);
   CHECK_EQUAL(1, ev_data.counter);
@@ -380,16 +378,12 @@ TEST(EventTest, FlipEventTest) {
   // We did two submits, so the video out event should fire again.
   memset(&ev, 0, sizeof(ev));
   count  = 0;
-  result = handle->waitFlipEvent(&ev, &count, nullptr);
+  result = handle->waitFlipEvent(&ev, 1, &count, nullptr);
   UNSIGNED_INT_EQUALS(0, result);
   CHECK_EQUAL(1, count);
 
   // Check returned data
   PrintEventData(&ev);
-  CHECK_EQUAL(0x6000000000000, ev.ident);
-  CHECK_EQUAL(-13, ev.filter);
-  CHECK_EQUAL(32, ev.flags);
-  CHECK_EQUAL(0, ev.fflags);
   CHECK(ev.data != 0);
   ev_data = *reinterpret_cast<VideoOutEventData*>(&ev.data);
   CHECK_EQUAL(1, ev_data.counter);
@@ -426,15 +420,11 @@ TEST(EventTest, FlipEventTest) {
   // Check returned data
   memset(&ev, 0, sizeof(ev));
   count  = 0;
-  result = handle->waitFlipEvent(&ev, &count, nullptr);
+  result = handle->waitFlipEvent(&ev, 1, &count, nullptr);
   UNSIGNED_INT_EQUALS(0, result);
   CHECK_EQUAL(1, count);
 
   PrintEventData(&ev);
-  CHECK_EQUAL(0x6000000000000, ev.ident);
-  CHECK_EQUAL(-13, ev.filter);
-  CHECK_EQUAL(32, ev.flags);
-  CHECK_EQUAL(0, ev.fflags);
   CHECK(ev.data != 0);
   ev_data = *reinterpret_cast<VideoOutEventData*>(&ev.data);
   // Counter is how many times the event was triggered.
@@ -444,7 +434,7 @@ TEST(EventTest, FlipEventTest) {
   // Shouldn't trigger again.
   memset(&ev, 0, sizeof(ev));
   count  = 0;
-  result = handle->waitFlipEvent(&ev, &count, &timeout);
+  result = handle->waitFlipEvent(&ev, 1, &count, &timeout);
   UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ETIMEDOUT, result);
 
   // Now test EOP flips
@@ -469,7 +459,7 @@ TEST(EventTest, FlipEventTest) {
   // Wait for EOP flip to occur.
   memset(&ev, 0, sizeof(ev));
   count  = 0;
-  result = handle->waitFlipEvent(&ev, &count, nullptr);
+  result = handle->waitFlipEvent(&ev, 1, &count, nullptr);
   UNSIGNED_INT_EQUALS(0, result);
   CHECK_EQUAL(1, count);
 
@@ -480,7 +470,8 @@ TEST(EventTest, FlipEventTest) {
   CHECK_EQUAL(0, ev.fflags);
   CHECK(ev.data != 0);
   ev_data = *reinterpret_cast<VideoOutEventData*>(&ev.data);
-  // Counter is how many times the event was triggered.
+  CHECK(ev.user_data != 0);
+  CHECK_EQUAL(1, *(u64*)ev.user_data);
   CHECK_EQUAL(3, ev_data.counter);
   CHECK_EQUAL(0x3000, ev_data.flip_arg);
 
@@ -496,18 +487,13 @@ TEST(EventTest, FlipEventTest) {
   // Wait for EOP flip to occur.
   memset(&ev, 0, sizeof(ev));
   count  = 0;
-  result = handle->waitFlipEvent(&ev, &count, nullptr);
+  result = handle->waitFlipEvent(&ev, 1, &count, nullptr);
   UNSIGNED_INT_EQUALS(0, result);
   CHECK_EQUAL(1, count);
 
   PrintEventData(&ev);
-  CHECK_EQUAL(0x6000000000000, ev.ident);
-  CHECK_EQUAL(-13, ev.filter);
-  CHECK_EQUAL(32, ev.flags);
-  CHECK_EQUAL(0, ev.fflags);
   CHECK(ev.data != 0);
   ev_data = *reinterpret_cast<VideoOutEventData*>(&ev.data);
-  // Counter is how many times the event was triggered.
   CHECK_EQUAL(1, ev_data.counter);
   CHECK_EQUAL(0x30000000000, ev_data.flip_arg);
 
@@ -516,6 +502,72 @@ TEST(EventTest, FlipEventTest) {
   result = handle->getStatus(&status);
   UNSIGNED_INT_EQUALS(0, result);
   PrintFlipStatus(&status);
+
+  // Try adding a second flip event
+  s64 num2 = 2;
+  result = handle->addFlipEvent(&num2);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Trigger a flip, then wait for two events with no timeout.
+  result = handle->flipFrame(0x10000);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Wait for flip
+  do {
+    memset(&status, 0, sizeof(status));
+    result = handle->getStatus(&status);
+    UNSIGNED_INT_EQUALS(0, result);
+
+    sceKernelUsleep(10000);
+  } while (status.num_flip_pending != 0);
+
+  OrbisKernelEvent events[2];
+  memset(events, 0, sizeof(events));
+  count = 0;
+  timeout = 10000;
+  result = handle->waitFlipEvent(events, 2, &count, &timeout);
+  UNSIGNED_INT_EQUALS(0, result);
+  // Despite adding another flip event, we still only get the one event.
+  CHECK_EQUAL(1, count);
+
+  // Print the event data.
+  PrintEventData(&events[0]);
+
+  CHECK(events[0].data != 0);
+  ev_data = *reinterpret_cast<VideoOutEventData*>(&events[0].data);
+  // The user data matches the new event
+  CHECK(events[0].user_data != 0);
+  CHECK_EQUAL(2, *(u64*)events[0].user_data);
+  CHECK_EQUAL(1, ev_data.counter);
+  CHECK_EQUAL(0x10000, ev_data.flip_arg);
+
+  // Trigger a flip, then wait for two events with no timeout.
+  result = handle->flipFrame(0x10000);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Wait for flip
+  do {
+    memset(&status, 0, sizeof(status));
+    result = handle->getStatus(&status);
+    UNSIGNED_INT_EQUALS(0, result);
+
+    sceKernelUsleep(10000);
+  } while (status.num_flip_pending != 0);
+
+  memset(events, 0, sizeof(events));
+  count = 0;
+  timeout = 10000;
+  result = handle->waitFlipEvent(events, 2, &count, &timeout);
+  UNSIGNED_INT_EQUALS(0, result);
+  // Despite adding another flip event, we still only get the one event.
+  CHECK_EQUAL(1, count);
+
+  // Print the event data.
+  PrintEventData(&events[0]);
+
+  // The user data still matches the new event
+  CHECK(events[0].user_data != 0);
+  CHECK_EQUAL(2, *(u64*)events[0].user_data);
 
   // Clean up after test
   delete (handle);

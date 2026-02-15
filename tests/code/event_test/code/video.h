@@ -182,5 +182,5 @@ class VideoOut {
     return result;
   };
 
-  s32 waitFlipEvent(OrbisKernelEvent* ev, s32* out, u32* timeout) { return sceKernelWaitEqueue(flip_queue, ev, 1, out, timeout); };
+  s32 waitFlipEvent(OrbisKernelEvent* ev, s32 num, s32* out, u32* timeout) { return sceKernelWaitEqueue(flip_queue, ev, num, out, timeout); };
 };
