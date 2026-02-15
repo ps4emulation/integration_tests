@@ -7,22 +7,27 @@
 class VideoOut {
   private:
   // Video out data
-  s32 handle;
-  s32 width;
-  s32 height;
+  s32 handle      = 0;
+  s32 width       = 0;
+  s32 height      = 0;
   s32 current_buf = -1;
 
   // Buffer allocations
-  std::vector<std::pair<s64, u64>> phys_bufs;
+  void* buf_addr  = nullptr;
+  s64   buf_paddr = 0;
+  u64   buf_size  = 0;
+  u64   buf_count = 0;
 
   // Equeue
   OrbisKernelEqueue flip_queue = nullptr;
   bool              flip_event = false;
 
   // Command buffer for EOP tests
-  void* cmd_buf = nullptr;
-  s64   phys_cmd_buf;
-  u32   stream_size;
+  void* cmd_buf          = nullptr;
+  s64   phys_cmd_buf     = 0;
+  u64   cmd_buf_size     = 0x4000;
+  u32   stream_size      = 0;
+  u32   cmd_start_offset = 0;
 
   public:
   VideoOut(s32 width, s32 height) {
@@ -42,11 +47,26 @@ class VideoOut {
     UNSIGNED_INT_EQUALS(0, result);
 
     // Initialize command buffer for EOP flip tests
-    result = sceKernelAllocateMainDirectMemory(0x4000, 0x4000, 0, &phys_cmd_buf);
+    result = sceKernelAllocateMainDirectMemory(cmd_buf_size, 0x4000, 0, &phys_cmd_buf);
     UNSIGNED_INT_EQUALS(0, result);
 
-    result = sceKernelMapDirectMemory(&cmd_buf, 0x4000, 0x33, 0, phys_cmd_buf, 0x4000);
+    result = sceKernelMapDirectMemory(&cmd_buf, cmd_buf_size, 0x33, 0, phys_cmd_buf, 0x4000);
     UNSIGNED_INT_EQUALS(0, result);
+
+    // Map a memory area for video out buffers
+    // Calculate necessary buffer size, logic is taken from red_prig's shader test homebrew
+    u64 pitch      = (width + 127) / 128;
+    u64 pad_width  = pitch * 128;
+    u64 pad_height = ((height + 63) & (~63));
+    u64 size       = pad_width * pad_height * 4;
+    buf_size       = (size + 16 * 1024 - 1) & ~(16 * 1024 - 1);
+
+    // Perform the actual memory mapping
+    result = sceKernelAllocateMainDirectMemory(buf_size, 0x10000, 3, &buf_paddr);
+    UNSIGNED_INT_EQUALS(0, result);
+    result = sceKernelMapDirectMemory(&buf_addr, buf_size, 0x33, 0, buf_paddr, 0x10000);
+    UNSIGNED_INT_EQUALS(0, result);
+    memset(buf_addr, 0, buf_size);
   };
 
   // Manually define a destructor to close everything.
@@ -64,18 +84,15 @@ class VideoOut {
       handle = 0;
     }
 
-    // Free allocations for video out buffers
-    for (auto& [phys_off, size]: phys_bufs) {
-      s32 result = sceKernelReleaseDirectMemory(phys_off, size);
+    // Free command buffer allocation
+    if (cmd_buf != nullptr) {
+      s32 result = sceKernelReleaseDirectMemory(phys_cmd_buf, cmd_buf_size);
       UNSIGNED_INT_EQUALS(0, result);
     }
 
-    // Manually destruct vector to clean memory footprint
-    phys_bufs.~vector();
-
-    // Free command buffer allocation
-    if (cmd_buf != nullptr) {
-      s32 result = sceKernelReleaseDirectMemory(phys_cmd_buf, 0x4000);
+    // Free video out buffer allocation
+    if (buf_addr != nullptr) {
+      s32 result = sceKernelReleaseDirectMemory(buf_paddr, buf_size);
       UNSIGNED_INT_EQUALS(0, result);
     }
   };
@@ -83,39 +100,42 @@ class VideoOut {
   s32 getStatus(OrbisVideoOutFlipStatus* status) { return sceVideoOutGetFlipStatus(handle, status); };
 
   s32 flipFrame(s64 flip_arg) {
-    if (phys_bufs.size() == 0) {
+    if (buf_count == 0) {
       // Force a blank frame if no buffers are registered
       current_buf = -1;
     }
     s32 result = sceVideoOutSubmitFlip(handle, current_buf, 1, flip_arg);
-    if (++current_buf == phys_bufs.size()) {
+    if (++current_buf == buf_count) {
       current_buf = 0;
     }
     return result;
   };
 
   s32 submitAndFlip(s64 flip_arg) {
-    if (phys_bufs.size() == 0) {
+    if (buf_count == 0) {
       // SubmitAndFlip fails on buffer -1, save time by failing early.
       return -1;
     }
 
-    // Clear memory for command buffer
-    memset(cmd_buf, 0, 0x4000);
-
     // Write GPU init packet to the pointer.
-    u32* cmds = (u32*)cmd_buf;
+    void* cmd_buf_start = (void*)((u64)cmd_buf + cmd_start_offset);
+    u32*  cmds          = (u32*)cmd_buf_start;
     cmds += sceGnmDrawInitDefaultHardwareState350(cmds, 0x100);
 
     // Write a flip packet to the pointer.
     cmds[0] = 0xc03e1000;
     cmds[1] = 0x68750777;
     cmds += 64;
-    stream_size = (u32)((u64)cmds - (u64)cmd_buf);
+    stream_size = (u32)((u64)cmds - (u64)cmd_buf_start);
+
+    cmd_start_offset += stream_size;
+    if (cmd_start_offset + stream_size > cmd_buf_size) {
+      cmd_start_offset = 0;
+    }
 
     // Perform GPU submit
-    s32 result = sceGnmSubmitAndFlipCommandBuffers(1, &cmd_buf, &stream_size, nullptr, nullptr, handle, current_buf, 1, flip_arg);
-    if (++current_buf == phys_bufs.size()) {
+    s32 result = sceGnmSubmitAndFlipCommandBuffers(1, &cmd_buf_start, &stream_size, nullptr, nullptr, handle, current_buf, 1, flip_arg);
+    if (++current_buf == buf_count) {
       current_buf = 0;
     }
     return result;
@@ -134,27 +154,15 @@ class VideoOut {
     attr.reserved0      = 0;
     attr.reserved1      = 0;
 
-    // calc some stuff, logic taken from red_prig's shader test homebrew.
-    u64 pitch        = (attr.width + 127) / 128;
-    u64 pad_width    = pitch * 128;
-    u64 pad_height   = ((attr.height + 63) & (~63));
-    u64 size         = pad_width * pad_height * 4;
-    u64 aligned_size = (size + 16 * 1024 - 1) & ~(16 * 1024 - 1);
-
-    // Map memory for buffer.
-    s64 dmem_addr = 0;
-    s32 result    = sceKernelAllocateMainDirectMemory(aligned_size, 64 * 1024, 3, &dmem_addr);
-    UNSIGNED_INT_EQUALS(0, result);
-    void* addr = nullptr;
-    result     = sceKernelMapDirectMemory(&addr, aligned_size, 0x33, 0, dmem_addr, 64 * 1024);
-    UNSIGNED_INT_EQUALS(0, result);
-    memset(addr, 0, aligned_size);
-
-    // Add buffer info to the buffers list
-    phys_bufs.emplace_back(dmem_addr, aligned_size);
-
     // Register buffer
-    return sceVideoOutRegisterBuffers(handle, phys_bufs.size() - 1, &addr, 1, &attr);
+    s32 result = sceVideoOutRegisterBuffers(handle, buf_count, &buf_addr, 1, &attr);
+
+    if (result == 0) {
+      // Buffer registered successfully, increment buffers count.
+      buf_count++;
+    }
+
+    return result;
   };
 
   s32 removeBuffers() {
