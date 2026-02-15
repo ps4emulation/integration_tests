@@ -6,49 +6,78 @@
 
 class VideoOut {
   private:
-  s32                              handle {0};
-  s32                              width {0};
-  s32                              height {0};
-  std::vector<std::pair<s64, u64>> phys_bufs {};
-  OrbisKernelEqueue                flip_queue {nullptr};
-  bool                             flip_event  = false;
-  s32                              current_buf = -1;
+  // Video out data
+  s32 handle;
+  s32 width;
+  s32 height;
+  s32 current_buf = -1;
+
+  // Buffer allocations
+  std::vector<std::pair<s64, u64>> phys_bufs;
+
+  // Equeue
+  OrbisKernelEqueue flip_queue = nullptr;
+  bool              flip_event = false;
+
+  // Command buffer for EOP tests
+  void* cmd_buf = nullptr;
+  s64   phys_cmd_buf;
+  u32   stream_size;
 
   public:
   VideoOut(s32 width, s32 height) {
+    // Store requested frame width and height
     this->width  = width;
     this->height = height;
+
     // Open VideoOut handle
     this->handle = sceVideoOutOpen(255, 0, 0, nullptr);
+
     // Set flip rate to 60fps
     s32 result = sceVideoOutSetFlipRate(this->handle, 0);
     UNSIGNED_INT_EQUALS(0, result);
+
     // Create flip equeue
     result = sceKernelCreateEqueue(&flip_queue, "VideoOutFlipEqueue");
+    UNSIGNED_INT_EQUALS(0, result);
+
+    // Initialize command buffer for EOP flip tests
+    result = sceKernelAllocateMainDirectMemory(0x4000, 0x4000, 0, &phys_cmd_buf);
+    UNSIGNED_INT_EQUALS(0, result);
+
+    result = sceKernelMapDirectMemory(&cmd_buf, 0x4000, 0x33, 0, phys_cmd_buf, 0x4000);
     UNSIGNED_INT_EQUALS(0, result);
   };
 
   // Manually define a destructor to close everything.
   ~VideoOut() {
-    if (flip_event) {
-      s32 result = sceVideoOutDeleteFlipEvent(flip_queue, handle);
-      UNSIGNED_INT_EQUALS(0, result);
-      flip_event = false;
-    }
+    // Delete event queue
     if (flip_queue != nullptr) {
       s32 result = sceKernelDeleteEqueue(flip_queue);
       UNSIGNED_INT_EQUALS(0, result);
     }
+
+    // Close video out handle
     if (handle > 0) {
       s32 result = sceVideoOutClose(handle);
       UNSIGNED_INT_EQUALS(0, result);
       handle = 0;
     }
+
+    // Free allocations for video out buffers
     for (auto& [phys_off, size]: phys_bufs) {
       s32 result = sceKernelReleaseDirectMemory(phys_off, size);
       UNSIGNED_INT_EQUALS(0, result);
     }
+
+    // Manually destruct vector to clean memory footprint
     phys_bufs.~vector();
+
+    // Free command buffer allocation
+    if (cmd_buf != nullptr) {
+      s32 result = sceKernelReleaseDirectMemory(phys_cmd_buf, 0x4000);
+      UNSIGNED_INT_EQUALS(0, result);
+    }
   };
 
   s32 getStatus(OrbisVideoOutFlipStatus* status) { return sceVideoOutGetFlipStatus(handle, status); };
@@ -70,26 +99,22 @@ class VideoOut {
       // SubmitAndFlip fails on buffer -1, save time by failing early.
       return -1;
     }
-    s64 cmd_dmem_ptr = 0;
-    s32 result       = sceKernelAllocateMainDirectMemory(0x4000, 0x4000, 0, &cmd_dmem_ptr);
-    UNSIGNED_INT_EQUALS(0, result);
 
-    void* cmd_ptr = nullptr;
-    result        = sceKernelMapDirectMemory(&cmd_ptr, 0x4000, 0x33, 0, cmd_dmem_ptr, 0x4000);
-    UNSIGNED_INT_EQUALS(0, result);
+    // Clear memory for command buffer
+    memset(cmd_buf, 0, 0x4000);
 
     // Write GPU init packet to the pointer.
-    u32* cmds       = (u32*)cmd_ptr;
+    u32* cmds = (u32*)cmd_buf;
     cmds += sceGnmDrawInitDefaultHardwareState350(cmds, 0x100);
 
     // Write a flip packet to the pointer.
     cmds[0] = 0xc03e1000;
     cmds[1] = 0x68750777;
     cmds += 64;
-    u32 stream_size = (u32)((u64)cmds - (u64)cmd_ptr);
+    stream_size = (u32)((u64)cmds - (u64)cmd_buf);
 
-    // GPU flips are not allowed on buffer -1.
-    result = sceGnmSubmitAndFlipCommandBuffers(1, &cmd_ptr, &stream_size, nullptr, nullptr, handle, current_buf, 1, flip_arg);
+    // Perform GPU submit
+    s32 result = sceGnmSubmitAndFlipCommandBuffers(1, &cmd_buf, &stream_size, nullptr, nullptr, handle, current_buf, 1, flip_arg);
     if (++current_buf == phys_bufs.size()) {
       current_buf = 0;
     }

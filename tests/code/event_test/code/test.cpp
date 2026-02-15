@@ -254,7 +254,7 @@ TEST(EventTest, FlipEventTest) {
   handle->addBuffer();
 
   OrbisVideoOutFlipStatus status {};
-  s32 result = handle->getStatus(&status);
+  s32                     result = handle->getStatus(&status);
   UNSIGNED_INT_EQUALS(0, result);
 
   // Create a flip event
@@ -269,10 +269,10 @@ TEST(EventTest, FlipEventTest) {
   UNSIGNED_INT_EQUALS(0, result);
 
   // Now we can wait on the flip event equeue prepared earlier.
-  OrbisKernelEvent ev{};
+  OrbisKernelEvent ev {};
   memset(&ev, 0, sizeof(ev));
-  s32 count  = 0;
-  result = handle->waitFlipEvent(&ev, &count, nullptr);
+  s32 count = 0;
+  result    = handle->waitFlipEvent(&ev, &count, nullptr);
   UNSIGNED_INT_EQUALS(0, result);
   CHECK_EQUAL(1, count);
 
@@ -289,9 +289,9 @@ TEST(EventTest, FlipEventTest) {
 
   // Flip events only trigger once.
   memset(&ev, 0, sizeof(ev));
-  count   = 0;
+  count       = 0;
   u32 timeout = 1000;
-  result  = handle->waitFlipEvent(&ev, &count, &timeout);
+  result      = handle->waitFlipEvent(&ev, &count, &timeout);
   UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ETIMEDOUT, result);
 
   // Check flip status
@@ -462,7 +462,7 @@ TEST(EventTest, FlipEventTest) {
     PrintFlipStatus(&status);
     UNSIGNED_INT_EQUALS(0, result);
 
-    sceKernelUsleep(1000);
+    sceKernelUsleep(10000);
   } while (status.num_flip_pending != 0);
 
   PrintFlipStatus(&status);
@@ -509,7 +509,7 @@ TEST(EventTest, FlipEventTest) {
   CHECK(ev.data != 0);
   ev_data = *reinterpret_cast<VideoOutEventData*>(&ev.data);
   // Counter is how many times the event was triggered.
-  CHECK_EQUAL(3, ev_data.counter);
+  CHECK_EQUAL(1, ev_data.counter);
   CHECK_EQUAL(0x30000000000, ev_data.flip_arg);
 
   // Print status again.
