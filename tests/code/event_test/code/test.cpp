@@ -45,7 +45,7 @@ static void PrintFlipStatus(OrbisVideoOutFlipStatus* status) {
   printf("status->current_buffer = %d\n\n", status->current_buffer);
 }
 
-TEST(EventTest, Test) {
+TEST(EventTest, UserEventTest) {
   // Need to test some equeue behavior.
   // Start by creating an equeue.
   OrbisKernelEqueue eq {};
@@ -241,7 +241,9 @@ TEST(EventTest, Test) {
   // Delete the equeue when tests complete.
   result = sceKernelDeleteEqueue(eq);
   UNSIGNED_INT_EQUALS(0, result);
+}
 
+TEST(EventTest, FlipEventTest) {
   // Test video out flip events.
   // First we need to properly open libSceVideoOut
   VideoOut* handle = new VideoOut(1920, 1080);
@@ -252,7 +254,7 @@ TEST(EventTest, Test) {
   handle->addBuffer();
 
   OrbisVideoOutFlipStatus status {};
-  result = handle->getStatus(&status);
+  s32 result = handle->getStatus(&status);
   UNSIGNED_INT_EQUALS(0, result);
 
   // Create a flip event
@@ -267,15 +269,16 @@ TEST(EventTest, Test) {
   UNSIGNED_INT_EQUALS(0, result);
 
   // Now we can wait on the flip event equeue prepared earlier.
+  OrbisKernelEvent ev{};
   memset(&ev, 0, sizeof(ev));
-  count  = 0;
+  s32 count  = 0;
   result = handle->waitFlipEvent(&ev, &count, nullptr);
   UNSIGNED_INT_EQUALS(0, result);
   CHECK_EQUAL(1, count);
 
   // Check returned data
   PrintEventData(&ev);
-  // CHECK_EQUAL(0x6000000000000, ev.ident);
+  CHECK_EQUAL(0x6000000000000, ev.ident);
   CHECK_EQUAL(-13, ev.filter);
   CHECK_EQUAL(32, ev.flags);
   CHECK_EQUAL(0, ev.fflags);
@@ -287,7 +290,7 @@ TEST(EventTest, Test) {
   // Flip events only trigger once.
   memset(&ev, 0, sizeof(ev));
   count   = 0;
-  timeout = 1000;
+  u32 timeout = 1000;
   result  = handle->waitFlipEvent(&ev, &count, &timeout);
   UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ETIMEDOUT, result);
 
@@ -311,7 +314,7 @@ TEST(EventTest, Test) {
 
   // Check returned data
   PrintEventData(&ev);
-  // CHECK_EQUAL(0x6000000000000, ev.ident);
+  CHECK_EQUAL(0x6000000000000, ev.ident);
   CHECK_EQUAL(-13, ev.filter);
   CHECK_EQUAL(32, ev.flags);
   CHECK_EQUAL(0, ev.fflags);
@@ -358,7 +361,7 @@ TEST(EventTest, Test) {
 
   // Check returned data
   PrintEventData(&ev);
-  // CHECK_EQUAL(0x6000000000000, ev.ident);
+  CHECK_EQUAL(0x6000000000000, ev.ident);
   CHECK_EQUAL(-13, ev.filter);
   CHECK_EQUAL(32, ev.flags);
   CHECK_EQUAL(0, ev.fflags);
@@ -383,7 +386,7 @@ TEST(EventTest, Test) {
 
   // Check returned data
   PrintEventData(&ev);
-  // CHECK_EQUAL(0x6000000000000, ev.ident);
+  CHECK_EQUAL(0x6000000000000, ev.ident);
   CHECK_EQUAL(-13, ev.filter);
   CHECK_EQUAL(32, ev.flags);
   CHECK_EQUAL(0, ev.fflags);
@@ -428,7 +431,7 @@ TEST(EventTest, Test) {
   CHECK_EQUAL(1, count);
 
   PrintEventData(&ev);
-  // CHECK_EQUAL(0x6000000000000, ev.ident);
+  CHECK_EQUAL(0x6000000000000, ev.ident);
   CHECK_EQUAL(-13, ev.filter);
   CHECK_EQUAL(32, ev.flags);
   CHECK_EQUAL(0, ev.fflags);
@@ -447,11 +450,21 @@ TEST(EventTest, Test) {
   // Now test EOP flips
   result = handle->submitAndFlip(0x1000);
   UNSIGNED_INT_EQUALS(0, result);
+  result = handle->submitAndFlip(0x2000);
+  UNSIGNED_INT_EQUALS(0, result);
+  result = handle->submitAndFlip(0x3000);
+  UNSIGNED_INT_EQUALS(0, result);
 
   // Print status
-  memset(&status, 0, sizeof(status));
-  result = handle->getStatus(&status);
-  UNSIGNED_INT_EQUALS(0, result);
+  do {
+    memset(&status, 0, sizeof(status));
+    result = handle->getStatus(&status);
+    PrintFlipStatus(&status);
+    UNSIGNED_INT_EQUALS(0, result);
+
+    sceKernelUsleep(1000);
+  } while (status.num_flip_pending != 0);
+
   PrintFlipStatus(&status);
 
   // Wait for EOP flip to occur.
@@ -462,15 +475,42 @@ TEST(EventTest, Test) {
   CHECK_EQUAL(1, count);
 
   PrintEventData(&ev);
-  // CHECK_EQUAL(0x6000000000000, ev.ident);
+  CHECK_EQUAL(0x6000000000000, ev.ident);
   CHECK_EQUAL(-13, ev.filter);
   CHECK_EQUAL(32, ev.flags);
   CHECK_EQUAL(0, ev.fflags);
   CHECK(ev.data != 0);
   ev_data = *reinterpret_cast<VideoOutEventData*>(&ev.data);
   // Counter is how many times the event was triggered.
-  CHECK_EQUAL(1, ev_data.counter);
-  CHECK_EQUAL(0x1000, ev_data.flip_arg);
+  CHECK_EQUAL(3, ev_data.counter);
+  CHECK_EQUAL(0x3000, ev_data.flip_arg);
+
+  // Print status again.
+  memset(&status, 0, sizeof(status));
+  result = handle->getStatus(&status);
+  UNSIGNED_INT_EQUALS(0, result);
+  PrintFlipStatus(&status);
+
+  result = handle->submitAndFlip(0x30000000000);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Wait for EOP flip to occur.
+  memset(&ev, 0, sizeof(ev));
+  count  = 0;
+  result = handle->waitFlipEvent(&ev, &count, nullptr);
+  UNSIGNED_INT_EQUALS(0, result);
+  CHECK_EQUAL(1, count);
+
+  PrintEventData(&ev);
+  CHECK_EQUAL(0x6000000000000, ev.ident);
+  CHECK_EQUAL(-13, ev.filter);
+  CHECK_EQUAL(32, ev.flags);
+  CHECK_EQUAL(0, ev.fflags);
+  CHECK(ev.data != 0);
+  ev_data = *reinterpret_cast<VideoOutEventData*>(&ev.data);
+  // Counter is how many times the event was triggered.
+  CHECK_EQUAL(3, ev_data.counter);
+  CHECK_EQUAL(0x30000000000, ev_data.flip_arg);
 
   // Print status again.
   memset(&status, 0, sizeof(status));

@@ -76,6 +76,7 @@ s32 sceVideoOutOpen(s32 user_id, s32 bus_type, s32 index, const void* param);
 s32 sceVideoOutSetFlipRate(s32 handle, s32 flip_rate);
 s32 sceVideoOutAddFlipEvent(OrbisKernelEqueue eq, s32 handle, void* user_data);
 s32 sceVideoOutRegisterBuffers(s32 handle, s32 index, void* const* addrs, s32 buf_num, OrbisVideoOutBufferAttribute* attrs);
+s32 sceVideoOutUnregisterBuffers(s32 handle, s32 attribute_index);
 s32 sceVideoOutSubmitFlip(s32 handle, s32 buf_index, s32 flip_mode, s64 flip_arg);
 s32 sceVideoOutGetFlipStatus(s32 handle, OrbisVideoOutFlipStatus* status);
 s32 sceVideoOutIsFlipPending(s32 handle);

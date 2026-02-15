@@ -54,14 +54,22 @@ class VideoOut {
   s32 getStatus(OrbisVideoOutFlipStatus* status) { return sceVideoOutGetFlipStatus(handle, status); };
 
   s32 flipFrame(s64 flip_arg) {
+    if (phys_bufs.size() == 0) {
+      // Force a blank frame if no buffers are registered
+      current_buf = -1;
+    }
     s32 result = sceVideoOutSubmitFlip(handle, current_buf, 1, flip_arg);
     if (++current_buf == phys_bufs.size()) {
-      current_buf = -1;
+      current_buf = 0;
     }
     return result;
   };
 
   s32 submitAndFlip(s64 flip_arg) {
+    if (phys_bufs.size() == 0) {
+      // SubmitAndFlip fails on buffer -1, save time by failing early.
+      return -1;
+    }
     s64 cmd_dmem_ptr = 0;
     s32 result       = sceKernelAllocateMainDirectMemory(0x4000, 0x4000, 0, &cmd_dmem_ptr);
     UNSIGNED_INT_EQUALS(0, result);
@@ -80,9 +88,10 @@ class VideoOut {
     cmds += 64;
     u32 stream_size = (u32)((u64)cmds - (u64)cmd_ptr);
 
+    // GPU flips are not allowed on buffer -1.
     result = sceGnmSubmitAndFlipCommandBuffers(1, &cmd_ptr, &stream_size, nullptr, nullptr, handle, current_buf, 1, flip_arg);
     if (++current_buf == phys_bufs.size()) {
-      current_buf = -1;
+      current_buf = 0;
     }
     return result;
   };
@@ -122,6 +131,11 @@ class VideoOut {
     // Register buffer
     return sceVideoOutRegisterBuffers(handle, phys_bufs.size() - 1, &addr, 1, &attr);
   };
+
+  s32 removeBuffers() {
+    current_buf = -1;
+    return sceVideoOutUnregisterBuffers(handle, 0);
+  }
 
   s32 addFlipEvent(void* user_data) {
     s32 result = sceVideoOutAddFlipEvent(flip_queue, handle, user_data);
