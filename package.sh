@@ -1,5 +1,4 @@
 PKG_CONTENT_ID="$1"
-OO_PS4_TOOLCHAIN="$2"
 
 FILES=$(find assets/ -type f -printf '%p ')
 FILES="$FILES$(find sce_module/ -type f -name '*.prx' -printf '%p ')"

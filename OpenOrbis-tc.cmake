@@ -19,11 +19,32 @@ endif()
 
 STRING(REGEX REPLACE "\\\\" "/" OO_PS4_TOOLCHAIN "$ENV{OO_PS4_TOOLCHAIN}")
 
+define_property(TARGET PROPERTY OO_FSELF_PATH BRIEF_DOCS "This property reports a ready-to use binary, should never be edited manually")
+define_property(TARGET PROPERTY OO_PKG_ROOT BRIEF_DOCS "This property reports a path where pkg file will be created, should never be edited manually")
+define_property(TARGET PROPERTY OO_PKG_SDKVER BRIEF_DOCS "This property reports the SDK version used by package, should never be edited manually")
+define_property(TARGET PROPERTY OO_PKG_FINALIZED BRIEF_DOCS "This property reports whether package was finalized or not, should never be edited manually")
+define_property(TARGET PROPERTY OO_PKG_TITLE BRIEF_DOCS "This property specifies TITLE for generated param.sfo file, can be edited between create and finalize blocks")
+define_property(TARGET PROPERTY OO_PKG_APPVER BRIEF_DOCS "This property specifies APPVER for generated param.sfo file, can be edited between create and finalize blocks")
+define_property(TARGET PROPERTY OO_PKG_CONTENTID BRIEF_DOCS "This property specifies CONTENT_ID for generated param.sfo file, can be edited between create and finalize blocks")
+define_property(TARGET PROPERTY OO_PKG_DOWNSIZE BRIEF_DOCS "This property specifies DOWNLOAD_DATA_SIZE for generated param.sfo file, can be edited between create and finalize blocks")
+define_property(TARGET PROPERTY OO_PKG_ATTRIBS1 BRIEF_DOCS "This property specifies ATTRIBUTE for generated param.sfo file, can be edited between create and finalize blocks")
+define_property(TARGET PROPERTY OO_PKG_ATTRIBS2 BRIEF_DOCS "This property specifies ATTRIBUTE2 for generated param.sfo file, can be edited between create and finalize blocks")
+
 set(CMAKE_SYSTEM_NAME FreeBSD CACHE STRING "" FORCE)
 set(CMAKE_C_COMPILER_TARGET "x86_64-pc-freebsd12-elf" CACHE STRING "" FORCE)
 set(CMAKE_CXX_COMPILER_TARGET "${CMAKE_C_COMPILER_TARGET}" CACHE STRING "" FORCE)
+set(CMAKE_C_FLAGS "-nostdinc" CACHE STRING "" FORCE)
+set(CMAKE_CXX_FLAGS "-nostdinc++" CACHE STRING "" FORCE)
 set(CMAKE_TRY_COMPILE_TARGET_TYPE "STATIC_LIBRARY" CACHE STRING "" FORCE)
 set(CMAKE_SYSROOT "${OO_PS4_TOOLCHAIN}" CACHE PATH "" FORCE)
+
+if(CMAKE_HOST_WIN32)
+  set(OO_BINARIES_PATH ${OO_PS4_TOOLCHAIN}/bin/windows)
+elseif(CMAKE_HOST_LINUX)
+  set(OO_BINARIES_PATH ${OO_PS4_TOOLCHAIN}/bin/linux)
+else()
+  message(FATAL_ERROR "Unsupported OS")
+endif()
 
 include_directories(SYSTEM
   ${OO_PS4_TOOLCHAIN}/include
@@ -34,9 +55,9 @@ link_directories(BEFORE
   ${OO_PS4_TOOLCHAIN}/lib
 )
 
-add_link_options(-pie -nostartfiles -nodefaultlibs -lc -lc++ -lkernel -fuse-ld=lld${OO_PS4_LINKER_SUFFIX} -Wl,-m,elf_x86_64 -Wl,--eh-frame-hdr "-Wl,--script,${OO_PS4_TOOLCHAIN}/link.x")
+add_link_options(-nostartfiles -nodefaultlibs -lc -lc++ -lkernel -fuse-ld=lld${OO_PS4_LINKER_SUFFIX} -Wl,-m,elf_x86_64 -Wl,--eh-frame-hdr "-Wl,--script,${OO_PS4_TOOLCHAIN}/link.x")
 
-add_compile_options(-nostdinc++ -nostdinc -fPIC -funwind-tables -fshort-wchar)
+add_compile_options(-fPIC -funwind-tables -fshort-wchar)
 
 add_compile_definitions(STBI_NO_SIMD=1)
 
@@ -46,39 +67,42 @@ else()
   add_compile_options(-O3)
 endif()
 
-function(OpenOrbisPackage_PreProject)
-  if(TARGET ${PKG_TITLE_ID})
-    message(FATAL_ERROR "Test name collision detected: ${PKG_TITLE_ID}.")
+function(OpenOrbis_AddFSelfCommand TargetProject WorkDir FSelfName TargetSDKVer)
+  set_target_properties(${TargetProject} PROPERTIES OUTPUT_NAME "${FSelfName}" SUFFIX ".elf" PREFIX "")
+
+  set(OUT_TYPE "eboot")
+  set(OUT_EXT "bin")
+
+  if(NOT ${FSelfName} STREQUAL "eboot")
+    set(OUT_TYPE "lib")
+    set(OUT_EXT "prx")
   endif()
+
+  math(EXPR OO_FWVER "${TargetSDKVer} * 65536")
+  set(OUT_ABS_PATH "${WorkDir}/${FSelfName}.${OUT_EXT}")
+
+  # Create object from generated elf file
+  add_custom_command(TARGET ${TargetProject} POST_BUILD COMMAND
+    ${CMAKE_COMMAND} -E env "OO_PS4_TOOLCHAIN=${OO_PS4_TOOLCHAIN}"
+    ${OO_BINARIES_PATH}/create-fself -in "${WorkDir}/${FSelfName}.elf"
+    --out "${WorkDir}/${FSelfName}.oelf" "--${OUT_TYPE}" "${OUT_ABS_PATH}" --paid 0x3800000000000011 --sdkver "${TargetSDKVer}" --fwversion "${OO_FWVER}"
+  )
+
+  set_target_properties(${TargetProject} PROPERTIES OO_FSELF_PATH "${OUT_ABS_PATH}")
 endfunction()
 
-function(OpenOrbisPackage_PostProject path_bin)
-  set_target_properties(${PKG_TITLE_ID} PROPERTIES OUTPUT_NAME "eboot" SUFFIX ".elf" PREFIX "")
-
-  if(CMAKE_HOST_WIN32)
-    set(ORBIS_BIN_PATH ${OO_PS4_TOOLCHAIN}/bin/windows)
-  elseif(CMAKE_HOST_LINUX)
-    set(ORBIS_BIN_PATH ${OO_PS4_TOOLCHAIN}/bin/linux)
-  else()
-    message(FATAL_ERROR "Unsupported OS")
-  endif()
-
-  if(OO_PS4_NOPKG)
-    set(PKG_SHOULDBUILD "nopkg")
-  else()
-    set(PKG_SHOULDBUILD "pkg")
-  endif()
-
-  math(EXPR OO_FWVER "${PKG_SYSVER} * 65536")
+function(OpenOrbisPackage_PostProject pkg_title_id pkg_fw_version_hex)
+  get_target_property(path_bin ${pkg_title_id} RUNTIME_OUTPUT_DIRECTORY)
 
   # Create eboot.bin from generated elf file
-  add_custom_command(TARGET ${PKG_TITLE_ID} POST_BUILD COMMAND
-    ${CMAKE_COMMAND} -E env "OO_PS4_TOOLCHAIN=${OO_PS4_TOOLCHAIN}"
-    ${ORBIS_BIN_PATH}/create-fself -in ${path_eboot} "${path_bin}/eboot.elf"
-    --out "${path_bin}/eboot.oelf" --eboot "${path_bin}/eboot.bin" --paid 0x3800000000000011 --sdkver "${PKG_SYSVER}" --fwversion "${OO_FWVER}"
+  OpenOrbis_AddFSelfCommand(${pkg_title_id} ${path_bin} "eboot" ${pkg_fw_version_hex})
+  get_filename_component(curr_folder ${CMAKE_CURRENT_SOURCE_DIR} NAME)
+  set(install_dir "${CMAKE_INSTALL_PREFIX}/${curr_folder}/${pkg_title_id}")
+  set_target_properties(${pkg_title_id} PROPERTIES
+    OO_PKG_ROOT "${install_dir}"
+    OO_PKG_SDKVER "${pkg_fw_version_hex}"
+    OO_PKG_FINALIZED FALSE
   )
-  get_filename_component(CURRENT_FOLDER_NAME ${CMAKE_CURRENT_SOURCE_DIR} NAME)
-  set(install_dir "${CMAKE_INSTALL_PREFIX}/${CURRENT_FOLDER_NAME}/${PKG_TITLE_ID}")
 
   # install
   install(FILES ${path_bin}/eboot.bin
@@ -86,119 +110,111 @@ function(OpenOrbisPackage_PostProject path_bin)
   )
 
   install(DIRECTORY
-    ${CMAKE_SOURCE_DIR}/app_data/sce_sys
-    DESTINATION "${install_dir}"
-  )
-
-  install(DIRECTORY
-    ${CMAKE_SOURCE_DIR}/app_data/sce_module
+    ${CMAKE_SOURCE_DIR}/app_data/
     DESTINATION "${install_dir}"
   )
 
   install(DIRECTORY
     ${CMAKE_CURRENT_SOURCE_DIR}/assets
     DESTINATION "${install_dir}"
+    OPTIONAL
   )
 
-  install(FILES ${path_bin}/param.sfo
-    DESTINATION "${install_dir}/sce_sys"
-  )
+  get_property(list GLOBAL PROPERTY OO_PRJ_LIST)
+  list(APPEND list "${pkg_title_id}")
+  set_property(GLOBAL PROPERTY OO_PRJ_LIST "${list}")
+endfunction()
 
-  # Create param.sfo
-  if(CMAKE_HOST_WIN32)
-    string(REPLACE "^" "^^" ESCAPED_PKG_TITLE "${PKG_TITLE}")
-    string(REPLACE "&" "^&" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
-    string(REPLACE "|" "^|" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
-    string(REPLACE "<" "^<" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
-    string(REPLACE ">" "^>" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
-    string(REPLACE "(" "^(" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
-    string(REPLACE ")" "^)" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
-    string(REPLACE "%" "%%" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
-    string(REPLACE "\"" "^\"" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
-    string(REPLACE "!" "^!" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
-    string(REPLACE ";" "^;" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
-    string(REPLACE "=" "^=" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
-    string(REPLACE "\n" "^n" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
-    string(REPLACE " " "^ " ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
+function(OpenOrbisPackage_FinalizeProject pkg_title_id)
+  get_target_property(pkg_finalized ${pkg_title_id} OO_PKG_FINALIZED)
 
-    add_custom_command(TARGET ${PKG_TITLE_ID} POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E env "OO_PS4_TOOLCHAIN=${OO_PS4_TOOLCHAIN}"
-      cmd /c ${INTEST_SOURCE_ROOT}/patch_param.bat
-      "${ESCAPED_PKG_TITLE}"
-      "${PKG_VERSION}"
-      "${PKG_TITLE_ID}"
-      "${PKG_CONTENT_ID}"
-      "${PKG_DOWNLOADSIZE}"
-      "${PKG_SYSVER}"
-      "${PKG_ATTRIBS1}"
-      "${PKG_ATTRIBS2}"
-      "${PKG_SHOULDBUILD}"
-      WORKING_DIRECTORY "${path_bin}"
-      COMMENT "Patching param.sfo..."
-    )
-
-    if(NOT OO_PS4_NOPKG)
-      # create pkg
-      install(CODE "
-          execute_process(
-              COMMAND \"${INTEST_SOURCE_ROOT}/package.bat\" \"${PKG_CONTENT_ID}\" \"${OO_PS4_TOOLCHAIN}\"
-              WORKING_DIRECTORY \"${install_dir}\"
-          )
-          message(STATUS \"Creating GP4 file\")
-      ")
-    endif()
-  elseif(CMAKE_HOST_LINUX)
-    string(REPLACE "\t" "\\t" ESCAPED_PKG_TITLE "${PKG_TITLE}")
-    string(REPLACE "\"" "\\\"" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
-    string(REPLACE "'" "\\'" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
-    string(REPLACE "\\" "\\\\" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
-    string(REPLACE "|" "\\|" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
-    string(REPLACE "&" "\\&" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
-    string(REPLACE ";" "\\;" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
-    string(REPLACE "(" "\\(" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
-    string(REPLACE ")" "\\)" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
-    string(REPLACE "<" "\\<" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
-    string(REPLACE ">" "\\>" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
-    string(REPLACE "*" "\\*" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
-    string(REPLACE "?" "\\?" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
-    string(REPLACE "[" "\\[" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
-    string(REPLACE "]" "\\]" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
-    string(REPLACE "{" "\\{" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
-    string(REPLACE "}" "\\}" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
-    string(REPLACE "#" "\\#" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
-    string(REPLACE "!" "\\!" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
-    string(REPLACE "$" "\\$" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
-    string(REPLACE "`" "\\`" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
-    string(REPLACE "~" "\\~" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
-    string(REPLACE "\n" "\\n" ESCAPED_PKG_TITLE "${ESCAPED_PKG_TITLE}")
-
-    add_custom_command(TARGET ${PKG_TITLE_ID} POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E env "OO_PS4_TOOLCHAIN=${OO_PS4_TOOLCHAIN}"
-      "${INTEST_SOURCE_ROOT}/patch_param.sh"
-      "${ESCAPED_PKG_TITLE}"
-      "${PKG_VERSION}"
-      "${PKG_TITLE_ID}"
-      "${PKG_CONTENT_ID}"
-      "${PKG_DOWNLOADSIZE}"
-      "${PKG_SYSVER}"
-      "${PKG_ATTRIBS1}"
-      "${PKG_ATTRIBS2}"
-      "${PKG_SHOULDBUILD}"
-      WORKING_DIRECTORY "${path_bin}"
-      COMMENT "Patching param.sfo..."
-    )
-
-    if(NOT OO_PS4_NOPKG)
-      # create pkg
-      install(CODE "
-          execute_process(
-              COMMAND \"${INTEST_SOURCE_ROOT}/package.sh\" \"${PKG_CONTENT_ID}\" \"${OO_PS4_TOOLCHAIN}\"
-              WORKING_DIRECTORY \"${install_dir}\"
-          )
-          message(STATUS \"Creating GP4 file\")
-      ")
-    endif()
-  else()
-    message(FATAL_ERROR "Unsupported OS")
+  if(pkg_finalized)
+    message(FATAL_ERROR "Target ${pkg_title_id} is already finalized!")
   endif()
+
+  set_target_properties(${pkg_title_id} PROPERTIES OO_PKG_FINALIZED TRUE)
+
+  set(BASE_SCRIPT [=[
+    set(ENV{OO_PS4_TOOLCHAIN} "${orbis_path}")
+
+    # Create param.sfo
+    if(CMAKE_HOST_WIN32)
+      set(PatchParamSfoCommand "${prj_root}/patch_param.bat")
+      set(PackageCommand "${prj_root}/package.bat")
+    elseif(CMAKE_HOST_LINUX)
+      set(PatchParamSfoCommand "${prj_root}/patch_param.sh")
+      set(PackageCommand "${prj_root}/package.sh")
+    else()
+      message(FATAL_ERROR "Unsupported OS, can't create param.sfo")
+    endif()
+
+    message(STATUS "Creating param.sfo file")
+    execute_process(
+      COMMAND "${PatchParamSfoCommand}"
+      "${pkg_title}"
+      "${pkg_appver}"
+      "${pkg_title_id}"
+      "${pkg_content_id}"
+      "${pkg_downsize}"
+      "${pkg_fw_version_hex}"
+      "${pkg_attribs1}"
+      "${pkg_attribs2}"
+      "${ShouldBuildArg}"
+      WORKING_DIRECTORY "${pkg_root}/sce_sys"
+    )
+
+    if(NOT OO_PS4_NOPKG)
+      message(STATUS "Creating GP4 file")
+
+      # create pkg
+      execute_process(
+        COMMAND "${PackageCommand}" "${pkg_content_id}"
+        WORKING_DIRECTORY "${pkg_root}"
+      )
+    endif()
+  ]=])
+
+  if(OO_PS4_NOPKG)
+    set(ShouldBuildArg "nopkg")
+  else()
+    set(ShouldBuildArg "pkg")
+  endif()
+
+  get_target_property(pkg_root ${pkg_title_id} OO_PKG_ROOT)
+  get_target_property(pkg_fw_version_hex ${pkg_title_id} OO_PKG_SDKVER)
+  get_target_property(pkg_title ${pkg_title_id} OO_PKG_TITLE)
+  get_target_property(pkg_content_id ${pkg_title_id} OO_PKG_CONTENTID)
+  get_target_property(pkg_appver ${pkg_title_id} OO_PKG_APPVER)
+  get_target_property(pkg_attribs1 ${pkg_title_id} OO_PKG_ATTRIBS1)
+  get_target_property(pkg_attribs2 ${pkg_title_id} OO_PKG_ATTRIBS2)
+  get_target_property(pkg_downsize ${pkg_title_id} OO_PKG_DOWNSIZE)
+  string(CONFIGURE [=[
+    set(orbis_path "${OO_PS4_TOOLCHAIN}")
+    set(prj_root "${INTEST_SOURCE_ROOT}")
+    set(pkg_root "${pkg_root}")
+    set(pkg_title "${pkg_title}")
+    set(pkg_title_id "${pkg_title_id}")
+    set(pkg_content_id "${pkg_content_id}")
+    set(pkg_fw_version_hex "${pkg_fw_version_hex}")
+    set(pkg_appver "${pkg_appver}")
+    set(pkg_attribs1 "${pkg_attribs1}")
+    set(pkg_attribs2 "${pkg_attribs2}")
+    set(pkg_downsize "${pkg_downsize}")
+    set(ShouldBuildArg "${ShouldBuildArg}")
+    ${BASE_SCRIPT}
+  ]=] install_code)
+
+  install(CODE "${install_code}")
+endfunction()
+
+function(OpenOrbisPackage_Validate)
+  get_property(list GLOBAL PROPERTY OO_PRJ_LIST)
+
+  foreach(Target ${list})
+    get_target_property(IsFinalized ${Target} OO_PKG_FINALIZED)
+
+    if(NOT ${IsFinalized})
+      message(FATAL_ERROR "Missing finalize call for ${Target}")
+    endif()
+  endforeach()
 endfunction()
