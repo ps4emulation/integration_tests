@@ -259,7 +259,7 @@ TEST(EventTest, FlipEventTest) {
 
   // Create a flip event
   u64 num = 1;
-  result = handle->addFlipEvent(&num);
+  result  = handle->addFlipEvent(&num);
   UNSIGNED_INT_EQUALS(0, result);
 
   // Not sure what we're dealing with, so from here, start logging info.
@@ -505,7 +505,7 @@ TEST(EventTest, FlipEventTest) {
 
   // Try adding a second flip event
   s64 num2 = 2;
-  result = handle->addFlipEvent(&num2);
+  result   = handle->addFlipEvent(&num2);
   UNSIGNED_INT_EQUALS(0, result);
 
   // Trigger a flip, then wait for two events with no timeout.
@@ -523,9 +523,9 @@ TEST(EventTest, FlipEventTest) {
 
   OrbisKernelEvent events[2];
   memset(events, 0, sizeof(events));
-  count = 0;
+  count   = 0;
   timeout = 10000;
-  result = handle->waitFlipEvent(events, 2, &count, &timeout);
+  result  = handle->waitFlipEvent(events, 2, &count, &timeout);
   UNSIGNED_INT_EQUALS(0, result);
   // Despite adding another flip event, we still only get the one event.
   CHECK_EQUAL(1, count);
@@ -555,9 +555,9 @@ TEST(EventTest, FlipEventTest) {
   } while (status.num_flip_pending != 0);
 
   memset(events, 0, sizeof(events));
-  count = 0;
+  count   = 0;
   timeout = 10000;
-  result = handle->waitFlipEvent(events, 2, &count, &timeout);
+  result  = handle->waitFlipEvent(events, 2, &count, &timeout);
   UNSIGNED_INT_EQUALS(0, result);
   // Despite adding another flip event, we still only get the one event.
   CHECK_EQUAL(1, count);
