@@ -20,7 +20,6 @@ class VideoOut {
 
   // Equeue
   OrbisKernelEqueue flip_queue = nullptr;
-  bool              flip_event = false;
 
   // Command buffer for EOP tests
   void* cmd_buf          = nullptr;
@@ -170,17 +169,9 @@ class VideoOut {
     return sceVideoOutUnregisterBuffers(handle, 0);
   }
 
-  s32 addFlipEvent(void* user_data) {
-    s32 result = sceVideoOutAddFlipEvent(flip_queue, handle, user_data);
-    flip_event = true;
-    return result;
-  };
+  s32 addFlipEvent(void* user_data) { return sceVideoOutAddFlipEvent(flip_queue, handle, user_data); };
 
-  s32 deleteFlipEvent() {
-    s32 result = sceVideoOutDeleteFlipEvent(flip_queue, handle);
-    flip_event = false;
-    return result;
-  };
+  s32 deleteFlipEvent() { return sceVideoOutDeleteFlipEvent(flip_queue, handle); };
 
   s32 waitFlipEvent(OrbisKernelEvent* ev, s32 num, s32* out, u32* timeout) { return sceKernelWaitEqueue(flip_queue, ev, num, out, timeout); };
 };
