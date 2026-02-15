@@ -11,34 +11,34 @@ TEST_GROUP (EventTest) {
 };
 
 static void PrintEventData(OrbisKernelEvent* ev) {
-  printf("ev->ident = 0x%08lx\n", ev->ident);
+  printf("ev->ident = 0x%lx\n", ev->ident);
   printf("ev->filter = %hd\n", ev->filter);
   printf("ev->flags = %u\n", ev->flags);
   printf("ev->fflags = %u\n", ev->fflags);
-  printf("ev->data = 0x%08lx\n", ev->data);
+  printf("ev->data = 0x%lx\n", ev->data);
   if (ev->data != 0) {
     if (ev->filter == -13) {
       // Video out event, cast data appropriately.
       VideoOutEventData data = *reinterpret_cast<VideoOutEventData*>(&ev->data);
       printf("ev->data->time = %d\n", data.time);
       printf("ev->data->counter = %d\n", data.counter);
-      printf("ev->data->flip_arg = 0x%08lx\n", data.flip_arg);
+      printf("ev->data->flip_arg = 0x%lx\n", data.flip_arg);
     } else {
-      printf("*(ev->data) = 0x%08lx\n", *(u64*)ev->data);
+      printf("*(ev->data) = 0x%lx\n", *(u64*)ev->data);
     }
   }
-  printf("ev->user_data = 0x%08lx\n", ev->user_data);
+  printf("ev->user_data = 0x%lx\n", ev->user_data);
   if (ev->user_data != 0) {
-    printf("*(ev->user_data) = 0x%08lx\n", *(u64*)ev->user_data);
+    printf("*(ev->user_data) = 0x%lx\n", *(u64*)ev->user_data);
   }
   printf("\n");
 }
 
 static void PrintFlipStatus(OrbisVideoOutFlipStatus* status) {
-  printf("status->count = 0x%08lx\n", status->count);
+  printf("status->count = 0x%lx\n", status->count);
   printf("status->process_time = %ld\n", status->process_time);
   printf("status->tsc_time = %ld\n", status->tsc_time);
-  printf("status->flip_arg = 0x%08lx\n", status->flip_arg);
+  printf("status->flip_arg = 0x%lx\n", status->flip_arg);
   printf("status->submit_tsc = %ld\n", status->submit_tsc);
   printf("status->num_gpu_flip_pending = %d\n", status->num_gpu_flip_pending);
   printf("status->num_flip_pending = %d\n", status->num_flip_pending);
