@@ -853,28 +853,10 @@ TEST(EventTest, TimerEventTest) {
   result    = sceKernelAddTimerEvent(eq, 0x10, 2000000, &data2);
   UNSIGNED_INT_EQUALS(0, result);
 
-  // This wait should fail, as the timer was only recently reset.
-  count   = 0;
-  timeout = 1000;
-  result  = sceKernelWaitEqueue(eq, &ev, 1, &count, &timeout);
-  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ETIMEDOUT, result);
-
-  // Now perform a sceKernelUsleep, wait out the timer timeout.
-  result = sceKernelUsleep(50000);
+  // If we wait out the new event timeout manually, we'll only see 1 trigger.
+  result = sceKernelUsleep(2000000);
   UNSIGNED_INT_EQUALS(0, result);
 
-  // This wait should fail, as we're still before the original timeout
-  count   = 0;
-  timeout = 1000;
-  result  = sceKernelWaitEqueue(eq, &ev, 1, &count, &timeout);
-  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ETIMEDOUT, result);
-
-  // Now perform a sceKernelUsleep, wait out the timer timeout.
-  result = sceKernelUsleep(50000);
-  UNSIGNED_INT_EQUALS(0, result);
-
-  // Calling sceKernelWaitEqueue during this period of time, where the old timer would've fired but not the new one,
-  // results in sceKernelWaitEqueue waiting out the remainder of the new event timer, despite the short timeout input.
   count   = 0;
   timeout = 1000;
   result  = sceKernelWaitEqueue(eq, &ev, 1, &count, &timeout);
@@ -892,12 +874,29 @@ TEST(EventTest, TimerEventTest) {
   CHECK(ev.user_data != 0);
   CHECK_EQUAL(data2, *(s64*)ev.user_data);
 
-  // Additionally, if we wait out the new event timeout manually, we'll only see 1 trigger.
-  result = sceKernelUsleep(2000000);
-  UNSIGNED_INT_EQUALS(0, result);
-
+  // Now test for a weird edge case.
+  // When replacing the timer, if the new timer is longer, 
+  // there is a period where sceKernelWaitEqueue will wait out the event timer.
+  // This call will fail
   count   = 0;
   timeout = 1000;
+  result  = sceKernelWaitEqueue(eq, &ev, 1, &count, &timeout);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ETIMEDOUT, result);
+
+  // Now perform a sceKernelUsleep, but for half of the old timer
+  result = sceKernelUsleep(50000);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // This wait should fail, as we're still before the original timeout
+  count   = 0;
+  timeout = 1000;
+  result  = sceKernelWaitEqueue(eq, &ev, 1, &count, &timeout);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ETIMEDOUT, result);
+
+  // Now run sceKernelWaitEqueue with a long enough timeout to fall in the difference.
+  // Instead of failing with ETIMEDOUT, this call blocks until the event is triggered.
+  count   = 0;
+  timeout = 60000;
   result  = sceKernelWaitEqueue(eq, &ev, 1, &count, &timeout);
   UNSIGNED_INT_EQUALS(0, result);
   UNSIGNED_INT_EQUALS(1, count);
