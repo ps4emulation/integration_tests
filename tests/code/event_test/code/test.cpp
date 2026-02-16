@@ -875,7 +875,7 @@ TEST(EventTest, TimerEventTest) {
   CHECK_EQUAL(data2, *(s64*)ev.user_data);
 
   // Now test for a weird edge case.
-  // When replacing the timer, if the new timer is longer, 
+  // When replacing the timer, if the new timer is longer,
   // there is a period where sceKernelWaitEqueue will wait out the event timer.
   // This call will fail
   count   = 0;
@@ -929,9 +929,9 @@ TEST(EventTest, TimerEventTest) {
   UNSIGNED_INT_EQUALS(0, result);
 
   // The trigger state isn't cleared
-  count = 0;
+  count   = 0;
   timeout = 1000;
-  result = sceKernelWaitEqueue(eq, &ev, 1, &count, &timeout);
+  result  = sceKernelWaitEqueue(eq, &ev, 1, &count, &timeout);
   UNSIGNED_INT_EQUALS(0, result);
   UNSIGNED_INT_EQUALS(1, count);
 
@@ -947,14 +947,14 @@ TEST(EventTest, TimerEventTest) {
   CHECK_EQUAL(data2, *(s64*)ev.user_data);
 
   // Check if the same edge case is present
-  count = 0;
+  count   = 0;
   timeout = 1000;
-  result = sceKernelWaitEqueue(eq, &ev, 1, &count, &timeout);
+  result  = sceKernelWaitEqueue(eq, &ev, 1, &count, &timeout);
   UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ETIMEDOUT, result);
 
-  count = 0;
+  count   = 0;
   timeout = 100000;
-  result = sceKernelWaitEqueue(eq, &ev, 1, &count, &timeout);
+  result  = sceKernelWaitEqueue(eq, &ev, 1, &count, &timeout);
   UNSIGNED_INT_EQUALS(0, result);
   UNSIGNED_INT_EQUALS(1, count);
 
