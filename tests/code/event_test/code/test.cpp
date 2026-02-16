@@ -349,20 +349,20 @@ TEST(EventTest, UserEventTest) {
   UNSIGNED_INT_EQUALS(0, result);
 
   // Wait for event to trigger.
-  memset(&ev, 0, sizeof(ev));
+  memset(evs, 0, sizeof(evs));
   count  = 0;
-  result = sceKernelWaitEqueue(eq, &ev, 1, &count, nullptr);
+  result = sceKernelWaitEqueue(eq, evs, 2, &count, nullptr);
   UNSIGNED_INT_EQUALS(0, result);
   CHECK_EQUAL(1, count);
 
-  PrintEventData(&ev);
-  CHECK_EQUAL(32, ev.ident);
-  CHECK_EQUAL(-11, ev.filter);
-  CHECK_EQUAL(32, ev.flags);
-  CHECK_EQUAL(0, ev.fflags);
-  CHECK(ev.data == 0);
-  CHECK(ev.user_data != 0);
-  CHECK_EQUAL(100, *(u64*)ev.user_data);
+  PrintEventData(&evs[0]);
+  CHECK_EQUAL(32, evs[0].ident);
+  CHECK_EQUAL(-11, evs[0].filter);
+  CHECK_EQUAL(32, evs[0].flags);
+  CHECK_EQUAL(0, evs[0].fflags);
+  CHECK(evs[0].data == 0);
+  CHECK(evs[0].user_data != 0);
+  CHECK_EQUAL(100, *(u64*)evs[0].user_data);
 
   // Delete event
   result = sceKernelDeleteUserEvent(eq, 32);
