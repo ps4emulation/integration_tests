@@ -43,6 +43,8 @@ s32 sceKernelAddUserEvent(OrbisKernelEqueue eq, s32 id);
 s32 sceKernelAddUserEventEdge(OrbisKernelEqueue eq, s32 id);
 s32 sceKernelTriggerUserEvent(OrbisKernelEqueue eq, s32 id, void* user_data);
 s32 sceKernelDeleteUserEvent(OrbisKernelEqueue eq, s32 id);
+s32 sceKernelAddTimerEvent(OrbisKernelEqueue eq, s32 id, u32 time, void* user_data);
+s32 sceKernelDeleteTimerEvent(OrbisKernelEqueue eq, s32 id);
 
 s32 sceKernelAllocateMainDirectMemory(u64 size, u64 align, s32 mtype, s64* phys_out);
 s32 sceKernelMapDirectMemory(void** addr, u64 size, s32 prot, s32 flags, s64 offset, u64 align);

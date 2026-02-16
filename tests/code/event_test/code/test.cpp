@@ -23,8 +23,6 @@ static void PrintEventData(OrbisKernelEvent* ev) {
       printf("ev->data->time = %d\n", data.time);
       printf("ev->data->counter = %d\n", data.counter);
       printf("ev->data->flip_arg = 0x%lx\n", data.flip_arg);
-    } else {
-      printf("*(ev->data) = 0x%lx\n", *(u64*)ev->data);
     }
   }
   printf("ev->user_data = 0x%lx\n", ev->user_data);
@@ -753,4 +751,173 @@ TEST(EventTest, VblankEventTest) {
 
   // Clean up after test
   delete (handle);
+}
+
+TEST(EventTest, TimerEventTest) {
+  // Timer events are pretty self explanatory.
+  // They have a timer, and when it expires, they trigger.
+  // This test will be rather simple, as I want to keep this single threaded.
+  OrbisKernelEqueue eq {};
+  s32               result = sceKernelCreateEqueue(&eq, "TimerEventQueue");
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Start by adding a timer event
+  s64 data = 0x100;
+  result   = sceKernelAddTimerEvent(eq, 0x10, 100000, &data);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // This shouldn't fire immediately, confirm by waiting with a short timeout.
+  OrbisKernelEvent ev {};
+  s32              count   = 0;
+  u32              timeout = 1000;
+  result                   = sceKernelWaitEqueue(eq, &ev, 1, &count, &timeout);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ETIMEDOUT, result);
+
+  // Now perform a sceKernelUsleep, wait out the timer timeout.
+  result = sceKernelUsleep(100000);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // The event should've triggered, and should be returned by this wait
+  count   = 0;
+  timeout = 1000;
+  result  = sceKernelWaitEqueue(eq, &ev, 1, &count, &timeout);
+  UNSIGNED_INT_EQUALS(0, result);
+  UNSIGNED_INT_EQUALS(1, count);
+
+  PrintEventData(&ev);
+
+  // Check validity of returned data
+  CHECK_EQUAL(0x10, ev.ident);
+  CHECK_EQUAL(-7, ev.filter);
+  CHECK_EQUAL(32, ev.flags);
+  CHECK_EQUAL(0, ev.fflags);
+  // Trigger count perhaps?
+  CHECK_EQUAL(1, ev.data);
+  CHECK(ev.user_data != 0);
+  CHECK_EQUAL(data, *(s64*)ev.user_data);
+
+  // Since the event has the clear flag, sceKernelWaitEqueue should've reset the timer.
+  // This wait should fail, as the timer was only recently reset.
+  count   = 0;
+  timeout = 1000;
+  result  = sceKernelWaitEqueue(eq, &ev, 1, &count, &timeout);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ETIMEDOUT, result);
+
+  // Now perform a sceKernelUsleep, wait out the timer timeout.
+  result = sceKernelUsleep(100000);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // The event should've triggered, and should be returned by this wait
+  count   = 0;
+  timeout = 1000;
+  result  = sceKernelWaitEqueue(eq, &ev, 1, &count, &timeout);
+  UNSIGNED_INT_EQUALS(0, result);
+  UNSIGNED_INT_EQUALS(1, count);
+
+  PrintEventData(&ev);
+
+  // Check validity of returned data
+  CHECK_EQUAL(0x10, ev.ident);
+  CHECK_EQUAL(-7, ev.filter);
+  CHECK_EQUAL(32, ev.flags);
+  CHECK_EQUAL(0, ev.fflags);
+  CHECK_EQUAL(1, ev.data);
+  CHECK(ev.user_data != 0);
+  CHECK_EQUAL(data, *(s64*)ev.user_data);
+
+  // Wait longer this time
+  result = sceKernelUsleep(1000000);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // The event should've triggered, and should be returned by this wait
+  count   = 0;
+  timeout = 1000;
+  result  = sceKernelWaitEqueue(eq, &ev, 1, &count, &timeout);
+  UNSIGNED_INT_EQUALS(0, result);
+  UNSIGNED_INT_EQUALS(1, count);
+
+  PrintEventData(&ev);
+
+  // Check validity of returned data
+  CHECK_EQUAL(0x10, ev.ident);
+  CHECK_EQUAL(-7, ev.filter);
+  CHECK_EQUAL(32, ev.flags);
+  CHECK_EQUAL(0, ev.fflags);
+  // This event should trigger 10 times, which sets data to 10.
+  CHECK_EQUAL(10, ev.data);
+  CHECK(ev.user_data != 0);
+  CHECK_EQUAL(data, *(s64*)ev.user_data);
+
+  // Replace timer event.
+  s64 data2 = 0x200;
+  result    = sceKernelAddTimerEvent(eq, 0x10, 2000000, &data2);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // This wait should fail, as the timer was only recently reset.
+  count   = 0;
+  timeout = 1000;
+  result  = sceKernelWaitEqueue(eq, &ev, 1, &count, &timeout);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ETIMEDOUT, result);
+
+  // Now perform a sceKernelUsleep, wait out the timer timeout.
+  result = sceKernelUsleep(50000);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // This wait should fail, as we're still before the original timeout
+  count   = 0;
+  timeout = 1000;
+  result  = sceKernelWaitEqueue(eq, &ev, 1, &count, &timeout);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ETIMEDOUT, result);
+
+  // Now perform a sceKernelUsleep, wait out the timer timeout.
+  result = sceKernelUsleep(50000);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Calling sceKernelWaitEqueue during this period of time, where the old timer would've fired but not the new one,
+  // results in sceKernelWaitEqueue waiting out the remainder of the new event timer, despite the short timeout input.
+  count   = 0;
+  timeout = 1000;
+  result  = sceKernelWaitEqueue(eq, &ev, 1, &count, &timeout);
+  UNSIGNED_INT_EQUALS(0, result);
+  UNSIGNED_INT_EQUALS(1, count);
+
+  PrintEventData(&ev);
+
+  // Check validity of returned data
+  CHECK_EQUAL(0x10, ev.ident);
+  CHECK_EQUAL(-7, ev.filter);
+  CHECK_EQUAL(32, ev.flags);
+  CHECK_EQUAL(0, ev.fflags);
+  CHECK_EQUAL(1, ev.data);
+  CHECK(ev.user_data != 0);
+  CHECK_EQUAL(data2, *(s64*)ev.user_data);
+
+  // Additionally, if we wait out the new event timeout manually, we'll only see 1 trigger.
+  result = sceKernelUsleep(2000000);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  count   = 0;
+  timeout = 1000;
+  result  = sceKernelWaitEqueue(eq, &ev, 1, &count, &timeout);
+  UNSIGNED_INT_EQUALS(0, result);
+  UNSIGNED_INT_EQUALS(1, count);
+
+  PrintEventData(&ev);
+
+  // Check validity of returned data
+  CHECK_EQUAL(0x10, ev.ident);
+  CHECK_EQUAL(-7, ev.filter);
+  CHECK_EQUAL(32, ev.flags);
+  CHECK_EQUAL(0, ev.fflags);
+  CHECK_EQUAL(1, ev.data);
+  CHECK(ev.user_data != 0);
+  CHECK_EQUAL(data2, *(s64*)ev.user_data);
+
+  // Delete the timer event
+  result = sceKernelDeleteTimerEvent(eq, 0x10);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Delete the equeue
+  result = sceKernelDeleteEqueue(eq);
+  UNSIGNED_INT_EQUALS(0, result);
 }
