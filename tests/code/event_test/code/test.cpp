@@ -969,6 +969,71 @@ TEST(EventTest, TimerEventTest) {
   CHECK(ev.user_data != 0);
   CHECK_EQUAL(data2, *(s64*)ev.user_data);
 
+  // Perform wait with high timeout
+  // This returns immediately after the first trigger, rather than waiting out timeout.
+  count   = 0;
+  timeout = 1000000;
+  result  = sceKernelWaitEqueue(eq, &ev, 1, &count, &timeout);
+  UNSIGNED_INT_EQUALS(0, result);
+  UNSIGNED_INT_EQUALS(1, count);
+
+  PrintEventData(&ev);
+
+  // Check validity of returned data
+  CHECK_EQUAL(0x10, ev.ident);
+  CHECK_EQUAL(-7, ev.filter);
+  CHECK_EQUAL(32, ev.flags);
+  CHECK_EQUAL(0, ev.fflags);
+  CHECK_EQUAL(1, ev.data);
+  CHECK(ev.user_data != 0);
+  CHECK_EQUAL(data2, *(s64*)ev.user_data);
+
+  // Add second timer event to queue, give it a shorter timeout.
+  result = sceKernelAddTimerEvent(eq, 0x20, 10000, &data);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Now we have a really fast event, and a lengthy event.
+  // Wait for our longer event to trigger
+  result = sceKernelUsleep(200000);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  OrbisKernelEvent evs[2];
+  count   = 0;
+  timeout = 0;
+  result  = sceKernelWaitEqueue(eq, evs, 2, &count, &timeout);
+  UNSIGNED_INT_EQUALS(0, result);
+  // This should return both events.
+  CHECK_EQUAL(2, count);
+
+  for (OrbisKernelEvent ev: evs) {
+    PrintEventData(&ev);
+    if (ev.ident == 0x20) {
+      // Check validity of returned data
+      CHECK_EQUAL(0x20, ev.ident);
+      CHECK_EQUAL(-7, ev.filter);
+      CHECK_EQUAL(32, ev.flags);
+      CHECK_EQUAL(0, ev.fflags);
+      CHECK_EQUAL(20, ev.data);
+      CHECK(ev.user_data != 0);
+      CHECK_EQUAL(data, *(s64*)ev.user_data);
+    } else {
+      // Check validity of returned data
+      CHECK_EQUAL(0x10, ev.ident);
+      CHECK_EQUAL(-7, ev.filter);
+      CHECK_EQUAL(32, ev.flags);
+      CHECK_EQUAL(0, ev.fflags);
+      CHECK_EQUAL(1, ev.data);
+      CHECK(ev.user_data != 0);
+      CHECK_EQUAL(data2, *(s64*)ev.user_data);
+    }
+  }
+
+  // Delete both events
+  result = sceKernelDeleteTimerEvent(eq, 0x10);
+  UNSIGNED_INT_EQUALS(0, result);
+  result = sceKernelDeleteTimerEvent(eq, 0x20);
+  UNSIGNED_INT_EQUALS(0, result);
+
   // Delete the equeue
   result = sceKernelDeleteEqueue(eq);
   UNSIGNED_INT_EQUALS(0, result);
