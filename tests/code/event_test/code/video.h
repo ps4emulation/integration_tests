@@ -19,7 +19,8 @@ class VideoOut {
   u64   buf_count = 0;
 
   // Equeue
-  OrbisKernelEqueue flip_queue = nullptr;
+  OrbisKernelEqueue flip_queue   = nullptr;
+  OrbisKernelEqueue vblank_queue = nullptr;
 
   // Command buffer for EOP tests
   void* cmd_buf          = nullptr;
@@ -43,6 +44,10 @@ class VideoOut {
 
     // Create flip equeue
     result = sceKernelCreateEqueue(&flip_queue, "VideoOutFlipEqueue");
+    UNSIGNED_INT_EQUALS(0, result);
+
+    // Create vblank equeue
+    result = sceKernelCreateEqueue(&vblank_queue, "VideoOutVblankEqueue");
     UNSIGNED_INT_EQUALS(0, result);
 
     // Initialize command buffer for EOP flip tests
@@ -70,9 +75,15 @@ class VideoOut {
 
   // Manually define a destructor to close everything.
   ~VideoOut() {
-    // Delete event queue
+    // Delete flip event queue
     if (flip_queue != nullptr) {
       s32 result = sceKernelDeleteEqueue(flip_queue);
+      UNSIGNED_INT_EQUALS(0, result);
+    }
+
+    // Delete vblank event queue
+    if (vblank_queue != nullptr) {
+      s32 result = sceKernelDeleteEqueue(vblank_queue);
       UNSIGNED_INT_EQUALS(0, result);
     }
 
@@ -186,14 +197,29 @@ class VideoOut {
     }
   };
 
+  s32 addVblankEvent(void* user_data) { return sceVideoOutAddVblankEvent(vblank_queue, handle, user_data); }
+
+  s32 deleteVblankEvent() { return sceVideoOutDeleteVblankEvent(vblank_queue, handle); }
+
+  s32 waitVblankEvent(OrbisKernelEvent* ev, s32 num, s32* out, u32 timeout) {
+    memset(ev, 0, sizeof(OrbisKernelEvent) * num);
+    *out = 0;
+    if (timeout == -1) {
+      return sceKernelWaitEqueue(vblank_queue, ev, num, out, nullptr);
+    } else {
+      return sceKernelWaitEqueue(vblank_queue, ev, num, out, &timeout);
+    }
+  };
+
   s32 waitFlip() {
     // Wait for flip
-    OrbisVideoOutFlipStatus status {};
-    s32                     result = 0;
-    do {
-      result = getStatus(&status);
+    s32 result = sceVideoOutIsFlipPending(handle);
+    while (result > 0) {
       sceKernelUsleep(10000);
-    } while (result == 0 && status.num_flip_pending != 0);
+      result = sceVideoOutIsFlipPending(handle);
+    };
     return result;
-  }
+  };
+
+  s32 waitVblank() { return sceVideoOutWaitVblank(handle); };
 };

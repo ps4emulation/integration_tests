@@ -540,3 +540,82 @@ TEST(EventTest, FlipEventTest) {
   // Clean up after test
   delete (handle);
 }
+
+TEST(EventTest, VblankEventTest) {
+  // Another type of video out event, these trigger automatically when the PS4 draws blank frames.
+  VideoOut* handle = new VideoOut(1920, 1080);
+
+  // Add vblank event
+  s64 val    = 1;
+  s32 result = handle->addVblankEvent(&val);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Wait with no timeout, this should return after vblank
+  OrbisKernelEvent ev {};
+  s32              count;
+  result = handle->waitVblankEvent(&ev, 1, &count, -1);
+  UNSIGNED_INT_EQUALS(0, result);
+  CHECK_EQUAL(1, count);
+
+  // Print event data
+  PrintEventData(&ev);
+
+  CHECK_EQUAL(0x7000000000000, ev.ident);
+  CHECK_EQUAL(-13, ev.filter);
+  CHECK_EQUAL(32, ev.flags);
+  CHECK_EQUAL(0, ev.fflags);
+  // Data for these follows the same format as internal data for flip events.
+  CHECK(ev.data != 0);
+  VideoOutEventData ev_data = *reinterpret_cast<VideoOutEventData*>(&ev.data);
+  // It is highly unlikely that more than 1 vblank happens between adding and waiting.
+  // Based on this assumption, we can check counter.
+  CHECK_EQUAL(1, ev_data.counter);
+  // ev_data flip arg seems to come from how many vblanks have occurred.
+  // There's no way to compare this to anything, as there will always be a chance of a race condition.
+  CHECK(ev_data.flip_arg > 0);
+  CHECK(ev_data.time > 0);
+  // user_data should be passed down from adding the event.
+  CHECK(ev.user_data != 0);
+  CHECK_EQUAL(val, *(s64*)ev.user_data);
+
+  // Add a new event, this should replace the old one.
+  s64 new_val = 2;
+  result      = handle->addVblankEvent(&new_val);
+
+  // Wait with no timeout, this should return after vblank
+  result = handle->waitVblankEvent(&ev, 1, &count, -1);
+  UNSIGNED_INT_EQUALS(0, result);
+  CHECK_EQUAL(1, count);
+
+  // Print event data
+  PrintEventData(&ev);
+
+  CHECK_EQUAL(0x7000000000000, ev.ident);
+  CHECK_EQUAL(-13, ev.filter);
+  CHECK_EQUAL(32, ev.flags);
+  CHECK_EQUAL(0, ev.fflags);
+  // Data for these follows the same format as internal data for flip events.
+  CHECK(ev.data != 0);
+  ev_data = *reinterpret_cast<VideoOutEventData*>(&ev.data);
+  CHECK_EQUAL(1, ev_data.counter);
+  CHECK(ev_data.flip_arg > 0);
+  CHECK(ev_data.time > 0);
+  CHECK(ev.user_data != 0);
+  CHECK_EQUAL(new_val, *(s64*)ev.user_data);
+
+  // Delete vblank event
+  result = handle->deleteVblankEvent();
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Now vblank events won't fire.
+  // Validate using sceVideoOutWaitVblank
+  result = handle->waitVblank();
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Wait with short timeout, this will return after timeout with error timedout
+  result = handle->waitVblankEvent(&ev, 1, &count, 1000);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ETIMEDOUT, result);
+
+  // Clean up after test
+  delete (handle);
+}
