@@ -572,7 +572,6 @@ TEST(EventTest, VblankEventTest) {
   CHECK_EQUAL(1, ev_data.counter);
   // ev_data flip arg seems to come from how many vblanks have occurred.
   // There's no way to compare this to anything, as there will always be a chance of a race condition.
-  CHECK(ev_data.flip_arg > 0);
   CHECK(ev_data.time > 0);
   // user_data should be passed down from adding the event.
   CHECK(ev.user_data != 0);
@@ -598,6 +597,9 @@ TEST(EventTest, VblankEventTest) {
   CHECK(ev.data != 0);
   ev_data = *reinterpret_cast<VideoOutEventData*>(&ev.data);
   CHECK_EQUAL(1, ev_data.counter);
+  // Flip arg is the number of vblanks that have occurred.
+  // First test can't check for these, since it's possible we fire an event on the first vblank.
+  // Here we know the flip arg must be positive, since we know a vblank has occurred.
   CHECK(ev_data.flip_arg > 0);
   CHECK(ev_data.time > 0);
   CHECK(ev.user_data != 0);
