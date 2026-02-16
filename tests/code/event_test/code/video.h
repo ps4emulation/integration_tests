@@ -96,7 +96,10 @@ class VideoOut {
     }
   };
 
-  s32 getStatus(OrbisVideoOutFlipStatus* status) { return sceVideoOutGetFlipStatus(handle, status); };
+  s32 getStatus(OrbisVideoOutFlipStatus* status) {
+    memset(status, 0, sizeof(OrbisVideoOutFlipStatus));
+    return sceVideoOutGetFlipStatus(handle, status);
+  };
 
   s32 flipFrame(s64 flip_arg) {
     if (buf_count == 0) {
@@ -173,5 +176,24 @@ class VideoOut {
 
   s32 deleteFlipEvent() { return sceVideoOutDeleteFlipEvent(flip_queue, handle); };
 
-  s32 waitFlipEvent(OrbisKernelEvent* ev, s32 num, s32* out, u32* timeout) { return sceKernelWaitEqueue(flip_queue, ev, num, out, timeout); };
+  s32 waitFlipEvent(OrbisKernelEvent* ev, s32 num, s32* out, u32 timeout) {
+    memset(ev, 0, sizeof(OrbisKernelEvent) * num);
+    *out = 0;
+    if (timeout == -1) {
+      return sceKernelWaitEqueue(flip_queue, ev, num, out, nullptr);
+    } else {
+      return sceKernelWaitEqueue(flip_queue, ev, num, out, &timeout);
+    }
+  };
+
+  s32 waitFlip() {
+    // Wait for flip
+    OrbisVideoOutFlipStatus status {};
+    s32                     result = 0;
+    do {
+      result = getStatus(&status);
+      sceKernelUsleep(10000);
+    } while (result == 0 && status.num_flip_pending != 0);
+    return result;
+  }
 };

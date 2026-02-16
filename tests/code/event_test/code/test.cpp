@@ -274,9 +274,8 @@ TEST(EventTest, FlipEventTest) {
 
   // Now we can wait on the flip event equeue prepared earlier.
   OrbisKernelEvent ev {};
-  memset(&ev, 0, sizeof(ev));
-  s32 count = 0;
-  result    = handle->waitFlipEvent(&ev, 1, &count, nullptr);
+  s32              count = 0;
+  result                 = handle->waitFlipEvent(&ev, 1, &count, -1);
   UNSIGNED_INT_EQUALS(0, result);
   CHECK_EQUAL(1, count);
 
@@ -294,14 +293,10 @@ TEST(EventTest, FlipEventTest) {
   CHECK_EQUAL(0x100, ev_data.flip_arg);
 
   // Flip events only trigger once.
-  memset(&ev, 0, sizeof(ev));
-  count       = 0;
-  u32 timeout = 1000;
-  result      = handle->waitFlipEvent(&ev, 1, &count, &timeout);
+  result = handle->waitFlipEvent(&ev, 1, &count, 1000);
   UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ETIMEDOUT, result);
 
   // Check flip status
-  memset(&status, 0, sizeof(status));
   result = handle->getStatus(&status);
   UNSIGNED_INT_EQUALS(0, result);
 
@@ -312,9 +307,8 @@ TEST(EventTest, FlipEventTest) {
   UNSIGNED_INT_EQUALS(0, result);
 
   // Now we can wait on the flip event equeue prepared earlier.
-  memset(&ev, 0, sizeof(ev));
   count  = 0;
-  result = handle->waitFlipEvent(&ev, 1, &count, nullptr);
+  result = handle->waitFlipEvent(&ev, 1, &count, -1);
   UNSIGNED_INT_EQUALS(0, result);
   CHECK_EQUAL(1, count);
 
@@ -329,14 +323,10 @@ TEST(EventTest, FlipEventTest) {
   CHECK_EQUAL(0x200, ev_data.flip_arg);
 
   // Flip events only trigger once.
-  memset(&ev, 0, sizeof(ev));
-  count   = 0;
-  timeout = 1000;
-  result  = handle->waitFlipEvent(&ev, 1, &count, &timeout);
+  result = handle->waitFlipEvent(&ev, 1, &count, 1000);
   UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ETIMEDOUT, result);
 
   // Check flip status
-  memset(&status, 0, sizeof(status));
   result = handle->getStatus(&status);
   UNSIGNED_INT_EQUALS(0, result);
 
@@ -358,9 +348,7 @@ TEST(EventTest, FlipEventTest) {
   PrintFlipStatus(&status);
 
   // Now we can wait on the flip event equeue prepared earlier.
-  memset(&ev, 0, sizeof(ev));
-  count  = 0;
-  result = handle->waitFlipEvent(&ev, 1, &count, nullptr);
+  result = handle->waitFlipEvent(&ev, 1, &count, -1);
   UNSIGNED_INT_EQUALS(0, result);
   CHECK_EQUAL(1, count);
 
@@ -372,16 +360,13 @@ TEST(EventTest, FlipEventTest) {
   CHECK_EQUAL(0x100, ev_data.flip_arg);
 
   // Check flip status
-  memset(&status, 0, sizeof(status));
   result = handle->getStatus(&status);
   UNSIGNED_INT_EQUALS(0, result);
 
   PrintFlipStatus(&status);
 
   // We did two submits, so the video out event should fire again.
-  memset(&ev, 0, sizeof(ev));
-  count  = 0;
-  result = handle->waitFlipEvent(&ev, 1, &count, nullptr);
+  result = handle->waitFlipEvent(&ev, 1, &count, -1);
   UNSIGNED_INT_EQUALS(0, result);
   CHECK_EQUAL(1, count);
 
@@ -393,7 +378,6 @@ TEST(EventTest, FlipEventTest) {
   CHECK_EQUAL(0x300, ev_data.flip_arg);
 
   // Check flip status
-  memset(&status, 0, sizeof(status));
   result = handle->getStatus(&status);
   UNSIGNED_INT_EQUALS(0, result);
 
@@ -405,25 +389,17 @@ TEST(EventTest, FlipEventTest) {
   result = handle->flipFrame(0x500);
   UNSIGNED_INT_EQUALS(0, result);
 
-  // Use sceVideoOutGetFlipStatus to wait for both flips to complete
-  memset(&status, 0, sizeof(status));
-  result = handle->getStatus(&status);
+  // Wait for all flips to occur
+  result = handle->waitFlip();
   UNSIGNED_INT_EQUALS(0, result);
-  while (status.num_flip_pending != 0) {
-    sceKernelUsleep(1000);
-
-    memset(&status, 0, sizeof(status));
-    result = handle->getStatus(&status);
-    UNSIGNED_INT_EQUALS(0, result);
-  }
 
   // Both flips are done, check status and event
+  result = handle->getStatus(&status);
+  UNSIGNED_INT_EQUALS(0, result);
   PrintFlipStatus(&status);
 
   // Check returned data
-  memset(&ev, 0, sizeof(ev));
-  count  = 0;
-  result = handle->waitFlipEvent(&ev, 1, &count, nullptr);
+  result = handle->waitFlipEvent(&ev, 1, &count, -1);
   UNSIGNED_INT_EQUALS(0, result);
   CHECK_EQUAL(1, count);
 
@@ -435,9 +411,7 @@ TEST(EventTest, FlipEventTest) {
   CHECK_EQUAL(0x500, ev_data.flip_arg);
 
   // Shouldn't trigger again.
-  memset(&ev, 0, sizeof(ev));
-  count  = 0;
-  result = handle->waitFlipEvent(&ev, 1, &count, &timeout);
+  result = handle->waitFlipEvent(&ev, 1, &count, 1000);
   UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ETIMEDOUT, result);
 
   // Now test EOP flips
@@ -448,21 +422,14 @@ TEST(EventTest, FlipEventTest) {
   result = handle->submitAndFlip(0x3000);
   UNSIGNED_INT_EQUALS(0, result);
 
-  // Print status
-  do {
-    memset(&status, 0, sizeof(status));
-    result = handle->getStatus(&status);
-    UNSIGNED_INT_EQUALS(0, result);
-
-    sceKernelUsleep(10000);
-  } while (status.num_flip_pending != 0);
+  // Wait for all flips to occur
+  result = handle->waitFlip();
+  UNSIGNED_INT_EQUALS(0, result);
 
   PrintFlipStatus(&status);
 
   // Wait for EOP flip to occur.
-  memset(&ev, 0, sizeof(ev));
-  count  = 0;
-  result = handle->waitFlipEvent(&ev, 1, &count, nullptr);
+  result = handle->waitFlipEvent(&ev, 1, &count, -1);
   UNSIGNED_INT_EQUALS(0, result);
   CHECK_EQUAL(1, count);
 
@@ -479,7 +446,6 @@ TEST(EventTest, FlipEventTest) {
   CHECK_EQUAL(0x3000, ev_data.flip_arg);
 
   // Print status again.
-  memset(&status, 0, sizeof(status));
   result = handle->getStatus(&status);
   UNSIGNED_INT_EQUALS(0, result);
   PrintFlipStatus(&status);
@@ -488,9 +454,7 @@ TEST(EventTest, FlipEventTest) {
   UNSIGNED_INT_EQUALS(0, result);
 
   // Wait for EOP flip to occur.
-  memset(&ev, 0, sizeof(ev));
-  count  = 0;
-  result = handle->waitFlipEvent(&ev, 1, &count, nullptr);
+  result = handle->waitFlipEvent(&ev, 1, &count, -1);
   UNSIGNED_INT_EQUALS(0, result);
   CHECK_EQUAL(1, count);
 
@@ -501,7 +465,6 @@ TEST(EventTest, FlipEventTest) {
   CHECK_EQUAL(0x30000000000, ev_data.flip_arg);
 
   // Print status again.
-  memset(&status, 0, sizeof(status));
   result = handle->getStatus(&status);
   UNSIGNED_INT_EQUALS(0, result);
   PrintFlipStatus(&status);
@@ -515,20 +478,12 @@ TEST(EventTest, FlipEventTest) {
   result = handle->flipFrame(0x10000);
   UNSIGNED_INT_EQUALS(0, result);
 
-  // Wait for flip
-  do {
-    memset(&status, 0, sizeof(status));
-    result = handle->getStatus(&status);
-    UNSIGNED_INT_EQUALS(0, result);
-
-    sceKernelUsleep(10000);
-  } while (status.num_flip_pending != 0);
+  // Wait for all flips to occur
+  result = handle->waitFlip();
+  UNSIGNED_INT_EQUALS(0, result);
 
   OrbisKernelEvent events[2];
-  memset(events, 0, sizeof(events));
-  count   = 0;
-  timeout = 10000;
-  result  = handle->waitFlipEvent(events, 2, &count, &timeout);
+  result = handle->waitFlipEvent(events, 2, &count, 10000);
   UNSIGNED_INT_EQUALS(0, result);
   // Despite adding another flip event, we still only get the one event.
   CHECK_EQUAL(1, count);
@@ -548,19 +503,11 @@ TEST(EventTest, FlipEventTest) {
   result = handle->flipFrame(0x10000);
   UNSIGNED_INT_EQUALS(0, result);
 
-  // Wait for flip
-  do {
-    memset(&status, 0, sizeof(status));
-    result = handle->getStatus(&status);
-    UNSIGNED_INT_EQUALS(0, result);
+  // Wait for all flips to occur
+  result = handle->waitFlip();
+  UNSIGNED_INT_EQUALS(0, result);
 
-    sceKernelUsleep(10000);
-  } while (status.num_flip_pending != 0);
-
-  memset(events, 0, sizeof(events));
-  count   = 0;
-  timeout = 10000;
-  result  = handle->waitFlipEvent(events, 2, &count, &timeout);
+  result = handle->waitFlipEvent(events, 2, &count, 10000);
   UNSIGNED_INT_EQUALS(0, result);
   // Despite adding another flip event, we still only get the one event.
   CHECK_EQUAL(1, count);
@@ -571,6 +518,24 @@ TEST(EventTest, FlipEventTest) {
   // The user data still matches the new event
   CHECK(events[0].user_data != 0);
   CHECK_EQUAL(2, *(u64*)events[0].user_data);
+
+  // Delete the event
+  result = handle->deleteFlipEvent();
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // This should result in having no events.
+  // Trigger a flip
+  result = handle->flipFrame(0x10000);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Wait for all flips to occur
+  result = handle->waitFlip();
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Wait for event.
+  result = handle->waitFlipEvent(events, 1, &count, 10000);
+  // Since there's no event left, nothing will be triggered when the flip occurs.
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ETIMEDOUT, result);
 
   // Clean up after test
   delete (handle);
