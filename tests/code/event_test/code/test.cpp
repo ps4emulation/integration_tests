@@ -141,7 +141,7 @@ TEST(EventTest, UserEventTest) {
   UNSIGNED_INT_EQUALS(0, result);
 
   // Add a "user event edge", these are user events with the clear flag.
-  // Presumably, these will not trigger multiple times.
+  // For these, trigger state resets every time it's returned.
   // Add a user event to this equeue, use id 32.
   result = sceKernelAddUserEventEdge(eq, 32);
   UNSIGNED_INT_EQUALS(0, result);
@@ -234,9 +234,142 @@ TEST(EventTest, UserEventTest) {
   result  = sceKernelWaitEqueue(eq, &ev, 1, &count, &timeout);
   UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ETIMEDOUT, result);
 
-  // Delete the user event.
+  // Add a second user event edge, this time with id 64
+  result = sceKernelAddUserEventEdge(eq, 64);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Trigger both events
+  result = sceKernelTriggerUserEvent(eq, 32, &data1);
+  UNSIGNED_INT_EQUALS(0, result);
+  result = sceKernelTriggerUserEvent(eq, 64, &data2);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Now sceKernelWaitEqueue should return both events.
+  OrbisKernelEvent evs[2];
+  memset(evs, 0, sizeof(evs));
+  count  = 0;
+  result = sceKernelWaitEqueue(eq, evs, 2, &count, nullptr);
+  UNSIGNED_INT_EQUALS(0, result);
+  CHECK_EQUAL(2, count);
+
+  // Check returned data for both events.
+  PrintEventData(&evs[0]);
+  if (evs[0].ident == 32) {
+    CHECK_EQUAL(32, evs[0].ident);
+    CHECK_EQUAL(-11, evs[0].filter);
+    CHECK_EQUAL(32, evs[0].flags);
+    CHECK_EQUAL(0, evs[0].fflags);
+    CHECK(evs[0].data == 0);
+    CHECK(evs[0].user_data != 0);
+    CHECK_EQUAL(100, *(u64*)evs[0].user_data);
+  } else {
+    CHECK_EQUAL(64, evs[0].ident);
+    CHECK_EQUAL(-11, evs[0].filter);
+    CHECK_EQUAL(32, evs[0].flags);
+    CHECK_EQUAL(0, evs[0].fflags);
+    CHECK(evs[0].data == 0);
+    CHECK(evs[0].user_data != 0);
+    CHECK_EQUAL(200, *(u64*)evs[0].user_data);
+  }
+  PrintEventData(&evs[1]);
+  if (evs[1].ident == 32) {
+    CHECK_EQUAL(32, evs[1].ident);
+    CHECK_EQUAL(-11, evs[1].filter);
+    CHECK_EQUAL(32, evs[1].flags);
+    CHECK_EQUAL(0, evs[1].fflags);
+    CHECK(evs[1].data == 0);
+    CHECK(evs[1].user_data != 0);
+    CHECK_EQUAL(100, *(u64*)evs[1].user_data);
+  } else {
+    CHECK_EQUAL(64, evs[1].ident);
+    CHECK_EQUAL(-11, evs[1].filter);
+    CHECK_EQUAL(32, evs[1].flags);
+    CHECK_EQUAL(0, evs[1].fflags);
+    CHECK(evs[1].data == 0);
+    CHECK(evs[1].user_data != 0);
+    CHECK_EQUAL(200, *(u64*)evs[1].user_data);
+  }
+
+  // Now only trigger the second.
+  result = sceKernelTriggerUserEvent(eq, 64, &data1);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Only the second event should return.
+  memset(evs, 0, sizeof(evs));
+  count  = 0;
+  result = sceKernelWaitEqueue(eq, evs, 2, &count, nullptr);
+  UNSIGNED_INT_EQUALS(0, result);
+  CHECK_EQUAL(1, count);
+
+  PrintEventData(&evs[0]);
+  CHECK_EQUAL(64, evs[0].ident);
+  CHECK_EQUAL(-11, evs[0].filter);
+  CHECK_EQUAL(32, evs[0].flags);
+  CHECK_EQUAL(0, evs[0].fflags);
+  CHECK(evs[0].data == 0);
+  CHECK(evs[0].user_data != 0);
+  CHECK_EQUAL(100, *(u64*)evs[0].user_data);
+
+  // Delete the first user event.
   result = sceKernelDeleteUserEvent(eq, 32);
   UNSIGNED_INT_EQUALS(0, result);
+
+  // The second user event should remain present and triggerable.
+  result = sceKernelTriggerUserEvent(eq, 64, &data1);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Only the second event should return.
+  memset(evs, 0, sizeof(evs));
+  count  = 0;
+  result = sceKernelWaitEqueue(eq, evs, 2, &count, nullptr);
+  UNSIGNED_INT_EQUALS(0, result);
+  CHECK_EQUAL(1, count);
+
+  PrintEventData(&evs[0]);
+  CHECK_EQUAL(64, evs[0].ident);
+  CHECK_EQUAL(-11, evs[0].filter);
+  CHECK_EQUAL(32, evs[0].flags);
+  CHECK_EQUAL(0, evs[0].fflags);
+  CHECK(evs[0].data == 0);
+  CHECK(evs[0].user_data != 0);
+  CHECK_EQUAL(100, *(u64*)evs[0].user_data);
+
+  // Delete the second user event.
+  result = sceKernelDeleteUserEvent(eq, 64);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // You cannot have two events with the same ident and filter.
+  result = sceKernelAddUserEventEdge(eq, 32);
+  UNSIGNED_INT_EQUALS(0, result);
+  // This call, despite succeeding, will do nothing.
+  result = sceKernelAddUserEvent(eq, 32);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  result = sceKernelTriggerUserEvent(eq, 32, &data1);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Wait for event to trigger.
+  memset(&ev, 0, sizeof(ev));
+  count  = 0;
+  result = sceKernelWaitEqueue(eq, &ev, 1, &count, nullptr);
+  UNSIGNED_INT_EQUALS(0, result);
+  CHECK_EQUAL(1, count);
+
+  PrintEventData(&ev);
+  CHECK_EQUAL(32, ev.ident);
+  CHECK_EQUAL(-11, ev.filter);
+  CHECK_EQUAL(32, ev.flags);
+  CHECK_EQUAL(0, ev.fflags);
+  CHECK(ev.data == 0);
+  CHECK(ev.user_data != 0);
+  CHECK_EQUAL(100, *(u64*)ev.user_data);
+
+  // Delete event
+  result = sceKernelDeleteUserEvent(eq, 32);
+  UNSIGNED_INT_EQUALS(0, result);
+  // Further proof there's not a second event
+  result = sceKernelDeleteUserEvent(eq, 32);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ENOENT, result);
 
   // Delete the equeue when tests complete.
   result = sceKernelDeleteEqueue(eq);

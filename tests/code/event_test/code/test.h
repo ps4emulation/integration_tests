@@ -32,6 +32,7 @@ struct OrbisKernelEvent {
   u64 user_data;
 };
 
+constexpr s32 ORBIS_KERNEL_ERROR_ENOENT = 0x80020002;
 constexpr s32 ORBIS_KERNEL_ERROR_ETIMEDOUT = 0x8002003c;
 
 s32 sceKernelUsleep(u32);
