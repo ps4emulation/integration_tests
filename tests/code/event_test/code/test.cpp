@@ -916,6 +916,59 @@ TEST(EventTest, TimerEventTest) {
   result = sceKernelDeleteTimerEvent(eq, 0x10);
   UNSIGNED_INT_EQUALS(0, result);
 
+  // Add timer event back in.
+  result = sceKernelAddTimerEvent(eq, 0x10, 100000, &data);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Wait for the event to trigger
+  result = sceKernelUsleep(100000);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Now replace it
+  result = sceKernelAddTimerEvent(eq, 0x10, 200000, &data2);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // The trigger state isn't cleared
+  count = 0;
+  timeout = 1000;
+  result = sceKernelWaitEqueue(eq, &ev, 1, &count, &timeout);
+  UNSIGNED_INT_EQUALS(0, result);
+  UNSIGNED_INT_EQUALS(1, count);
+
+  PrintEventData(&ev);
+
+  // Check validity of returned data
+  CHECK_EQUAL(0x10, ev.ident);
+  CHECK_EQUAL(-7, ev.filter);
+  CHECK_EQUAL(32, ev.flags);
+  CHECK_EQUAL(0, ev.fflags);
+  CHECK_EQUAL(1, ev.data);
+  CHECK(ev.user_data != 0);
+  CHECK_EQUAL(data2, *(s64*)ev.user_data);
+
+  // Check if the same edge case is present
+  count = 0;
+  timeout = 1000;
+  result = sceKernelWaitEqueue(eq, &ev, 1, &count, &timeout);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ETIMEDOUT, result);
+
+  count = 0;
+  timeout = 100000;
+  result = sceKernelWaitEqueue(eq, &ev, 1, &count, &timeout);
+  UNSIGNED_INT_EQUALS(0, result);
+  UNSIGNED_INT_EQUALS(1, count);
+
+  PrintEventData(&ev);
+
+  // Check validity of returned data
+  CHECK_EQUAL(0x10, ev.ident);
+  CHECK_EQUAL(-7, ev.filter);
+  CHECK_EQUAL(32, ev.flags);
+  CHECK_EQUAL(0, ev.fflags);
+  CHECK_EQUAL(1, ev.data);
+  CHECK(ev.user_data != 0);
+  CHECK_EQUAL(data2, *(s64*)ev.user_data);
+
   // Delete the equeue
   result = sceKernelDeleteEqueue(eq);
   UNSIGNED_INT_EQUALS(0, result);
