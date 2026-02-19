@@ -7,7 +7,6 @@
 #include <string>
 #include <vector>
 
-namespace FS_Test {
 namespace oi = OrbisInternals;
 
 off_t GetSize(int fd) {
@@ -24,7 +23,11 @@ off_t GetSize(const char* path) {
 }
 
 int32_t touch(const char* path) {
-  return sceKernelClose(sceKernelOpen(path, O_RDWR | O_CREAT | O_TRUNC, 0777));
+  return sceKernelClose(sceKernelOpen(path, O_WRONLY | O_CREAT | O_TRUNC, 0777));
+}
+
+int32_t touch(const std::string& path) {
+  return sceKernelClose(sceKernelOpen(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0777));
 }
 
 ino_t get_fileno(int fd) {
@@ -516,5 +519,5 @@ s8 GetDir(fs::path path, fs::path leaf, oi::FolderDirent* dirent) {
   }
 
   return found;
-}
+
 } // namespace FS_Test

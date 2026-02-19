@@ -2,6 +2,7 @@
 
 #include "fs_constants.h"
 
+#include <CppUTest/TestHarness.h>
 #include <chrono>
 #include <cstring>
 #include <fcntl.h>
@@ -12,12 +13,181 @@
 #include <unistd.h>
 
 namespace fs = std::filesystem;
-
-namespace FS_Test {
 namespace oi = OrbisInternals;
 
+TEST_GROUP (FilesystemTests) {
+  void setup() {}
+  void teardown() {}
+};
+
+TEST(FilesystemTests, FileOpenTests) {
+  Log();
+  Log("\t<<<< File open tests >>>>");
+  Log("\tAcual flag values for Orbis are different from sys/fcntl.h");
+  Log("\tNumerical values are correct as of today, macro flags are not");
+  Log();
+
+  RegenerateDir("/data/therapist/tmp_open");
+  int status {0};
+  int status_errno {0};
+
+  // No modifiers
+  // O_RDONLY
+  status = TestOpenFlags("/data/therapist/tmp_open/nonexistent_ro.txt", O_RDONLY, "O_RDONLY", &status_errno);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ENOENT, status);
+  UNSIGNED_INT_EQUALS(ENOENT, status_errno);
+  // O_WRONLY
+  status = TestOpenFlags("/data/therapist/tmp_open/nonexistent_wo.txt", O_WRONLY, "O_WRONLY", &status_errno);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ENOENT, status);
+  UNSIGNED_INT_EQUALS(ENOENT, status_errno);
+  // O_RDWR
+  status = TestOpenFlags("/data/therapist/tmp_open/nonexistent_rw.txt", O_RDWR, "O_RDWR", &status_errno);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ENOENT, status);
+  UNSIGNED_INT_EQUALS(ENOENT, status_errno);
+  // O_RDONLY | O_WRONLY | O_RDWR
+  status = TestOpenFlags("/data/therapist/tmp_open/nonexistent_rowo.txt", O_RDONLY | O_WRONLY | O_RDWR, "O_RDONLY | O_WRONLY | O_RDWR", &status_errno);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_EINVAL, status);
+  UNSIGNED_INT_EQUALS(EINVAL, status_errno);
+
+  // O_TRUNC
+  status = TestOpenFlags("/data/therapist/tmp_open/nonexistent_rot.txt", O_TRUNC, "O_RDONLY | O_TRUNC", &status_errno);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ENOENT, status);
+  UNSIGNED_INT_EQUALS(ENOENT, status_errno);
+  status = TestOpenFlags("/data/therapist/tmp_open/nonexistent_wot.txt", O_WRONLY | O_TRUNC, "O_WRONLY | O_TRUNC", &status_errno);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ENOENT, status);
+  UNSIGNED_INT_EQUALS(ENOENT, status_errno);
+  status = TestOpenFlags("/data/therapist/tmp_open/nonexistent_rwt.txt", O_RDWR | O_TRUNC, "O_RDWR | O_TRUNC", &status_errno);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ENOENT, status);
+  UNSIGNED_INT_EQUALS(ENOENT, status_errno);
+
+  // O_CREAT
+  // these create a file
+  status = TestOpenFlags("/data/therapist/tmp_open/nonexistent_roc.txt", O_RDONLY | O_CREAT, "O_RDONLY | O_CREAT", &status_errno);
+  UNSIGNED_INT_EQUALS(0, status);
+  UNSIGNED_INT_EQUALS(0, status_errno);
+  status = TestOpenFlags("/data/therapist/tmp_open/nonexistent_woc.txt", O_WRONLY | O_CREAT, "O_WRONLY | O_CREAT", &status_errno);
+  UNSIGNED_INT_EQUALS(0, status);
+  UNSIGNED_INT_EQUALS(0, status_errno);
+  status = TestOpenFlags("/data/therapist/tmp_open/nonexistent_rwc.txt", O_RDWR | O_CREAT, "O_RDWR | O_CREAT", &status_errno);
+  UNSIGNED_INT_EQUALS(0, status);
+  UNSIGNED_INT_EQUALS(0, status_errno);
+
+  // O_CREAT | O_EXCL
+  // exists, not creating
+  status = TestOpenFlags("/data/therapist/tmp_open/nonexistent_roc.txt", O_RDONLY | O_CREAT | O_EXCL, "O_RDONLY | O_CREAT | O_EXCL", &status_errno);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_EEXIST, status);
+  UNSIGNED_INT_EQUALS(EEXIST, status_errno);
+  status = TestOpenFlags("/data/therapist/tmp_open/nonexistent_woc.txt", O_WRONLY | O_CREAT | O_EXCL, "O_WRONLY | O_CREAT | O_EXCL", &status_errno);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_EEXIST, status);
+  UNSIGNED_INT_EQUALS(EEXIST, status_errno);
+  status = TestOpenFlags("/data/therapist/tmp_open/nonexistent_rwc.txt", O_RDWR | O_CREAT | O_EXCL, "O_RDWR | O_CREAT | O_EXCL", &status_errno);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_EEXIST, status);
+  UNSIGNED_INT_EQUALS(EEXIST, status_errno);
+
+  // O_APPEND
+  status = TestOpenFlags("/data/therapist/tmp_open/nonexistent_roa.txt", O_RDONLY | O_APPEND, "O_RDONLY | O_APPEND", &status_errno);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ENOENT, status);
+  UNSIGNED_INT_EQUALS(ENOENT, status_errno);
+  status = TestOpenFlags("/data/therapist/tmp_open/nonexistent_woa.txt", O_WRONLY | O_APPEND, "O_WRONLY | O_APPEND", &status_errno);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ENOENT, status);
+  UNSIGNED_INT_EQUALS(ENOENT, status_errno);
+  status = TestOpenFlags("/data/therapist/tmp_open/nonexistent_rwa.txt", O_RDWR | O_APPEND, "O_RDWR | O_APPEND", &status_errno);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ENOENT, status);
+  UNSIGNED_INT_EQUALS(ENOENT, status_errno);
+
+  // O_TRUNC | O_APPEND
+  status = TestOpenFlags("/data/therapist/tmp_open/nonexistent_rota.txt", O_RDONLY | O_TRUNC | O_APPEND, "O_RDONLY | O_TRUNC | O_APPEND", &status_errno);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ENOENT, status);
+  UNSIGNED_INT_EQUALS(ENOENT, status_errno);
+  status = TestOpenFlags("/data/therapist/tmp_open/nonexistent_wota.txt", O_WRONLY | O_TRUNC | O_APPEND, "O_WRONLY | O_TRUNC | O_APPEND", &status_errno);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ENOENT, status);
+  UNSIGNED_INT_EQUALS(ENOENT, status_errno);
+  status = TestOpenFlags("/data/therapist/tmp_open/nonexistent_rwta.txt", O_RDWR | O_TRUNC | O_APPEND, "O_RDWR | O_TRUNC | O_APPEND", &status_errno);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ENOENT, status);
+  UNSIGNED_INT_EQUALS(ENOENT, status_errno);
+
+  // O_DIRECTORY (nonexistent file is a target)
+  status = TestOpenFlags("/data/therapist/tmp_open/nonexistent_dir_ro", O_RDONLY | O_DIRECTORY, "O_RDONLY | O_DIRECTORY", &status_errno);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ENOENT, status);
+  UNSIGNED_INT_EQUALS(ENOENT, status_errno);
+  status = TestOpenFlags("/data/therapist/tmp_open/nonexistent_dir_wo", O_WRONLY | O_DIRECTORY, "O_WRONLY | O_DIRECTORY", &status_errno);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ENOENT, status);
+  UNSIGNED_INT_EQUALS(ENOENT, status_errno);
+  status = TestOpenFlags("/data/therapist/tmp_open/nonexistent_dir_rw", O_RDWR | O_DIRECTORY, "O_RDWR | O_DIRECTORY", &status_errno);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ENOENT, status);
+  UNSIGNED_INT_EQUALS(ENOENT, status_errno);
+
+  // O_DIRECTORY (existing directory)
+  status = TestOpenFlags("/data/therapist/tmp_open/", 0 | 0x20000, "O_RDONLY | O_DIRECTORY", &status_errno);
+  UNSIGNED_INT_EQUALS(0, status);
+  status = TestOpenFlags("/data/therapist/tmp_open/", 0x1 | 0x20000, "O_WRONLY | O_DIRECTORY", &status_errno);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_EISDIR, status);
+  UNSIGNED_INT_EQUALS(EISDIR, status_errno);
+  status = TestOpenFlags("/data/therapist/tmp_open/", 0x2 | 0x20000, "O_RDWR | O_DIRECTORY", &status_errno);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_EISDIR, status);
+  UNSIGNED_INT_EQUALS(EISDIR, status_errno);
+
+  // O_CREAT | O_DIRECTORY (unspecified type, directory)
+  // these create a file
+  status = TestOpenFlags("/data/therapist/tmp_open/nonexistent_dir_rocd", 0 | 0x200 | 0x20000, "O_RDONLY | O_CREAT | O_DIRECTORY", &status_errno);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ENOTDIR, status);
+  UNSIGNED_INT_EQUALS(ENOTDIR, status_errno);
+  status = TestOpenFlags("/data/therapist/tmp_open/nonexistent_dir_wocd", 0x1 | 0x200 | 0x20000, "O_WRONLY | O_CREAT | O_DIRECTORY", &status_errno);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ENOTDIR, status);
+  UNSIGNED_INT_EQUALS(ENOTDIR, status_errno);
+  status = TestOpenFlags("/data/therapist/tmp_open/nonexistent_dir_rwcd", 0x2 | 0x200 | 0x20000, "O_RDWR | O_CREAT | O_DIRECTORY", &status_errno);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ENOTDIR, status);
+  UNSIGNED_INT_EQUALS(ENOTDIR, status_errno);
+
+  // No modifiers, RO directory
+  // O_RDONLY
+  status = TestOpenFlags("/app0/assets/misc/file.txt", 0, "O_RDONLY", &status_errno);
+  UNSIGNED_INT_EQUALS(0, status);
+  UNSIGNED_INT_EQUALS(0, status_errno);
+  // O_WRONLY
+  status = TestOpenFlags("/app0/assets/misc/file.txt", 0x1, "O_WRONLY", &status_errno);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_EROFS, status);
+  UNSIGNED_INT_EQUALS(EROFS, status_errno);
+  // O_RDWR
+  status = TestOpenFlags("/app0/assets/misc/file.txt", 0x2, "O_RDWR", &status_errno);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_EROFS, status);
+  UNSIGNED_INT_EQUALS(EROFS, status_errno);
+  // O_RDONLY | O_WRONLY | O_RDWR
+  status = TestOpenFlags("/app0/assets/misc/file.txt", 0 | 0x1 | 0x2, "O_RDONLY | O_WRONLY | O_RDWR", &status_errno);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_EINVAL, status);
+  UNSIGNED_INT_EQUALS(EINVAL, status_errno);
+
+  // Obviously bad ones, flags are irrelevant
+  // #warning Disabled test
+  status = TestOpenFlags("assets/misc/file.txt", 0, "O_RDONLY", &status_errno);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_EINVAL, status);
+  UNSIGNED_INT_EQUALS(EINVAL, status_errno);
+  status = TestOpenFlags("./assets/misc/file.txt", 0, "O_RDONLY", &status_errno);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_EINVAL, status);
+  UNSIGNED_INT_EQUALS(EINVAL, status_errno);
+  status = TestOpenFlags("", 0, "O_RDONLY", &status_errno);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_EINVAL, status);
+  UNSIGNED_INT_EQUALS(EINVAL, status_errno);
+
+  Log("Edge case: RO+Truncate");
+  int __fd = sceKernelOpen("/data/therapist/tmp_open/nonexistent_rot.txt", O_RDONLY | O_TRUNC, 0777);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ENOENT, __fd);
+  UNSIGNED_INT_EQUALS(ENOENT, errno);
+  exists("/data/therapist/tmp_open/nonexistent_rot.txt");
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ENOENT, __fd);
+  UNSIGNED_INT_EQUALS(ENOENT, errno);
+
+  Log("Edge case: RO+Truncate");
+  __fd = sceKernelOpen("/data/therapist/tmp_open/nonexistent_rota.txt", O_RDONLY | O_TRUNC | O_APPEND, 0777);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ENOENT, __fd);
+  UNSIGNED_INT_EQUALS(ENOENT, errno);
+  exists("/data/therapist/tmp_open/nonexistent_rota.txt");
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ENOENT, __fd, "hehehe");
+  UNSIGNED_INT_EQUALS(ENOENT, errno, "XDXDXD");
+  UNSIGNED_INT_EQUALS(0, 1, "qweqweqwe");
+}
+
 void RunTests() {
-  RegenerateDir("/data/therapist");
 
   Log();
   Log("<<<< TEST SUITE STARTING >>>>");
@@ -81,8 +251,8 @@ void RunTests() {
   Log("\t       UID, GID are always 0");
   Log();
 
-  ElEsDashElAy("/");
-  ElEsDashElAy("/app0");
+  // ElEsDashElAy("/");
+  // ElEsDashElAy("/app0");
 
   //
   // Dirents
@@ -152,124 +322,6 @@ void RunTests() {
     TEST_CASE(!TestFileTouch("../../../data/therapist/tmp_cursed/escape_from_app0_file.txt"), "Test complete: Can't", "Test failed: Can",
               "escape from curdir with relatives");
     TEST_CASE(!TestFileTouch("app0_file.txt"), "Test complete: File not", "Test failed: File", "written to (RO?) curdir");
-  }
-
-  //
-  // File open tests
-  //
-
-  Log();
-  Log("\t<<<< File open tests >>>>");
-  Log("\tAcual flag values for Orbis are different from sys/fcntl.h");
-  Log("\tNumerical values are correct as of today, macro flags are not");
-  Log();
-
-  bool file_open_tests_prepared = RegenerateDir("/data/therapist/tmp_open"); // the same conditions
-  if (file_open_tests_prepared) {
-    // No modifiers
-    // O_RDONLY
-    TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_ro.txt", O_RDONLY, "O_RDONLY");
-              _errno == ENOENT, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 2, ")");
-    // O_WRONLY
-    TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_wo.txt", O_WRONLY, "O_WRONLY");
-              _errno == ENOENT, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 2, ")");
-    // O_RDWR
-    TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_rw.txt", O_RDWR, "O_RDWR");
-              _errno == ENOENT, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 2, ")");
-    // O_RDONLY | O_WRONLY | O_RDWR
-    TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_rowo.txt", O_RDONLY | O_WRONLY | O_RDWR, "O_RDONLY | O_WRONLY | O_RDWR");
-              _errno == EINVAL, "Pass (EINVAL)", "Fail", "( errno =", _errno, "should be =", 22, ")");
-
-    // O_TRUNC
-    TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_rot.txt", O_TRUNC, "O_RDONLY | O_TRUNC");
-              _errno == ENOENT, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", ENOENT, ")");
-    TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_wot.txt", O_WRONLY | O_TRUNC, "O_WRONLY | O_TRUNC");
-              _errno == ENOENT, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", ENOENT, ")");
-    TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_rwt.txt", O_RDWR | O_TRUNC, "O_RDWR | O_TRUNC");
-              _errno == ENOENT, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", ENOENT, ")");
-    // O_CREAT
-    // these create a file
-    TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_roc.txt", O_RDONLY | O_CREAT, "O_RDONLY | O_CREAT");
-              _errno == 0, "Pass", "Fail", "( errno =", _errno, "should be =", 0, ")");
-    TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_woc.txt", O_WRONLY | O_CREAT, "O_WRONLY | O_CREAT");
-              _errno == 0, "Pass", "Fail", "( errno =", _errno, "should be =", 0, ")");
-    TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_rwc.txt", O_RDWR | O_CREAT, "O_RDWR | O_CREAT");
-              _errno == 0, "Pass", "Fail", "( errno =", _errno, "should be =", 0, ")");
-    // O_CREAT | O_EXCL
-    // exists, not creating
-    TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_roc.txt", O_RDONLY | O_CREAT | O_EXCL, "O_RDONLY | O_CREAT | O_EXCL");
-              _errno == 17, "Pass (EEXIST)", "Fail", "( errno =", _errno, "should be =", EEXIST, ")");
-    TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_woc.txt", O_WRONLY | O_CREAT | O_EXCL, "O_WRONLY | O_CREAT | O_EXCL");
-              _errno == 17, "Pass (EEXIST)", "Fail", "( errno =", _errno, "should be =", EEXIST, ")");
-    TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_rwc.txt", O_RDWR | O_CREAT | O_EXCL, "O_RDWR | O_CREAT | O_EXCL");
-              _errno == 17, "Pass (EEXIST)", "Fail", "( errno =", _errno, "should be =", EEXIST, ")");
-    // O_APPEND
-    TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_roa.txt", O_RDONLY | O_APPEND, "O_RDONLY | O_APPEND");
-              _errno == ENOENT, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", ENOENT, ")");
-    TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_woa.txt", O_WRONLY | O_APPEND, "O_WRONLY | O_APPEND");
-              _errno == ENOENT, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", ENOENT, ")");
-    TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_rwa.txt", O_RDWR | O_APPEND, "O_RDWR | O_APPEND");
-              _errno == ENOENT, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", ENOENT, ")");
-    // O_TRUNC | O_APPEND
-    TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_rota.txt", O_RDONLY | O_TRUNC | O_APPEND, "O_RDONLY | O_TRUNC | O_APPEND");
-              _errno == ENOENT, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", ENOENT, ")");
-    TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_wota.txt", O_WRONLY | O_TRUNC | O_APPEND, "O_WRONLY | O_TRUNC | O_APPEND");
-              _errno == ENOENT, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", ENOENT, ")");
-    TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_rwta.txt", O_RDWR | O_TRUNC | O_APPEND, "O_RDWR | O_TRUNC | O_APPEND");
-              _errno == ENOENT, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", ENOENT, ")");
-    // O_DIRECTORY (nonexistent file is a target)
-    TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_dir_ro.txt", O_RDONLY | O_DIRECTORY, "O_RDONLY | O_DIRECTORY");
-              _errno == ENOENT, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", ENOENT, ")");
-    TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_dir_wo.txt", O_WRONLY | O_DIRECTORY, "O_WRONLY | O_DIRECTORY");
-              _errno == ENOENT, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", ENOENT, ")");
-    TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_dir_rw.txt", O_RDWR | O_DIRECTORY, "O_RDWR | O_DIRECTORY");
-              _errno == ENOENT, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", ENOENT, ")");
-    // O_DIRECTORY (existing directory)
-    TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/", 0 | 0x20000, "O_RDONLY | O_DIRECTORY");
-              _errno == 0, "Pass", "Fail", "( errno =", _errno, "should be =", 0, ")");
-    TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/", 0x1 | 0x20000, "O_WRONLY | O_DIRECTORY");
-              _errno == 21, "Pass (EISDIR)", "Fail", "( errno =", _errno, "should be =", EISDIR, ")");
-    TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/", 0x2 | 0x20000, "O_RDWR | O_DIRECTORY");
-              _errno == 21, "Pass (EISDIR)", "Fail", "( errno =", _errno, "should be =", EISDIR, ")");
-    // O_CREAT | O_DIRECTORY (unspecified type, directory)
-    // these create a file
-    TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_dir_rocd", 0 | 0x200 | 0x20000, "O_RDONLY | O_CREAT | O_DIRECTORY");
-              _errno == 20, "Pass (ENOTDIR)", "Fail", "( errno =", _errno, "should be =", ENOTDIR, ")");
-    TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_dir_wocd", 0x1 | 0x200 | 0x20000, "O_WRONLY | O_CREAT | O_DIRECTORY");
-              _errno == 20, "Pass (ENOTDIR)", "Fail", "( errno =", _errno, "should be =", ENOTDIR, ")");
-    TEST_CASE(int _errno = TestOpenFlags("/data/therapist/tmp_open/nonexistent_dir_rwcd", 0x2 | 0x200 | 0x20000, "O_RDWR | O_CREAT | O_DIRECTORY");
-              _errno == 20, "Pass (ENOTDIR)", "Fail", "( errno =", _errno, "should be =", ENOTDIR, ")");
-    // No modifiers, RO directory
-    // O_RDONLY
-    TEST_CASE(int _errno = TestOpenFlags("/app0/assets/misc/file.txt", 0, "O_RDONLY");
-              _errno == 0, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", 0, ")");
-    // O_WRONLY
-    TEST_CASE(int _errno = TestOpenFlags("/app0/assets/misc/file.txt", 0x1, "O_WRONLY");
-              _errno == 30, "Pass (EROFS)", "Fail", "( errno =", _errno, "should be =", EROFS, ")");
-    // O_RDWR
-    TEST_CASE(int _errno = TestOpenFlags("/app0/assets/misc/file.txt", 0x2, "O_RDWR");
-              _errno == 30, "Pass (EROFS)", "Fail", "( errno =", _errno, "should be =", EROFS, ")");
-    // O_RDONLY | O_WRONLY | O_RDWR
-    TEST_CASE(int _errno = TestOpenFlags("/app0/assets/misc/file.txt", 0 | 0x1 | 0x2, "O_RDONLY | O_WRONLY | O_RDWR");
-              _errno == EINVAL, "Pass (EINVAL)", "Fail", "( errno =", _errno, "should be =", EINVAL, ")");
-    // Obviously bad ones, flags are irrelevant
-    TEST_CASE(int _errno = TestOpenFlags("assets/misc/file.txt", 0, "O_RDONLY");
-              _errno == EINVAL, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", EINVAL, ")");
-    TEST_CASE(int _errno = TestOpenFlags("./assets/misc/file.txt", 0, "O_RDONLY");
-              _errno == EINVAL, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", EINVAL, ")");
-    TEST_CASE(int _errno = TestOpenFlags("", 0, "O_RDONLY"); _errno == EINVAL, "Pass (ENOENT)", "Fail", "( errno =", _errno, "should be =", EINVAL, ")");
-
-    Log("RO+Truncate is undefined. Testing");
-    int __fd = sceKernelOpen("/data/therapist/tmp_open/nonexistent_rot.txt", O_RDONLY | O_TRUNC, 0777);
-    TEST_CASE(errno == ENOENT, "RO+TRUNC returned correct errno", "RO+TRUNC returned wrong errno", ":", errno, "( should be:", ENOENT, ")");
-    TEST_CASE(exists("/data/therapist/tmp_open/nonexistent_rot.txt");
-              errno == ENOENT, "RO+TRUNC file not created", "RO+TRUNC file created", "( errno =", errno, "should be =", ENOENT, ")")
-
-    Log("RO+Truncate+Append is undefined. Testing");
-    __fd = sceKernelOpen("/data/therapist/tmp_open/nonexistent_rota.txt", O_RDONLY | O_TRUNC | O_APPEND, 0777);
-    TEST_CASE(errno == ENOENT, "ROTA returned correct errno", "ROTA returned wrong errno", ":", errno, "( should be:", ENOENT, ")");
-    TEST_CASE(exists("/data/therapist/tmp_open/nonexistent_rota.txt");
-              errno == ENOENT, "ROTA file not created", "ROTA file created", "( errno =", errno, "should be =", ENOENT, ")")
   }
 
   //
@@ -695,16 +747,18 @@ bool TestFileOps(const char* path) {
   return GetErrorCounter() == 0;
 }
 
-int TestOpenFlags(const char* path, int32_t flags, const char* flags_str) {
+int TestOpenFlags(const char* path, int32_t flags, const char* flags_str, int* errno_return) {
   LogTest("Testing open() on [", path, "] with flags:", to_hex(flags), "(", flags_str, ")");
 
-  errno      = 0;
-  int fd     = sceKernelOpen(path, flags, 0777);
-  int _errno = errno;
+  errno  = 0;
+  int fd = sceKernelOpen(path, flags, 0777);
+  if (nullptr != errno_return) *errno_return = errno;
+  if (fd < 0) return fd;
+
   // dummy string, some files need text to be created
   sceKernelWrite(fd, "TEST", 4);
-  if (fd > -1) sceKernelClose(fd);
-  return _errno;
+  sceKernelClose(fd);
+  return 0;
 }
 
 bool TestFileRW(const char* path, u16 to_test) {
@@ -1136,4 +1190,3 @@ bool CompareNormalVsPFS(fs::path path, fs::path leaf, s32 expected_normal_reclen
 
   return GetErrorCounter() == 0;
 }
-} // namespace FS_Test

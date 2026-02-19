@@ -1,6 +1,9 @@
 #ifndef FS_TEST_H
 #define FS_TEST_H
 
+#define UNSIGNED_INT_EQUALS(expected, actual) UNSIGNED_LONGS_EQUAL_LOCATION((uint32_t)expected, (uint32_t)actual, NULLPTR, __FILE__, __LINE__)
+#define UNSIGNED_INT_EQUALS_TEXT(expected, actual, text) UNSIGNED_LONGS_EQUAL_LOCATION((uint32_t)expected, (uint32_t)actual, text, __FILE__, __LINE__)
+
 #include "log.h"
 
 #include <filesystem>
@@ -11,7 +14,6 @@
 
 namespace fs = std::filesystem;
 
-namespace FS_Test {
 #define DIRENT_PFS_BUFFER_SIZE 65536
 #define DIRENT_BUFFER_SIZE     512
 
@@ -53,7 +55,7 @@ bool TestStat(fs::path path, const OrbisKernelStat* original = nullptr);
 bool TestLStat(fs::path path);
 bool PrepareCursedFileop(void);
 bool TestFileTouch(const char* path);
-int  TestOpenFlags(const char* path, int32_t flags, const char* flags_str);
+int  TestOpenFlags(const char* path, int32_t flags, const char* flags_str, int* errno_return = nullptr);
 bool TestFileRW(const char* path, u16 to_test);
 bool TestFileOps(const char* path);
 
@@ -73,9 +75,9 @@ ino_t       get_fileno(int fd);
 void        Obliterate(const char* path);
 void        ElEsDashElAy(const char* path);
 int32_t     touch(const char* path);
+int32_t     touch(const std::string& path);
 off_t       GetSize(const char* path);
 off_t       GetSize(int fd);
 int         exists(const char* path);
 
-} // namespace FS_Test
 #endif // FS_TEST_H
