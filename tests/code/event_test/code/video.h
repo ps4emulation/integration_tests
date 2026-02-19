@@ -10,7 +10,7 @@ class VideoOut {
   s32 handle      = 0;
   s32 width       = 0;
   s32 height      = 0;
-  s32 current_buf = -1;
+  s32 current_buf = 0;
 
   // Buffer allocations
   void* buf_addr  = nullptr;
@@ -158,6 +158,11 @@ class VideoOut {
     if (result >= 0) {
       // Buffer registered successfully, increment buffers count.
       buf_count++;
+    }
+
+    if (current_buf == -1) {
+      // Now that we have buffers, avoid submitting to the empty buffer.
+      current_buf = 0;
     }
 
     return result;
@@ -321,9 +326,9 @@ class VideoOut {
     memset(ev, 0, sizeof(OrbisKernelEvent) * num);
     *out = 0;
     if (timeout == -1) {
-      return sceKernelWaitEqueue(vblank_queue, ev, num, out, nullptr);
+      return sceKernelWaitEqueue(gc_queue, ev, num, out, nullptr);
     } else {
-      return sceKernelWaitEqueue(vblank_queue, ev, num, out, &timeout);
+      return sceKernelWaitEqueue(gc_queue, ev, num, out, &timeout);
     }
   };
 
