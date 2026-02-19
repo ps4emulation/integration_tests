@@ -36,7 +36,7 @@ macro(SUBDIRLIST result curdir)
   set(dirlist)
 
   foreach(child ${children})
-    if(IS_DIRECTORY ${curdir}/${child} AND NOT child STREQUAL "template" AND EXISTS "{curdir}/${child}/CMakeLists.txt")
+    if(IS_DIRECTORY ${curdir}/${child} AND NOT child STREQUAL "template" AND EXISTS "${curdir}/${child}/CMakeLists.txt")
       LIST(APPEND dirlist ${child})
     endif()
   endforeach()
