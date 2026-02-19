@@ -753,6 +753,145 @@ TEST(EventTest, VblankEventTest) {
   delete (handle);
 }
 
+TEST(EventTest, GraphicsEventTest) {
+  // These events are triggered through GPU command processing.
+  // Most commonly through prepare flip packets with interrupts,
+  // or through EventWriteEop packets.
+  VideoOut* handle = new VideoOut(1920, 1080);
+
+  // Start by using the handle to create an EOP event
+  s64 val    = 1;
+  s32 result = handle->addGraphicsEvent(&val);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // As-is, trying to wait on the event should timeout.
+  OrbisKernelEvent ev {};
+  s32              count = 0;
+  result                 = handle->waitGraphicsEvent(&ev, 1, &count, 100000);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ETIMEDOUT, result);
+
+  // Map a small area of memory with GPU access
+  void* gpu_addr = nullptr;
+  s64   gpu_paddr;
+  result = sceKernelAllocateMainDirectMemory(0x4000, 0, 0, &gpu_paddr);
+  UNSIGNED_INT_EQUALS(0, result);
+  result = sceKernelMapDirectMemory(&gpu_addr, 0x4000, 0x33, 0, gpu_paddr, 0);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Now fire off a GPU packet that should trigger this event.
+  // We don't really care for the actual memory data this packet does, this test is for events.
+  result = handle->submitWithEopInterrupt(gpu_addr, 0, 0x1000000000, 1);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Now we should eventually see the event fire.
+  result = handle->waitGraphicsEvent(&ev, 1, &count, -1);
+  UNSIGNED_INT_EQUALS(0, result);
+  UNSIGNED_INT_EQUALS(1, count);
+
+  PrintEventData(&ev);
+
+  // Check values
+  CHECK_EQUAL(0x40, ev.ident);
+  CHECK_EQUAL(-14, ev.filter);
+  CHECK_EQUAL(0x20, ev.flags);
+  CHECK_EQUAL(0, ev.fflags);
+  // Not sure what's in the data field, so not checking yet.
+  CHECK(ev.user_data != 0);
+  CHECK_EQUAL(val, *(s64*)ev.user_data);
+
+  // Gfx events have EV_CLEAR, so you wont see them again after sceKernelWaitEqueue
+  result = handle->waitGraphicsEvent(&ev, 1, &count, 100000);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ETIMEDOUT, result);
+
+  // Fire off another interrupt
+  result = handle->submitWithEopInterrupt(gpu_addr, 0, 0x1000000000, 2);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Should eventually see the event fire.
+  result = handle->waitGraphicsEvent(&ev, 1, &count, -1);
+  UNSIGNED_INT_EQUALS(0, result);
+  UNSIGNED_INT_EQUALS(1, count);
+
+  PrintEventData(&ev);
+
+  // Check values
+  CHECK_EQUAL(0x40, ev.ident);
+  CHECK_EQUAL(-14, ev.filter);
+  CHECK_EQUAL(0x20, ev.flags);
+  CHECK_EQUAL(0, ev.fflags);
+  // Not sure what's in the data field, so not checking yet.
+  CHECK(ev.user_data != 0);
+  CHECK_EQUAL(val, *(s64*)ev.user_data);
+
+  // These are valid packets that should not fire an interrupt.
+  result = handle->submitWithEopInterrupt(gpu_addr, 0, 0x1000000000, 0);
+  UNSIGNED_INT_EQUALS(0, result);
+  result = handle->submitWithEopInterrupt(gpu_addr, 0, 0x1000000000, 3);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  result = handle->waitGraphicsEvent(&ev, 1, &count, 100000);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ETIMEDOUT, result);
+
+  // Multiple interrupts before checking event
+  result = handle->submitWithEopInterrupt(gpu_addr, 0, 0x1000000000, 1);
+  UNSIGNED_INT_EQUALS(0, result);
+  result = handle->submitWithEopInterrupt(gpu_addr, 0, 0x1000000000, 1);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Should eventually see the event fire.
+  result = handle->waitGraphicsEvent(&ev, 1, &count, -1);
+  UNSIGNED_INT_EQUALS(0, result);
+  UNSIGNED_INT_EQUALS(1, count);
+
+  PrintEventData(&ev);
+
+  // Check values
+  CHECK_EQUAL(0x40, ev.ident);
+  CHECK_EQUAL(-14, ev.filter);
+  CHECK_EQUAL(0x20, ev.flags);
+  CHECK_EQUAL(0, ev.fflags);
+  // Not sure what's in the data field, so not checking yet.
+  CHECK(ev.user_data != 0);
+  CHECK_EQUAL(val, *(s64*)ev.user_data);
+
+  // Now try with special flips
+  // To run a flip, we need to register a video out buffer first.
+  result = handle->addBuffer();
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Now we can submit and flip
+  result = handle->submitAndFlipWithEopInterrupt(0x1000000000);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Should eventually see the event fire.
+  result = handle->waitGraphicsEvent(&ev, 1, &count, -1);
+  UNSIGNED_INT_EQUALS(0, result);
+  UNSIGNED_INT_EQUALS(1, count);
+
+  PrintEventData(&ev);
+
+  // Check values
+  CHECK_EQUAL(0x40, ev.ident);
+  CHECK_EQUAL(-14, ev.filter);
+  CHECK_EQUAL(0x20, ev.flags);
+  CHECK_EQUAL(0, ev.fflags);
+  // Not sure what's in the data field, so not checking yet.
+  CHECK(ev.user_data != 0);
+  CHECK_EQUAL(val, *(s64*)ev.user_data);
+
+  // Still has the EV_CLEAR flag, so it shouldn't appear again.
+  result = handle->waitGraphicsEvent(&ev, 1, &count, 100000);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ETIMEDOUT, result);
+
+  // Normal submit and flip shouldn't trigger the event.
+  result = handle->submitAndFlip(0x1000000000);
+  UNSIGNED_INT_EQUALS(0, result);
+  result = handle->waitGraphicsEvent(&ev, 1, &count, 100000);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ETIMEDOUT, result);
+
+  delete (handle);
+}
+
 TEST(EventTest, TimerEventTest) {
   // Timer events are pretty self explanatory.
   // They have a timer, and when it expires, they trigger.
