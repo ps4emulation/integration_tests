@@ -158,7 +158,6 @@ TEST(FilesystemTests, FileOpenTests) {
   UNSIGNED_INT_EQUALS(EINVAL, status_errno);
 
   // Obviously bad ones, flags are irrelevant
-  // #warning Disabled test
   status = TestOpenFlags("assets/misc/file.txt", 0, "O_RDONLY", &status_errno);
   UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_EINVAL, status);
   UNSIGNED_INT_EQUALS(EINVAL, status_errno);
@@ -169,22 +168,162 @@ TEST(FilesystemTests, FileOpenTests) {
   UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_EINVAL, status);
   UNSIGNED_INT_EQUALS(EINVAL, status_errno);
 
-  Log("Edge case: RO+Truncate");
-  int __fd = sceKernelOpen("/data/therapist/tmp_open/nonexistent_rot.txt", O_RDONLY | O_TRUNC, 0777);
-  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ENOENT, __fd);
-  UNSIGNED_INT_EQUALS(ENOENT, errno);
-  exists("/data/therapist/tmp_open/nonexistent_rot.txt");
-  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ENOENT, __fd);
-  UNSIGNED_INT_EQUALS(ENOENT, errno);
+  // Edge cases - oficial behaviour is undefined
+  status = TestOpenFlags("/data/therapist/tmp_open/nonexistent_rot.txt", O_RDONLY | O_TRUNC, "O_RDONLY | O_TRUNC", &status_errno);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ENOENT, status);
+  UNSIGNED_INT_EQUALS(ENOENT, status_errno);
+  CHECK_TRUE_TEXT(exists("/data/therapist/tmp_open/nonexistent_rot.txt"), "R+TR should error but create a file");
 
-  Log("Edge case: RO+Truncate");
-  __fd = sceKernelOpen("/data/therapist/tmp_open/nonexistent_rota.txt", O_RDONLY | O_TRUNC | O_APPEND, 0777);
-  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ENOENT, __fd);
-  UNSIGNED_INT_EQUALS(ENOENT, errno);
-  exists("/data/therapist/tmp_open/nonexistent_rota.txt");
-  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ENOENT, __fd, "hehehe");
-  UNSIGNED_INT_EQUALS(ENOENT, errno, "XDXDXD");
-  UNSIGNED_INT_EQUALS(0, 1, "qweqweqwe");
+  status = TestOpenFlags("/data/therapist/tmp_open/nonexistent_rota.txt", O_RDONLY | O_TRUNC | O_APPEND, "O_RDONLY | O_TRUNC | O_APPEND", &status_errno);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ENOENT, status);
+  UNSIGNED_INT_EQUALS(ENOENT, status_errno);
+  CHECK_TRUE_TEXT(exists("/data/therapist/tmp_open/nonexistent_rota.txt"), "R+A+TR should error but create a file");
+}
+
+TEST(FilesystemTests, FileMovementTests) {
+  Log();
+  Log("\t<<<< Moving files >>>>");
+  Log();
+
+  const char* movingFileA = "/data/therapist/moves/fileA";
+  const char* movingFileB = "/data/therapist/moves/fileB";
+  const char* movingFileC = "/data/therapist/moves/fileC";
+
+  const char* movingDirectoryA = "/data/therapist/moves/dirA";
+  const char* movingDirectoryB = "/data/therapist/moves/dirB";
+  const char* movingDirectoryC = "/data/therapist/moves/dirC";
+  const char* movingDirectoryD = "/data/therapist/moves/dirD";
+
+  Obliterate("/data/therapist/moves");
+  CHECK_EQUAL_ZERO(sceKernelMkdir("/data/therapist/moves", 0777));
+  CHECK_EQUAL_ZERO(sceKernelMkdir(movingDirectoryA, 0777));
+  CHECK_EQUAL_ZERO(sceKernelMkdir(movingDirectoryB, 0777));
+  CHECK_EQUAL_ZERO(sceKernelMkdir(movingDirectoryC, 0777));
+  CHECK_EQUAL_ZERO(sceKernelMkdir(movingDirectoryD, 0777));
+  CHECK_EQUAL_ZERO(touch(movingFileA));
+  CHECK_EQUAL_ZERO(touch(movingFileB));
+  CHECK_EQUAL_ZERO(touch(movingFileC));
+
+  ino_t fileno_movingDirectoryA = get_fileno(movingDirectoryA);
+  ino_t fileno_movingDirectoryB = get_fileno(movingDirectoryB);
+  ino_t fileno_movingDirectoryC = get_fileno(movingDirectoryC);
+  ino_t fileno_movingDirectoryD = get_fileno(movingDirectoryD);
+  ino_t fileno_movingFileA      = get_fileno(movingFileA);
+  ino_t fileno_movingFileB      = get_fileno(movingFileB);
+  ino_t fileno_movingFileC      = get_fileno(movingFileC);
+
+  Log("fileno of: movingDirectoryA:\t", fileno_movingDirectoryA);
+  Log("fileno of: movingDirectoryB:\t", fileno_movingDirectoryB);
+  Log("fileno of: movingDirectoryC:\t", fileno_movingDirectoryC);
+  Log("fileno of: movingDirectoryD:\t", fileno_movingDirectoryD);
+  Log("fileno of: movingFileA:\t", fileno_movingFileA);
+  Log("fileno of: movingFileB:\t", fileno_movingFileB);
+  Log("fileno of: movingFileC:\t", fileno_movingFileC);
+
+  const char* yeetFile = "/data/therapist/moves/yeet";
+  const char* yeetDir  = "/data/therapist/moves/yeet_dir";
+
+  int status {0};
+  // file->(existent)file:
+  status = sceKernelRename(movingFileA, movingFileB);
+  CHECK_EQUAL_ZERO(status);
+  UNSIGNED_LONGS_EQUAL(fileno_movingFileA, get_fileno(movingFileB));
+  fileno_movingFileB = fileno_movingFileA;
+
+  // file->(nonexistent)file
+  status = sceKernelRename(movingFileC, yeetFile);
+  CHECK_EQUAL_ZERO(status);
+  UNSIGNED_LONGS_EQUAL(fileno_movingFileC, get_fileno(yeetFile));
+  ino_t fileno_movingFileYeet = fileno_movingFileC;
+  Log("fileno of: yeetFile:\t", fileno_movingFileYeet);
+
+  // dir->(existing)dir
+  status = sceKernelRename(movingDirectoryA, movingDirectoryB);
+  CHECK_EQUAL_ZERO(status);
+  UNSIGNED_LONGS_EQUAL(fileno_movingDirectoryA, get_fileno(movingDirectoryB));
+  fileno_movingDirectoryB = fileno_movingDirectoryA;
+
+  // dir->(nonexistent)dir
+  status = sceKernelRename(movingDirectoryC, yeetDir);
+  CHECK_EQUAL_ZERO(status);
+  UNSIGNED_LONGS_EQUAL(fileno_movingDirectoryC, get_fileno(yeetDir));
+  fileno_movingDirectoryB    = fileno_movingDirectoryA;
+  ino_t fileno_movingDirYeet = fileno_movingDirectoryC;
+  Log("fileno of: yeetDir:\t", fileno_movingDirYeet);
+
+  // no change in folder structure
+  // file->(existent)dir
+  status = sceKernelRename(yeetFile, yeetDir);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_EISDIR, status);
+  UNSIGNED_INT_EQUALS(EISDIR, errno);
+
+  // no change either
+  // dir->(existent)file
+  status = sceKernelRename(yeetDir, yeetFile);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ENOTDIR, status);
+  UNSIGNED_INT_EQUALS(ENOTDIR, errno);
+  // file->(into existent)dir
+  status = sceKernelRename(yeetFile, "/data/therapist/moves/yeet_dir/yeeee");
+  CHECK_EQUAL_ZERO(status);
+  UNSIGNED_LONGS_EQUAL(fileno_movingFileYeet, get_fileno("/data/therapist/moves/yeet_dir/yeeee"));
+
+  // move empty to not empty dir, no change
+  // empty dir->not empty dir
+  status = sceKernelRename(movingDirectoryD, yeetDir);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ENOTEMPTY, status);
+  UNSIGNED_INT_EQUALS(ENOTEMPTY, errno);
+  UNSIGNED_LONGS_EQUAL(fileno_movingDirYeet, get_fileno(yeetDir));
+
+  // not empty to empty, changed
+  // not empty dir->empty dir
+  status = sceKernelRename(yeetDir, movingDirectoryD);
+  CHECK_EQUAL_ZERO(status);
+  UNSIGNED_LONGS_EQUAL(fileno_movingDirYeet, get_fileno(movingDirectoryD));
+  fileno_movingDirectoryD = fileno_movingDirYeet; // just to keep track
+}
+
+TEST(FilesystemTests, FileOpenAbuseTest) {
+  Log();
+  Log("\t<<<< Open fd abuse (moving/removing files with open fd) >>>>");
+  Log();
+
+  const char* abused_file         = "/data/therapist/abuse.txt";
+  const char* teststring1         = "0123456789\r\n";
+  const char* teststring2         = "9876543210\r\n";
+  const char* readback_string     = "0123456789\r\n9876543210\r\n";
+  int64_t     readback_string_len = strlen(readback_string);
+  char*       abused_buffer[256] {0};
+
+  touch(abused_file);
+  int  status {0};
+  int  abused_fd     = sceKernelOpen(abused_file, O_RDWR, 0777);
+  auto abused_fileno = get_fileno(abused_file);
+
+  CHECK_COMPARE(0, <, abused_fileno); // File not created otherwise
+
+  // write to opened file
+  status = sceKernelWrite(abused_fd, teststring1, strlen(teststring1));
+  LONGLONGS_EQUAL(strlen(teststring1), status);
+  // remove that file
+  status = sceKernelUnlink(abused_file);
+  CHECK_EQUAL_ZERO(status);
+  // should be unlinked
+  CHECK_EQUAL_ZERO(get_fileno(abused_file)); // not unlinked if !=0
+
+  // should be able to r/w to it, inode remains while directory entry is deleted
+  LONGLONGS_EQUAL(strlen(teststring2), sceKernelWrite(abused_fd, teststring2, strlen(teststring2)));
+  CHECK_EQUAL_ZERO(sceKernelLseek(abused_fd, 0, 0));
+  CHECK_COMPARE_TEXT(sceKernelRead(abused_fd, abused_buffer, 256), >, 0, "XDXDXD");
+  CHECK_EQUAL_ZERO(memcmp(abused_buffer, readback_string, readback_string_len));
+
+  Log("fstat() Fileno before removal =", abused_fileno, "after =", get_fileno(abused_fd));
+  Log("stat() after removal =", exists(abused_file));
+
+  if (int status = sceKernelClose(abused_fd); status != 0) LogError("File didn't close properly ( status =", status, ")");
+
+  struct OrbisKernelStat ost;
+  Log(sceKernelStat("/download0", &ost));
+  Log(sceKernelMkdir("/download0/temp/", 0777));
 }
 
 void RunTests() {
@@ -479,125 +618,6 @@ void RunTests() {
                                                                "stat() ( errno =", errno, ", should be", ENAMETOOLONG, ")");
   TEST_CASE(int status = unlink(very_long_path); errno == ENAMETOOLONG, "File name too long detected", "Didn't detect file name >255 characters",
                                                  "unlink() ( errno =", errno, ", should be", ENAMETOOLONG, ")");
-
-  ///
-  /// Moving files
-  ///
-
-  Log();
-  Log("\t<<<< Moving files >>>>");
-  Log();
-
-  const char* movingFileA = "/data/therapist/moves/fileA";
-  const char* movingFileB = "/data/therapist/moves/fileB";
-  const char* movingFileC = "/data/therapist/moves/fileC";
-
-  const char* movingDirectoryA = "/data/therapist/moves/dirA";
-  const char* movingDirectoryB = "/data/therapist/moves/dirB";
-  const char* movingDirectoryC = "/data/therapist/moves/dirC";
-  const char* movingDirectoryD = "/data/therapist/moves/dirD";
-
-  Obliterate("/data/therapist/moves");
-  sceKernelMkdir("/data/therapist/moves", 0777);
-  sceKernelMkdir(movingDirectoryA, 0777);
-  sceKernelMkdir(movingDirectoryB, 0777);
-  sceKernelMkdir(movingDirectoryC, 0777);
-  sceKernelMkdir(movingDirectoryD, 0777);
-  touch(movingFileA);
-  touch(movingFileB);
-  touch(movingFileC);
-
-  ino_t fileno_movingDirectoryA = get_fileno(movingDirectoryA);
-  ino_t fileno_movingDirectoryB = get_fileno(movingDirectoryB);
-  ino_t fileno_movingDirectoryC = get_fileno(movingDirectoryC);
-  ino_t fileno_movingDirectoryD = get_fileno(movingDirectoryD);
-  ino_t fileno_movingFileA      = get_fileno(movingFileA);
-  ino_t fileno_movingFileB      = get_fileno(movingFileB);
-  ino_t fileno_movingFileC      = get_fileno(movingFileC);
-
-  Log("fileno of: movingDirectoryA:\t", fileno_movingDirectoryA);
-  Log("fileno of: movingDirectoryB:\t", fileno_movingDirectoryB);
-  Log("fileno of: movingDirectoryC:\t", fileno_movingDirectoryC);
-  Log("fileno of: movingDirectoryD:\t", fileno_movingDirectoryD);
-  Log("fileno of: movingFileA:\t", fileno_movingFileA);
-  Log("fileno of: movingFileB:\t", fileno_movingFileB);
-  Log("fileno of: movingFileC:\t", fileno_movingFileC);
-
-  const char* yeetFile = "/data/therapist/moves/yeet";
-  const char* yeetDir  = "/data/therapist/moves/yeet_dir";
-
-  TEST_CASE(int status = sceKernelRename(movingFileA, movingFileB);
-            status == 0 && get_fileno(movingFileB) == fileno_movingFileA, "Moved", "Not moved", "file->(existent)file:", status);
-  fileno_movingFileB = fileno_movingFileA;
-  TEST_CASE(int status = sceKernelRename(movingFileC, yeetFile);
-            status == 0 && get_fileno(yeetFile) == fileno_movingFileC, "Moved", "Not moved", "file->(nonexistent)file:", status);
-  ino_t fileno_movingFileYeet = fileno_movingFileC;
-  Log("fileno of: yeetFile:\t", fileno_movingFileYeet);
-
-  TEST_CASE(int status = sceKernelRename(movingDirectoryA, movingDirectoryB);
-            status == 0 && get_fileno(movingDirectoryB) == fileno_movingDirectoryA, "Moved", "Not moved", "dir->(existing)dir:", status);
-  fileno_movingDirectoryB = fileno_movingDirectoryA;
-  TEST_CASE(int status = sceKernelRename(movingDirectoryC, yeetDir);
-            status == 0 && get_fileno(yeetDir) == fileno_movingDirectoryC, "Moved", "Not moved", "dir->(nonexistent)dir:", status);
-  ino_t fileno_movingDirYeet = fileno_movingDirectoryC;
-  Log("fileno of: yeetDir:\t", fileno_movingDirYeet);
-
-  // no change in folder structure
-  TEST_CASE(int status = sceKernelRename(yeetFile, yeetDir); errno == EISDIR, "Not moved", "Moved", "file->(existent)dir:", status);
-  // no change either
-  TEST_CASE(int status = sceKernelRename(yeetDir, yeetFile); errno == ENOTDIR, "Not moved", "Moved", "dir->(existent)file:", status);
-  TEST_CASE(int status = sceKernelRename(yeetFile, "/data/therapist/moves/yeet_dir/yeeee");
-            status == 0 && get_fileno("/data/therapist/moves/yeet_dir/yeeee") == fileno_movingFileYeet, "Moved", "Not moved",
-            "file->(into existent)dir:", status);
-
-  // move empty to not empty dir, no change
-  sceKernelMkdir(movingDirectoryD, 0777);
-  TEST_CASE(int status = sceKernelRename(movingDirectoryD, yeetDir);
-            errno == ENOTEMPTY && get_fileno(yeetDir) == fileno_movingDirYeet, "Not moved", "Moved", "empty dir->not empty dir:", status);
-  // not empty to empty, changed
-  TEST_CASE(int status = sceKernelRename(yeetDir, movingDirectoryD);
-            status == 0 && get_fileno(movingDirectoryD) == fileno_movingDirYeet, "Moved", "Not moved", "not empty dir->empty dir:", status);
-  fileno_movingDirectoryD = fileno_movingDirYeet;
-
-  ///
-  /// Open fd abuse (moving/removing files with open fd)
-  ///
-
-  Log();
-  Log("\t<<<< Open fd abuse (moving/removing files with open fd) >>>>");
-  Log();
-
-  const char* abused_file         = "/data/therapist/abuse.txt";
-  const char* teststring1         = "0123456789\r\n";
-  const char* teststring2         = "9876543210\r\n";
-  const char* readback_string     = "0123456789\r\n9876543210\r\n";
-  int64_t     readback_string_len = strlen(readback_string);
-  char*       abused_buffer[256] {0};
-
-  touch(abused_file);
-  int  abused_fd     = sceKernelOpen(abused_file, O_RDWR, 0777);
-  auto abused_fileno = get_fileno(abused_file);
-
-  if (abused_fileno == 0) LogError("File not created");
-  TEST_CASE(abused_fd >= 0, "Test file opened", "Test file not opened", "status =", abused_fd);
-
-  if (int bw = sceKernelWrite(abused_fd, teststring1, strlen(teststring1)); bw < 0) LogError("Didn't write the whole string 1:", bw, "written");
-  TEST_CASE(int status = sceKernelUnlink(abused_file); status == 0, "File", "File not", "unlinked ( status =", status, ")");
-  if (get_fileno(abused_file) != 0) LogError("File not unlinked");
-
-  if (int bw = sceKernelWrite(abused_fd, teststring2, strlen(teststring2)); bw < 0) LogError("Didn't write the whole string 2:", bw, "written");
-  if (int lsr = sceKernelLseek(abused_fd, 0, 0); lsr != 0) LogError("Can't lseek:", lsr);
-  if (int br = sceKernelRead(abused_fd, abused_buffer, 256); br < 0) LogError("Didn't read the whole string:", br, "read");
-  TEST_CASE(memcmp(abused_buffer, readback_string, readback_string_len) == 0, "Readback string is correct", "Readback string is incorrect", "");
-
-  Log("fstat() Fileno before removal =", abused_fileno, "after =", get_fileno(abused_fd));
-  Log("stat() after removal =", exists(abused_file));
-
-  if (int status = sceKernelClose(abused_fd); status != 0) LogError("File didn't close properly ( status =", status, ")");
-
-  struct OrbisKernelStat ost;
-  Log(sceKernelStat("/download0", &ost));
-  Log(sceKernelMkdir("/download0/temp/", 0777));
 }
 
 bool TestFileOps(const char* path) {
