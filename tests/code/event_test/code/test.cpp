@@ -889,6 +889,9 @@ TEST(EventTest, GraphicsEventTest) {
   result = handle->waitGraphicsEvent(&ev, 1, &count, 100000);
   UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ETIMEDOUT, result);
 
+  result = handle->deleteGraphicsEvent();
+  UNSIGNED_INT_EQUALS(0, result);
+
   delete (handle);
 }
 
@@ -930,7 +933,7 @@ TEST(EventTest, TimerEventTest) {
   CHECK_EQUAL(-7, ev.filter);
   CHECK_EQUAL(32, ev.flags);
   CHECK_EQUAL(0, ev.fflags);
-  // Trigger count perhaps?
+  // Timer events store a count of how many times the event has fired since the event was last returned.
   CHECK_EQUAL(1, ev.data);
   CHECK(ev.user_data != 0);
   CHECK_EQUAL(data, *(s64*)ev.user_data);
@@ -1176,4 +1179,113 @@ TEST(EventTest, TimerEventTest) {
   // Delete the equeue
   result = sceKernelDeleteEqueue(eq);
   UNSIGNED_INT_EQUALS(0, result);
+}
+
+TEST(EventTest, HighResTimerEvent) {
+  // HRTimer events are pretty self explanatory.
+  // They have a timer, and when it expires, they trigger.
+  // These are "high-res", which is supposed to mean they're more accurate.
+  OrbisKernelEqueue eq {};
+  s32               result = sceKernelCreateEqueue(&eq, "HRTimerEventQueue");
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Add a high-res timer to the equeue
+  // This timespec should match the timeout used for my timer event tests.
+  OrbisKernelTimespec time {0, 10000000};
+  s64                 data = 0x100;
+  result                   = sceKernelAddHRTimerEvent(eq, 0x10, &time, &data);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Wait for timer to fire
+  OrbisKernelEvent ev {};
+  s32              count = 0;
+  result                 = sceKernelWaitEqueue(eq, &ev, 1, &count, nullptr);
+  UNSIGNED_INT_EQUALS(0, result);
+  CHECK_EQUAL(1, count);
+
+  PrintEventData(&ev);
+
+  // Validate returned data
+  CHECK_EQUAL(0x10, ev.ident);
+  CHECK_EQUAL(-15, ev.filter);
+  CHECK_EQUAL(0x30, ev.flags);
+  CHECK_EQUAL(0, ev.fflags);
+  CHECK_EQUAL(1, ev.data);
+  CHECK(ev.user_data != 0);
+  CHECK_EQUAL(data, *(s64*)ev.user_data);
+
+  // HR timer events use EV_ONESHOT | EV_CLEAR
+  // This means that, once returned via sceKernelWaitEqueue, the event is gone.
+  result = sceKernelDeleteHRTimerEvent(eq, 0x10);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ENOENT, result);
+
+  // Add a new HRTimer event
+  result = sceKernelAddHRTimerEvent(eq, 0x10, &time, &data);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Use sceKernelUsleep to wait out 10 timer intervals.
+  result = sceKernelUsleep(100000);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // Wait for timer to fire
+  result = sceKernelWaitEqueue(eq, &ev, 1, &count, nullptr);
+  UNSIGNED_INT_EQUALS(0, result);
+  CHECK_EQUAL(1, count);
+
+  PrintEventData(&ev);
+
+  // Validate returned data
+  CHECK_EQUAL(0x10, ev.ident);
+  CHECK_EQUAL(-15, ev.filter);
+  CHECK_EQUAL(0x30, ev.flags);
+  CHECK_EQUAL(0, ev.fflags);
+  // Event data is still one,
+  // Might indicate that the timer only triggers once?
+  CHECK_EQUAL(1, ev.data);
+  CHECK(ev.user_data != 0);
+  CHECK_EQUAL(data, *(s64*)ev.user_data);
+
+  // Check for potential oddities like what timer events have
+  result = sceKernelAddHRTimerEvent(eq, 0x10, &time, &data);
+  UNSIGNED_INT_EQUALS(0, result);
+  s64                 data2 = 0x200;
+  OrbisKernelTimespec time2 {0, 100000000};
+  result = sceKernelAddHRTimerEvent(eq, 0x10, &time2, &data2);
+  UNSIGNED_INT_EQUALS(0, result);
+
+  // If these succeed like this, then the high-res timers have the same edge case as normal timers.
+  u32 micros = 1000;
+  result     = sceKernelWaitEqueue(eq, &ev, 1, &count, &micros);
+  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ETIMEDOUT, result);
+  micros = 20000;
+  result = sceKernelWaitEqueue(eq, &ev, 1, &count, &micros);
+  UNSIGNED_INT_EQUALS(0, result);
+  CHECK_EQUAL(1, count);
+
+  PrintEventData(&ev);
+
+  // Validate returned data
+  CHECK_EQUAL(0x10, ev.ident);
+  CHECK_EQUAL(-15, ev.filter);
+  CHECK_EQUAL(0x30, ev.flags);
+  CHECK_EQUAL(0, ev.fflags);
+  // Event data is still one,
+  // Might indicate that the timer only triggers once?
+  CHECK_EQUAL(1, ev.data);
+  CHECK(ev.user_data != 0);
+  CHECK_EQUAL(data2, *(s64*)ev.user_data);
+
+  // To properly test real-world behavior, fire these off and wait for events in a loop.
+  for (s32 i = 0; i < 100; i++) {
+    time.tv_nsec = 10000000;
+    result       = sceKernelAddHRTimerEvent(eq, 0x10, &time, &data);
+    UNSIGNED_INT_EQUALS(0, result);
+    // Real hardware doesn't entirely manage proper accuracy at 10000 micros.
+    // 20000 micros is enough for this to consistently pass though.
+    micros = 20000;
+    result = sceKernelWaitEqueue(eq, &ev, 1, &count, &micros);
+    UNSIGNED_INT_EQUALS(0, result);
+    result = sceKernelDeleteHRTimerEvent(eq, 0x10);
+    UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ENOENT, result);
+  }
 }

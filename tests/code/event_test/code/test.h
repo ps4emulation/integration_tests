@@ -17,12 +17,6 @@ extern "C" {
 
 typedef void* OrbisKernelEqueue;
 
-struct VideoOutEventData {
-  u64 time     : 12;
-  u64 counter  : 4;
-  u64 flip_arg : 48;
-};
-
 struct OrbisKernelEvent {
   u64 ident;
   s16 filter;
@@ -30,6 +24,11 @@ struct OrbisKernelEvent {
   u32 fflags;
   u64 data;
   u64 user_data;
+};
+
+struct OrbisKernelTimespec {
+  s64 tv_sec;
+  s64 tv_nsec;
 };
 
 constexpr s32 ORBIS_KERNEL_ERROR_ENOENT    = 0x80020002;
@@ -45,7 +44,8 @@ s32 sceKernelTriggerUserEvent(OrbisKernelEqueue eq, s32 id, void* user_data);
 s32 sceKernelDeleteUserEvent(OrbisKernelEqueue eq, s32 id);
 s32 sceKernelAddTimerEvent(OrbisKernelEqueue eq, s32 id, u32 time, void* user_data);
 s32 sceKernelDeleteTimerEvent(OrbisKernelEqueue eq, s32 id);
-
+s32 sceKernelAddHRTimerEvent(OrbisKernelEqueue eq, s32 id, OrbisKernelTimespec* timeout, void* user_data);
+s32 sceKernelDeleteHRTimerEvent(OrbisKernelEqueue eq, s32 id);
 s32 sceKernelAllocateMainDirectMemory(u64 size, u64 align, s32 mtype, s64* phys_out);
 s32 sceKernelMapDirectMemory(void** addr, u64 size, s32 prot, s32 flags, s64 offset, u64 align);
 s32 sceKernelReleaseDirectMemory(s64 phys_addr, u64 size);
@@ -73,6 +73,12 @@ struct OrbisVideoOutBufferAttribute {
   u32 option;
   u32 reserved0;
   u64 reserved1;
+};
+
+struct VideoOutEventData {
+  u64 time     : 12;
+  u64 counter  : 4;
+  u64 flip_arg : 48;
 };
 
 s32 sceVideoOutOpen(s32 user_id, s32 bus_type, s32 index, const void* param);
