@@ -21,6 +21,7 @@ class VideoOut {
   // Equeue
   OrbisKernelEqueue flip_queue   = nullptr;
   OrbisKernelEqueue vblank_queue = nullptr;
+  OrbisKernelEqueue gc_queue     = nullptr;
 
   // Command buffer for EOP tests
   void* cmd_buf          = nullptr;
@@ -28,6 +29,7 @@ class VideoOut {
   u64   cmd_buf_size     = 0x4000;
   u32   stream_size      = 0;
   u32   cmd_start_offset = 0;
+  bool  gpu_init         = false;
 
   public:
   VideoOut(s32 width, s32 height) {
@@ -48,6 +50,10 @@ class VideoOut {
 
     // Create vblank equeue
     result = sceKernelCreateEqueue(&vblank_queue, "VideoOutVblankEqueue");
+    UNSIGNED_INT_EQUALS(0, result);
+
+    // Create graphics equeue
+    result = sceKernelCreateEqueue(&gc_queue, "VideoOutGraphicsEqueue");
     UNSIGNED_INT_EQUALS(0, result);
 
     // Initialize command buffer for EOP flip tests
@@ -79,12 +85,21 @@ class VideoOut {
     if (flip_queue != nullptr) {
       s32 result = sceKernelDeleteEqueue(flip_queue);
       UNSIGNED_INT_EQUALS(0, result);
+      flip_queue = nullptr;
     }
 
     // Delete vblank event queue
     if (vblank_queue != nullptr) {
       s32 result = sceKernelDeleteEqueue(vblank_queue);
       UNSIGNED_INT_EQUALS(0, result);
+      vblank_queue = nullptr;
+    }
+
+    // Delete graphics event queue
+    if (gc_queue != nullptr) {
+      s32 result = sceKernelDeleteEqueue(gc_queue);
+      UNSIGNED_INT_EQUALS(0, result);
+      gc_queue = nullptr;
     }
 
     // Close video out handle
@@ -124,36 +139,6 @@ class VideoOut {
     return result;
   };
 
-  s32 submitAndFlip(s64 flip_arg) {
-    if (buf_count == 0) {
-      // SubmitAndFlip fails on buffer -1, save time by failing early.
-      return -1;
-    }
-
-    // Write GPU init packet to the pointer.
-    void* cmd_buf_start = (void*)((u64)cmd_buf + cmd_start_offset);
-    u32*  cmds          = (u32*)cmd_buf_start;
-    cmds += sceGnmDrawInitDefaultHardwareState350(cmds, 0x100);
-
-    // Write a flip packet to the pointer.
-    cmds[0] = 0xc03e1000;
-    cmds[1] = 0x68750777;
-    cmds += 64;
-    stream_size = (u32)((u64)cmds - (u64)cmd_buf_start);
-
-    cmd_start_offset += stream_size;
-    if (cmd_start_offset + stream_size > cmd_buf_size) {
-      cmd_start_offset = 0;
-    }
-
-    // Perform GPU submit
-    s32 result = sceGnmSubmitAndFlipCommandBuffers(1, &cmd_buf_start, &stream_size, nullptr, nullptr, handle, current_buf, 1, flip_arg);
-    if (++current_buf == buf_count) {
-      current_buf = 0;
-    }
-    return result;
-  };
-
   s32 addBuffer() {
     // Create a buffer attribute
     OrbisVideoOutBufferAttribute attr {};
@@ -175,6 +160,123 @@ class VideoOut {
       buf_count++;
     }
 
+    return result;
+  };
+
+  s32 ensureGpuInit() {
+    u32 num_dwords = 0;
+    if (!gpu_init) {
+      void* cmd_buf_start = (void*)((u64)cmd_buf + cmd_start_offset);
+      u32*  cmds          = (u32*)cmd_buf_start;
+      num_dwords          = sceGnmDrawInitDefaultHardwareState350(cmds, 0x100);
+
+      gpu_init = true;
+    }
+    return num_dwords;
+  };
+
+  s32 submitWithEopInterrupt(s32 event_type, s32 dest_sel, void* dest_gpu_addr, s32 src_sel, u64 value, s32 cache_action, s32 cache_policy, s32 int_sel) {
+    // If necessary, write a GPU init packet to the buffer
+    void* cmd_buf_start = (void*)((u64)cmd_buf + cmd_start_offset);
+    u32*  cmds          = (u32*)cmd_buf_start;
+    cmds += ensureGpuInit();
+
+    // Write EventWriteEop packet to fire interrupt
+    cmds[0]  = 0xc0044700;
+    u64 mask = 0xfffffffffc;
+    if (src_sel != 1) {
+      mask = 0xfffffffff8;
+    };
+
+    cmds[1]           = (cache_policy & 3) * 0x2000000 + 0x500 + ((dest_sel & 0x10) << 23 | event_type & 0x3f | (cache_action & 0x3f) << 12);
+    cmds[2]           = (s32)(mask & (u64)dest_gpu_addr);
+    cmds[3]           = (s32)((mask & (u64)dest_gpu_addr) >> 32) + ((int_sel & 3) << 24) + (src_sel << 29 | (dest_sel & 1) << 16);
+    *(u64*)(cmds + 4) = value;
+
+    cmds += 6;
+    stream_size = (u32)((u64)cmds - (u64)cmd_buf_start);
+
+    // Track area used by this packet
+    cmd_start_offset += stream_size;
+    if (cmd_start_offset + stream_size > cmd_buf_size) {
+      cmd_start_offset = 0;
+    }
+
+    // Submit command buffers, then submit done.
+    s32 result = sceGnmSubmitCommandBuffers(1, &cmd_buf_start, &stream_size, nullptr, nullptr);
+    if (result < 0) {
+      return result;
+    }
+    return sceGnmSubmitDone();
+  };
+
+  s32 submitAndFlip(s64 flip_arg) {
+    if (buf_count == 0) {
+      // SubmitAndFlip fails on buffer -1, save time by failing early.
+      return -1;
+    }
+
+    // If necessary, write a GPU init packet to the buffer
+    void* cmd_buf_start = (void*)((u64)cmd_buf + cmd_start_offset);
+    u32*  cmds          = (u32*)cmd_buf_start;
+    cmds += ensureGpuInit();
+
+    // Write a flip packet to the pointer.
+    cmds[0] = 0xc03e1000;
+    cmds[1] = 0x68750777;
+    cmds += 64;
+    stream_size = (u32)((u64)cmds - (u64)cmd_buf_start);
+
+    // Track area used by this packet
+    cmd_start_offset += stream_size;
+    if (cmd_start_offset + stream_size > cmd_buf_size) {
+      cmd_start_offset = 0;
+    }
+
+    // Perform GPU submit
+    s32 result = sceGnmSubmitAndFlipCommandBuffers(1, &cmd_buf_start, &stream_size, nullptr, nullptr, handle, current_buf, 1, flip_arg);
+    if (result == 0) {
+      if (++current_buf == buf_count) {
+        current_buf = 0;
+      }
+      return sceGnmSubmitDone();
+    }
+    return result;
+  };
+
+  s32 submitAndFlipWithEopInterrupt(s64 flip_arg) {
+    if (buf_count == 0) {
+      // SubmitAndFlip fails on buffer -1, save time by failing early.
+      return -1;
+    }
+
+    // If necessary, write a GPU init packet to the buffer
+    void* cmd_buf_start = (void*)((u64)cmd_buf + cmd_start_offset);
+    u32*  cmds          = (u32*)cmd_buf_start;
+    cmds += ensureGpuInit();
+
+    // Write a flip packet to the pointer.
+    cmds[0] = 0xc03e1000;
+    cmds[1] = 0x68750780;
+    cmds[5] = 4;
+    cmds[6] = 0;
+    cmds += 64;
+    stream_size = (u32)((u64)cmds - (u64)cmd_buf_start);
+
+    // Track area used by this packet
+    cmd_start_offset += stream_size;
+    if (cmd_start_offset + stream_size > cmd_buf_size) {
+      cmd_start_offset = 0;
+    }
+
+    // Perform GPU submit
+    s32 result = sceGnmSubmitAndFlipCommandBuffers(1, &cmd_buf_start, &stream_size, nullptr, nullptr, handle, current_buf, 1, flip_arg);
+    if (result == 0) {
+      if (++current_buf == buf_count) {
+        current_buf = 0;
+      }
+      return sceGnmSubmitDone();
+    }
     return result;
   };
 
@@ -202,6 +304,20 @@ class VideoOut {
   s32 deleteVblankEvent() { return sceVideoOutDeleteVblankEvent(vblank_queue, handle); }
 
   s32 waitVblankEvent(OrbisKernelEvent* ev, s32 num, s32* out, u32 timeout) {
+    memset(ev, 0, sizeof(OrbisKernelEvent) * num);
+    *out = 0;
+    if (timeout == -1) {
+      return sceKernelWaitEqueue(vblank_queue, ev, num, out, nullptr);
+    } else {
+      return sceKernelWaitEqueue(vblank_queue, ev, num, out, &timeout);
+    }
+  };
+
+  s32 addGraphicsEvent(void* user_data) { return sceGnmAddEqEvent(gc_queue, 0x40, user_data); };
+
+  s32 deleteGraphicsEvent() { return sceGnmDeleteEqEvent(gc_queue, 0x40); };
+
+  s32 waitGraphicsEvent(OrbisKernelEvent* ev, s32 num, s32* out, u32 timeout) {
     memset(ev, 0, sizeof(OrbisKernelEvent) * num);
     *out = 0;
     if (timeout == -1) {
