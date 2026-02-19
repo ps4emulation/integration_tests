@@ -82,14 +82,14 @@ void DumpDirents(int fd, int buffer_size, s64 offset, bool is_pfs = false) {
   if (int _tmp = sceKernelLseek(fd, offset, 0); _tmp < 0) LogError("Lseek failed:", _tmp);
   while (--max_loops && DropRead(fd, read_fd, buffer, buffer_size))
     ;
-  if (0 == max_loops) LogError("Aborted after 255 loops");
+  if (0 == max_loops) LogError("Aborted");
 
   s64 idx   = 0;
   max_loops = 0;
   if (int _tmp = sceKernelLseek(fd, offset, 0); _tmp < 0) LogError("Lseek failed:", _tmp);
   while (--max_loops && DropDirents(fd, dirent_fd, buffer, buffer_size, &idx))
     ;
-  if (0 == max_loops) LogError("Aborted after 255 loops");
+  if (0 == max_loops) LogError("Aborted");
 
   sceKernelClose(read_fd);
   sceKernelClose(dirent_fd);
@@ -139,8 +139,6 @@ void RunTests() {
   sceKernelClose(sceKernelOpen("/data/enderman/filewithaverylongname39", O_CREAT | O_WRONLY | O_TRUNC, 0777));
   sceKernelClose(sceKernelOpen("/data/enderman/filewithaverylongname40", O_CREAT | O_WRONLY | O_TRUNC, 0777));
 
-#define FUCKING_LSEEK_OFFSET 1024
-
   Log("---------------------");
   Log("Dump normal directory");
   Log("---------------------");
@@ -148,6 +146,14 @@ void RunTests() {
   int fd = sceKernelOpen("/data/enderman", O_DIRECTORY | O_RDONLY, 0777);
   Log("Directory opened with fd=", fd);
 
+  Log("LSeek START+0=", sceKernelLseek(fd, 0, 0));
+  Log("LSeek START-123=", sceKernelLseek(fd, 123, 0));
+  Log("LSeek START+123456=", sceKernelLseek(fd, 123456, 0));
+  Log("LSeek START+60=", sceKernelLseek(fd, 60, 0));
+  Log("LSeek CUR+0=", sceKernelLseek(fd, 0, 1));
+  Log("LSeek CUR+24=", sceKernelLseek(fd, 24, 1));
+  Log("LSeek CUR-6666=", sceKernelLseek(fd, 6666, 1));
+  Log("LSeek CUR+123456=", sceKernelLseek(fd, 123456, 1));
   Log("LSeek END+0=", sceKernelLseek(fd, 0, 2));
   Log("LSeek END+123456=", sceKernelLseek(fd, 123456, 2));
   Log("LSeek END+100=", sceKernelLseek(fd, 100, 2));
@@ -172,6 +178,14 @@ void RunTests() {
 
   Log("Directory opened with fd=", fd);
 
+  Log("LSeek START+0=", sceKernelLseek(fd, 0, 0));
+  Log("LSeek START-123=", sceKernelLseek(fd, 123, 0));
+  Log("LSeek START+123456=", sceKernelLseek(fd, 123456, 0));
+  Log("LSeek START+60=", sceKernelLseek(fd, 60, 0));
+  Log("LSeek CUR+0=", sceKernelLseek(fd, 0, 1));
+  Log("LSeek CUR+24=", sceKernelLseek(fd, 24, 1));
+  Log("LSeek CUR-6666=", sceKernelLseek(fd, 6666, 1));
+  Log("LSeek CUR+123456=", sceKernelLseek(fd, 123456, 1));
   Log("LSeek END+0=", sceKernelLseek(fd, 0, 2));
   Log("LSeek END+123456=", sceKernelLseek(fd, 123456, 2));
   Log("LSeek END+100=", sceKernelLseek(fd, 100, 2));
