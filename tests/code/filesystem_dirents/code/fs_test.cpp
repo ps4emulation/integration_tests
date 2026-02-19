@@ -30,10 +30,16 @@ bool DropRead(int dir_fd, int dump_fd, char* buffer, size_t size) {
   memset(buffer, 0xAA, size);
 
   s64 tbr = sceKernelRead(dir_fd, buffer, size);
-  if (tbr != size) LogError("Read", tbr, "bytes out of", size, "bytes requested");
-  if (tbr <= 0) return false;
+  Log("Read got", tbr, "/", size, "bytes, ptr =", sceKernelLseek(dir_fd, 0, 1));
 
-  Log("Read", tbr, "bytes, ptr =", sceKernelLseek(dir_fd, 0, 1));
+  if (tbr < 0) {
+    LogError("Read finished with error:", tbr);
+    return false;
+  }
+  if (tbr == 0) {
+    LogSuccess("Read finished");
+    return false;
+  }
 
   s64 tbw = sceKernelWrite(dump_fd, buffer, tbr);
   if (tbw != tbr) LogError("Written", tbw, "bytes out of", tbr, "bytes read");
@@ -44,10 +50,16 @@ bool DropDirents(int dir_fd, int dump_fd, char* buffer, size_t size, s64* idx) {
   memset(buffer, 0xAA, size);
 
   s64 tbr = sceKernelGetdirentries(dir_fd, buffer, size, idx);
-  if (tbr != size) LogError("GetDirEntries", tbr, "bytes out of", size, "bytes requested");
-  if (tbr <= 0) return false;
+  Log("Dirent got", tbr, "/", size, "bytes, ptr =", sceKernelLseek(dir_fd, 0, 1), "idx =", *idx);
 
-  Log("Read", tbr, "bytes, ptr =", sceKernelLseek(dir_fd, 0, 1), "idx =", *idx);
+  if (tbr < 0) {
+    LogError("Dirent finished with error:", tbr);
+    return false;
+  }
+  if (tbr == 0) {
+    LogSuccess("Dirent finished");
+    return false;
+  }
 
   s64 tbw = sceKernelWrite(dump_fd, buffer, tbr);
   if (tbw != tbr) LogError("Written", tbw, "bytes out of", tbr, "bytes read");
@@ -57,8 +69,6 @@ bool DropDirents(int dir_fd, int dump_fd, char* buffer, size_t size, s64* idx) {
 void DumpDirents(int fd, int buffer_size, s64 offset, bool is_pfs = false) {
   char* buffer = new char[buffer_size] {0};
 
-  LogTest("Reading fd =", fd, "size =", buffer_size, "offset =", offset);
-
   fs::path read_path =
       "/data/enderman/dumps/read_" + (is_pfs ? std::string("PFS_") : std::string("")) + std::to_string(buffer_size) + '+' + std::to_string(offset) + ".bin";
   fs::path dirent_path =
@@ -67,6 +77,7 @@ void DumpDirents(int fd, int buffer_size, s64 offset, bool is_pfs = false) {
   int read_fd   = sceKernelOpen(read_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0777);
   int dirent_fd = sceKernelOpen(dirent_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0777);
 
+  LogTest("Read", is_pfs ? "PFS" : "normal", "directory, fd =", fd, "size =", buffer_size, "offset =", offset);
   u16 max_loops = 0; // 65536 iterations lmao
   if (int _tmp = sceKernelLseek(fd, offset, 0); _tmp < 0) LogError("Lseek failed:", _tmp);
   while (--max_loops && DropRead(fd, read_fd, buffer, buffer_size))
