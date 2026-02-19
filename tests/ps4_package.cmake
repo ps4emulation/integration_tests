@@ -1,15 +1,16 @@
-# description:
+# Description:
 # This function creates an OpenOrbis prx library with specified parameters.
 #
-# params:
+# Params:
 # work_lib_name - Name for the library target in CMake project
 # fw_version - Firmware version of the library, it is recommended to use the same version as pkg version to avoid linking problems
 # pkg_title_id - Package CMake target where to install this library
 # inst_path - Relative to project install directory path where to install the library, i.e. "sce_module" to put it in /app0/sce_module
 # out_lib_name - Final library name, the one it will be installed with to the `inst_path`
 # reuse_existing - Boolean argument, if set to true it will not error on CMake target name collision, already compiled lib will be installed to the specified directory
+# vararg... - The list of files to compile into a library
 #
-# result:
+# Result:
 # This function sets ${prx_first_occur} variable in parent scope to TRUE if library with specified parameters was just built the first time.
 # The function always sets this variable to TRUE if reuse_existing set to FALSE.
 function(create_lib work_lib_name fw_version pkg_title_id inst_path out_lib_name reuse_existing)
@@ -66,6 +67,22 @@ function(internal_create_stub_libs pkg_title_id fw_version)
   endif()
 endfunction()
 
+# Description:
+# This function is a first stage for pkg creation. The `finalize_pkg` function should always
+# be called after this one. It is allowed to change CMake's target properties for package
+# between `create_pkg` and `finalize_pkg` calls. All available for change target properties
+# are listed in OpenOrbis-tc.cmake file with brief description explicitly state the
+# permission to change the value.
+#
+# Params:
+# title_id - the package title id
+# fw_major - the major firmware version
+# fw_minor - the first two digits of minor firmware version
+# vararg... - The list of files to compile into a eboot.bin file
+#
+# Result:
+# Creates a target with the `title_id` name, this target builds the eboot.bin file and necessary
+# stub libraries like libc.prx, libSceFios2.prx and right.sprx for specified firmware version.
 function(create_pkg title_id fw_major fw_minor)
   list(LENGTH ARGN source_count)
 
@@ -142,6 +159,14 @@ function(create_pkg title_id fw_major fw_minor)
   internal_create_stub_libs(${title_id} ${fw_version_hex})
 endfunction(create_pkg)
 
+# Description:
+# Finishes the package setup process, none of the parameters for
+# finalized package target should be changed after this call.
+# Changing target parameters after this call could lead to
+# undefined behavior and compilation fails.
+#
+# Params:
+# title_id - the package title id
 function(finalize_pkg pkg_title_id)
   OpenOrbisPackage_FinalizeProject(${pkg_title_id})
 endfunction(finalize_pkg)
