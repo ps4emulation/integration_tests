@@ -175,7 +175,7 @@ class VideoOut {
     return num_dwords;
   };
 
-  s32 submitWithEopInterrupt(s32 event_type, s32 dest_sel, void* dest_gpu_addr, s32 src_sel, u64 value, s32 cache_action, s32 cache_policy, s32 int_sel) {
+  s32 submitWithEopInterrupt(void* dest_gpu_addr, s32 src_sel, u64 value, s32 int_sel) {
     // If necessary, write a GPU init packet to the buffer
     void* cmd_buf_start = (void*)((u64)cmd_buf + cmd_start_offset);
     u32*  cmds          = (u32*)cmd_buf_start;
@@ -188,9 +188,9 @@ class VideoOut {
       mask = 0xfffffffff8;
     };
 
-    cmds[1]           = (cache_policy & 3) * 0x2000000 + 0x500 + ((dest_sel & 0x10) << 23 | event_type & 0x3f | (cache_action & 0x3f) << 12);
+    cmds[1]           = 0x504;
     cmds[2]           = (s32)(mask & (u64)dest_gpu_addr);
-    cmds[3]           = (s32)((mask & (u64)dest_gpu_addr) >> 32) + ((int_sel & 3) << 24) + (src_sel << 29 | (dest_sel & 1) << 16);
+    cmds[3]           = (s32)((mask & (u64)dest_gpu_addr) >> 32) + ((int_sel & 3) << 24) + (src_sel << 29);
     *(u64*)(cmds + 4) = value;
 
     cmds += 6;
