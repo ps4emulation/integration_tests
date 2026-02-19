@@ -209,6 +209,11 @@ endfunction()
 
 function(OpenOrbisPackage_Validate)
   get_property(list GLOBAL PROPERTY OO_PRJ_LIST)
+  list(LENGTH list list_len)
+
+  if(${list_len} LESS 1)
+    message(FATAL_ERROR "No packages were added")
+  endif()
 
   foreach(Target ${list})
     get_target_property(IsFinalized ${Target} OO_PKG_FINALIZED)
