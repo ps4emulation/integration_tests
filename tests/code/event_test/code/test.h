@@ -35,6 +35,7 @@ constexpr s32 ORBIS_KERNEL_ERROR_ENOENT    = 0x80020002;
 constexpr s32 ORBIS_KERNEL_ERROR_ETIMEDOUT = 0x8002003c;
 
 s32 sceKernelUsleep(u32);
+u64 sceKernelGetProcessTime();
 s32 sceKernelCreateEqueue(OrbisKernelEqueue* eq, const char* name);
 s32 sceKernelDeleteEqueue(OrbisKernelEqueue eq);
 s32 sceKernelWaitEqueue(OrbisKernelEqueue eq, OrbisKernelEvent* ev, s32 num, s32* out, u32* timeout);

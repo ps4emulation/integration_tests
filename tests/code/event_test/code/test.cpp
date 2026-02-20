@@ -1176,6 +1176,29 @@ TEST(EventTest, TimerEventTest) {
   result = sceKernelDeleteTimerEvent(eq, 0x20);
   UNSIGNED_INT_EQUALS(0, result);
 
+  // For testing purposes, we'll run a loop to try and get some measure of accuracy.
+  u32 micros = 100000;
+  while (true) {
+    u64 total_test_time = 0;
+    for (s32 i = 0; i < 10; i++) {
+      u64 cur_time_micros = sceKernelGetProcessTime();
+      sceKernelAddTimerEvent(eq, 0x10, micros, &data);
+      // For the sake of timing accuracy, don't check results.
+      // This may lead to undetected hangs in emulators with issues.
+      sceKernelWaitEqueue(eq, &ev, 1, &count, nullptr);
+      u64 end_time_micros = sceKernelGetProcessTime();
+      total_test_time += end_time_micros - cur_time_micros;
+      sceKernelDeleteTimerEvent(eq, 0x10);
+    }
+    total_test_time /= 10;
+    printf("%u micro timer took around %li micros to complete on average\n", micros, total_test_time);
+    if (total_test_time > micros * 1.5) {
+      // Break after reaching a large enough level of inaccuracy.
+      break;
+    }
+    micros /= 2;
+  }
+
   // Delete the equeue
   result = sceKernelDeleteEqueue(eq);
   UNSIGNED_INT_EQUALS(0, result);
@@ -1275,17 +1298,26 @@ TEST(EventTest, HighResTimerEvent) {
   CHECK(ev.user_data != 0);
   CHECK_EQUAL(data2, *(s64*)ev.user_data);
 
-  // To properly test real-world behavior, fire these off and wait for events in a loop.
-  for (s32 i = 0; i < 100; i++) {
-    time.tv_nsec = 10000000;
-    result       = sceKernelAddHRTimerEvent(eq, 0x10, &time, &data);
-    UNSIGNED_INT_EQUALS(0, result);
-    // Real hardware doesn't entirely manage proper accuracy at 10000 micros.
-    // 20000 micros is enough for this to consistently pass though.
-    micros = 20000;
-    result = sceKernelWaitEqueue(eq, &ev, 1, &count, &micros);
-    UNSIGNED_INT_EQUALS(0, result);
-    result = sceKernelDeleteHRTimerEvent(eq, 0x10);
-    UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ENOENT, result);
+  // For testing purposes, we'll run a loop to try and get some measure of accuracy.
+  micros = 100000;
+  while (true) {
+    u64 total_test_time = 0;
+    for (s32 i = 0; i < 10; i++) {
+      OrbisKernelTimespec time {0, micros * 1000};
+      u64                 cur_time_micros = sceKernelGetProcessTime();
+      sceKernelAddHRTimerEvent(eq, 0x10, &time, &data);
+      // For the sake of timing accuracy, don't check results.
+      // This may lead to undetected hangs in emulators with issues.
+      sceKernelWaitEqueue(eq, &ev, 1, &count, nullptr);
+      u64 end_time_micros = sceKernelGetProcessTime();
+      total_test_time += end_time_micros - cur_time_micros;
+    }
+    total_test_time /= 10;
+    printf("%u micro HR timer took around %li micros to complete on average\n", micros, total_test_time);
+    if (total_test_time > micros * 1.5) {
+      // Break after reaching a large enough level of inaccuracy.
+      break;
+    }
+    micros /= 2;
   }
 }
