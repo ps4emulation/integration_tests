@@ -5,9 +5,15 @@
 
 #include <bit>
 
+VideoOut* handle;
+
 TEST_GROUP (EventTest) {
-  void setup() {}
-  void teardown() {}
+  void setup() {
+    handle = new VideoOut(1920, 1080);
+  }
+  void teardown() {
+    delete (handle);
+  }
 };
 
 static void PrintEventData(OrbisKernelEvent* ev) {
@@ -375,10 +381,6 @@ TEST(EventTest, UserEventTest) {
 }
 
 TEST(EventTest, FlipEventTest) {
-  // Test video out flip events.
-  // First we need to properly open libSceVideoOut
-  VideoOut* handle = new VideoOut(1920, 1080);
-
   // Register buffers
   s32 result = handle->addBuffer();
   UNSIGNED_INT_EQUALS(0, result);
@@ -667,15 +669,10 @@ TEST(EventTest, FlipEventTest) {
   result = handle->waitFlipEvent(events, 1, &count, 10000);
   // Since there's no event left, nothing will be triggered when the flip occurs.
   UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ETIMEDOUT, result);
-
-  // Clean up after test
-  delete (handle);
 }
 
 TEST(EventTest, VblankEventTest) {
   // Another type of video out event, these trigger automatically when the PS4 draws blank frames.
-  VideoOut* handle = new VideoOut(1920, 1080);
-
   // Add vblank event
   s64 val    = 1;
   s32 result = handle->addVblankEvent(&val);
@@ -748,17 +745,12 @@ TEST(EventTest, VblankEventTest) {
   // Wait with short timeout, this will return after timeout with error timedout
   result = handle->waitVblankEvent(&ev, 1, &count, 1000);
   UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_ETIMEDOUT, result);
-
-  // Clean up after test
-  delete (handle);
 }
 
 TEST(EventTest, GraphicsEventTest) {
   // These events are triggered through GPU command processing.
   // Most commonly through prepare flip packets with interrupts,
   // or through EventWriteEop packets.
-  VideoOut* handle = new VideoOut(1920, 1080);
-
   // Start by using the handle to create an EOP event
   s64 val    = 1;
   s32 result = handle->addGraphicsEvent(&val);
@@ -891,8 +883,6 @@ TEST(EventTest, GraphicsEventTest) {
 
   result = handle->deleteGraphicsEvent();
   UNSIGNED_INT_EQUALS(0, result);
-
-  delete (handle);
 }
 
 TEST(EventTest, TimerEventTest) {
