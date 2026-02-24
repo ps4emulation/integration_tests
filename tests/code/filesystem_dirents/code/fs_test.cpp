@@ -7,8 +7,38 @@
 #include <filesystem>
 #include <sstream>
 #include <string>
+#include <vector>
 
 namespace FS_Test {
+
+std::vector<u32> read_sizes {// 8
+                             7, 8, 9,
+                             // 16
+                             15, 16, 17,
+                             // 32
+                             31, 32, 33,
+                             // 64
+                             63, 64, 65,
+                             // 128
+                             127, 128, 129,
+                             // 256
+                             255, 256, 257,
+                             // 512
+                             511, 512, 513,
+                             // 1024
+                             1023, 1024, 1025,
+                             // 2048
+                             2047, 2048, 2049,
+                             // 4096
+                             4095, 4096, 4097,
+                             // 65536
+                             65535, 65536, 65537,
+                             // cursed
+                             2137, 21, 37, 69, 420, 42, 123, 222, 666, 911, 112, 997,
+                             // something for zoomers
+                             67};
+std::vector<u32> read_sizes_pfs {65535, 65536, 65537};
+std::vector<u16> read_offsets {0, 1, 5, 10, 21, 37, 127, 128, 129, 400, 500, 512, 768, 1024, 111, 666, 420, 1234, 96, 42};
 
 namespace fs = std::filesystem;
 namespace oi = OrbisInternals;
@@ -49,76 +79,11 @@ void RunTests() {
   Log("LSeek END-100=", sceKernelLseek(fd, -100, 2));
   Log("LSeek END-100000=", sceKernelLseek(fd, -100000, 2));
 
-  DumpDirectory(fd, 16, 0);
-  DumpDirectory(fd, 16, 7);
-  DumpDirectory(fd, 16, 47);
-  DumpDirectory(fd, 16, 123);
-  DumpDirectory(fd, 16, 128);
-  DumpDirectory(fd, 23, 0);
-  DumpDirectory(fd, 23, 7);
-  DumpDirectory(fd, 23, 47);
-  DumpDirectory(fd, 23, 123);
-  DumpDirectory(fd, 23, 128);
-  DumpDirectory(fd, 64, 0);
-  DumpDirectory(fd, 64, 7);
-  DumpDirectory(fd, 64, 47);
-  DumpDirectory(fd, 64, 123);
-  DumpDirectory(fd, 64, 128);
-  DumpDirectory(fd, 123, 0);
-  DumpDirectory(fd, 123, 7);
-  DumpDirectory(fd, 123, 47);
-  DumpDirectory(fd, 123, 123);
-  DumpDirectory(fd, 123, 128);
-  DumpDirectory(fd, 128, 0);
-  DumpDirectory(fd, 128, 7);
-  DumpDirectory(fd, 128, 47);
-  DumpDirectory(fd, 128, 123);
-  DumpDirectory(fd, 128, 128);
-  DumpDirectory(fd, 199, 0);
-  DumpDirectory(fd, 199, 7);
-  DumpDirectory(fd, 199, 47);
-  DumpDirectory(fd, 199, 123);
-  DumpDirectory(fd, 199, 128);
-  DumpDirectory(fd, 256, 0);
-  DumpDirectory(fd, 256, 7);
-  DumpDirectory(fd, 256, 47);
-  DumpDirectory(fd, 256, 123);
-  DumpDirectory(fd, 256, 128);
-  DumpDirectory(fd, 512, 0);
-  DumpDirectory(fd, 512, 7);
-  DumpDirectory(fd, 512, 47);
-  DumpDirectory(fd, 512, 123);
-  DumpDirectory(fd, 512, 128);
-  DumpDirectory(fd, 567, 0);
-  DumpDirectory(fd, 567, 7);
-  DumpDirectory(fd, 567, 47);
-  DumpDirectory(fd, 567, 123);
-  DumpDirectory(fd, 567, 128);
-  DumpDirectory(fd, 999, 0);
-  DumpDirectory(fd, 999, 7);
-  DumpDirectory(fd, 999, 47);
-  DumpDirectory(fd, 999, 123);
-  DumpDirectory(fd, 999, 128);
-  DumpDirectory(fd, 1024, 0);
-  DumpDirectory(fd, 1024, 7);
-  DumpDirectory(fd, 1024, 47);
-  DumpDirectory(fd, 1024, 123);
-  DumpDirectory(fd, 1024, 128);
-  DumpDirectory(fd, 1555, 0);
-  DumpDirectory(fd, 1555, 7);
-  DumpDirectory(fd, 1555, 47);
-  DumpDirectory(fd, 1555, 123);
-  DumpDirectory(fd, 1555, 128);
-  DumpDirectory(fd, 2048, 0);
-  DumpDirectory(fd, 2048, 7);
-  DumpDirectory(fd, 2048, 47);
-  DumpDirectory(fd, 2048, 123);
-  DumpDirectory(fd, 2048, 128);
-  DumpDirectory(fd, 2123, 0);
-  DumpDirectory(fd, 2123, 7);
-  DumpDirectory(fd, 2123, 47);
-  DumpDirectory(fd, 2123, 123);
-  DumpDirectory(fd, 2123, 128);
+  for (auto read_size: read_sizes) {
+    for (auto read_offset: read_offsets) {
+      DumpDirectory(fd, read_size, read_offset);
+    }
+  }
 
   sceKernelClose(fd);
 
@@ -144,66 +109,11 @@ void RunTests() {
   Log("LSeek END-100=", sceKernelLseek(fd, -100, 2));
   Log("LSeek END-100000=", sceKernelLseek(fd, -100000, 2));
 
-  DumpDirectory(fd, 16, 0, true);
-  DumpDirectory(fd, 16, 7, true);
-  DumpDirectory(fd, 16, 47, true);
-  DumpDirectory(fd, 16, 123, true);
-  DumpDirectory(fd, 16, 128, true);
-  DumpDirectory(fd, 23, 0, true);
-  DumpDirectory(fd, 23, 7, true);
-  DumpDirectory(fd, 23, 47, true);
-  DumpDirectory(fd, 23, 123, true);
-  DumpDirectory(fd, 23, 128, true);
-  DumpDirectory(fd, 64, 0, true);
-  DumpDirectory(fd, 64, 7, true);
-  DumpDirectory(fd, 64, 47, true);
-  DumpDirectory(fd, 64, 123, true);
-  DumpDirectory(fd, 64, 128, true);
-  DumpDirectory(fd, 123, 0, true);
-  DumpDirectory(fd, 123, 7, true);
-  DumpDirectory(fd, 123, 47, true);
-  DumpDirectory(fd, 123, 123, true);
-  DumpDirectory(fd, 123, 128, true);
-  DumpDirectory(fd, 128, 0, true);
-  DumpDirectory(fd, 128, 7, true);
-  DumpDirectory(fd, 128, 47, true);
-  DumpDirectory(fd, 128, 123, true);
-  DumpDirectory(fd, 128, 128, true);
-  DumpDirectory(fd, 199, 0, true);
-  DumpDirectory(fd, 199, 7, true);
-  DumpDirectory(fd, 199, 47, true);
-  DumpDirectory(fd, 199, 123, true);
-  DumpDirectory(fd, 199, 128, true);
-  DumpDirectory(fd, 256, 0, true);
-  DumpDirectory(fd, 256, 7, true);
-  DumpDirectory(fd, 256, 47, true);
-  DumpDirectory(fd, 256, 123, true);
-  DumpDirectory(fd, 256, 128, true);
-  DumpDirectory(fd, 512, 0, true);
-  DumpDirectory(fd, 512, 7, true);
-  DumpDirectory(fd, 512, 47, true);
-  DumpDirectory(fd, 512, 123, true);
-  DumpDirectory(fd, 512, 128, true);
-  DumpDirectory(fd, 567, 0, true);
-  DumpDirectory(fd, 567, 7, true);
-  DumpDirectory(fd, 567, 47, true);
-  DumpDirectory(fd, 567, 123, true);
-  DumpDirectory(fd, 567, 128, true);
-  DumpDirectory(fd, 999, 0, true);
-  DumpDirectory(fd, 999, 7, true);
-  DumpDirectory(fd, 999, 47, true);
-  DumpDirectory(fd, 999, 123, true);
-  DumpDirectory(fd, 999, 128, true);
-  DumpDirectory(fd, 1024, 0, true);
-  DumpDirectory(fd, 1024, 7, true);
-  DumpDirectory(fd, 1024, 47, true);
-  DumpDirectory(fd, 1024, 123, true);
-  DumpDirectory(fd, 1024, 128, true);
-  DumpDirectory(fd, 65536, 0, true);
-  DumpDirectory(fd, 65536, 7, true);
-  DumpDirectory(fd, 65536, 47, true);
-  DumpDirectory(fd, 65536, 123, true);
-  DumpDirectory(fd, 65536, 128, true);
+  for (auto read_size: read_sizes) {
+    for (auto read_offset: read_offsets) {
+      DumpDirectory(fd, read_size, read_offset, true);
+    }
+  }
 
   sceKernelClose(fd);
 }
@@ -212,7 +122,7 @@ bool DumpByRead(int dir_fd, int dump_fd, char* buffer, size_t size) {
   memset(buffer, 0xAA, size);
 
   s64 tbr = sceKernelRead(dir_fd, buffer, size);
-  Log("Read got", tbr, "/", size, "bytes, ptr =", sceKernelLseek(dir_fd, 0, 1));
+  // Log("Read got", tbr, "/", size, "bytes, ptr =", sceKernelLseek(dir_fd, 0, 1));
 
   if (tbr < 0) {
     LogError("Read finished with error:", tbr);
@@ -223,8 +133,7 @@ bool DumpByRead(int dir_fd, int dump_fd, char* buffer, size_t size) {
     return false;
   }
 
-  s64 tbw = sceKernelWrite(dump_fd, buffer, size);
-  if (tbw != tbr) LogError("Written", tbw, "bytes out of", size, "bytes read");
+  if (s64 tbw = sceKernelWrite(dump_fd, buffer, size); tbw != size) LogError("Written", tbw, "bytes out of", size, "bytes");
   return true;
 }
 
@@ -233,7 +142,7 @@ bool DumpByDirent(int dir_fd, int dump_fd, char* buffer, size_t size, s64* idx) 
   memset(buffer, 0xAA, size);
 
   s64 tbr = sceKernelGetdirentries(dir_fd, buffer, size, idx);
-  Log("Dirent got", tbr, "/", size, "bytes, ptr =", sceKernelLseek(dir_fd, 0, 1), "idx =", *idx);
+  // Log("Dirent got", tbr, "/", size, "bytes, ptr =", sceKernelLseek(dir_fd, 0, 1), "idx =", *idx);
 
   if (tbr < 0) {
     LogError("Dirent finished with error:", tbr);
@@ -244,8 +153,7 @@ bool DumpByDirent(int dir_fd, int dump_fd, char* buffer, size_t size, s64* idx) 
     return false;
   }
 
-  s64 tbw = sceKernelWrite(dump_fd, buffer, size);
-  if (tbw != tbr) LogError("Written", tbw, "bytes out of", size, "bytes read");
+  if (s64 tbw = sceKernelWrite(dump_fd, buffer, size); tbw != size) LogError("Written", tbw, "bytes out of", size, "bytes");
   return true;
 }
 
@@ -257,7 +165,7 @@ void DumpDirectory(int fd, int buffer_size, s64 offset, bool is_pfs) {
   fs::path dirent_path =
       "/data/enderman/dumps/dirent_" + (is_pfs ? std::string("PFS_") : std::string("")) + std::to_string(buffer_size) + '+' + std::to_string(offset) + ".bin";
 
-  LogTest("Read", is_pfs ? "PFS" : "normal", "directory, fd =", fd, "size =", buffer_size, "offset =", offset);
+  LogTest("Read", is_pfs ? "PFS" : "normal", "directory, fd =", fd, "buffer size =", buffer_size, "starting offset =", offset);
 
   u16 max_loops = 0; // 65536 iterations lmao
   int read_fd   = sceKernelOpen(read_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0777);

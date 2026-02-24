@@ -13,7 +13,31 @@
     "args": [
       // change accordingly
       "${workspaceFolder}/tests/code/filesystem_dirents/dumps/1202",
-      "${workspaceFolder}/tests/code/filesystem_dirents/dumps/407d287-main"
+      "${workspaceFolder}/tests/code/filesystem_dirents/dumps/af9cbb8-main"
+    ]
+  },
+    {
+    "name": "Compare dumps (main mod)",
+    "type": "python",
+    "request": "launch",
+    "program": "${workspaceFolder}/tests/code/filesystem_dirents/dumps/comparator.py",
+    "console": "integratedTerminal",
+    "args": [
+      // change accordingly
+      "${workspaceFolder}/tests/code/filesystem_dirents/dumps/1202",
+      "${workspaceFolder}/tests/code/filesystem_dirents/dumps/af9cbb8-main-mod"
+    ]
+  },
+    {
+    "name": "Compare dumps (current)",
+    "type": "python",
+    "request": "launch",
+    "program": "${workspaceFolder}/tests/code/filesystem_dirents/dumps/comparator.py",
+    "console": "integratedTerminal",
+    "args": [
+      // change accordingly
+      "${workspaceFolder}/tests/code/filesystem_dirents/dumps/1202",
+      "${userHome}/.local/share/shadps4/data/enderman/dumps"
     ]
   },
     {
