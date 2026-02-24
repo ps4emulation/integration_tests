@@ -159,8 +159,8 @@ TEST(FilesystemTests, FileOpenTests) {
 
   // Obviously bad ones, flags are irrelevant
   status = TestOpenFlags("assets/misc/file.txt", 0, "O_RDONLY", &status_errno);
-  UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_EINVAL, status);
-  UNSIGNED_INT_EQUALS(EINVAL, status_errno);
+  UNSIGNED_INT_EQUALS_TEXT(ORBIS_KERNEL_ERROR_EINVAL, status, "Relative paths = EINVAL");
+  UNSIGNED_INT_EQUALS_TEXT(EINVAL, status_errno, "Relative paths = EINVAL");
   status = TestOpenFlags("./assets/misc/file.txt", 0, "O_RDONLY", &status_errno);
   UNSIGNED_INT_EQUALS(ORBIS_KERNEL_ERROR_EINVAL, status);
   UNSIGNED_INT_EQUALS(EINVAL, status_errno);
@@ -226,7 +226,7 @@ TEST(FilesystemTests, FileMovementTests) {
   int status {0};
   // file->(existent)file:
   status = sceKernelRename(movingFileA, movingFileB);
-  CHECK_EQUAL_ZERO(status);
+  CHECK_EQUAL_ZERO_TEXT(status, "If target exists, it should be overwritten");
   UNSIGNED_LONGS_EQUAL(fileno_movingFileA, get_fileno(movingFileB));
   fileno_movingFileB = fileno_movingFileA;
 
@@ -299,7 +299,7 @@ TEST(FilesystemTests, FileOpenAbuseTest) {
   int  abused_fd     = sceKernelOpen(abused_file, O_RDWR, 0777);
   auto abused_fileno = get_fileno(abused_file);
 
-  CHECK_COMPARE(0, <, abused_fileno); // File not created otherwise
+  CHECK_COMPARE_TEXT(0, <, abused_fileno, "Fileno cannot be 0"); // File not created otherwise
 
   // write to opened file
   status = sceKernelWrite(abused_fd, teststring1, strlen(teststring1));
@@ -313,17 +313,39 @@ TEST(FilesystemTests, FileOpenAbuseTest) {
   // should be able to r/w to it, inode remains while directory entry is deleted
   LONGLONGS_EQUAL(strlen(teststring2), sceKernelWrite(abused_fd, teststring2, strlen(teststring2)));
   CHECK_EQUAL_ZERO(sceKernelLseek(abused_fd, 0, 0));
-  CHECK_COMPARE_TEXT(sceKernelRead(abused_fd, abused_buffer, 256), >, 0, "XDXDXD");
+  CHECK_COMPARE(sceKernelRead(abused_fd, abused_buffer, 256), >, 0);
   CHECK_EQUAL_ZERO(memcmp(abused_buffer, readback_string, readback_string_len));
 
-  Log("fstat() Fileno before removal =", abused_fileno, "after =", get_fileno(abused_fd));
-  Log("stat() after removal =", exists(abused_file));
+  UNSIGNED_LONGS_EQUAL_TEXT(abused_fileno, get_fileno(abused_fd), "fileno should be preserved after unlink before closing the file");
+  UNSIGNED_INT_EQUALS_TEXT(ORBIS_KERNEL_ERROR_ENOENT, exists(abused_file), "Disk entry should be removed");
+  UNSIGNED_INT_EQUALS_TEXT(ENOENT, errno, "Disk entry should be removed");
+  CHECK_EQUAL_ZERO_TEXT(sceKernelClose(abused_fd), "Descriptor should be valid up until now");
+}
 
-  if (int status = sceKernelClose(abused_fd); status != 0) LogError("File didn't close properly ( status =", status, ")");
+TEST(FilesystemTests, StatDumpTests) {
+  Log();
+  Log("\t<<<< STAT >>>>");
+  Log("\tLHS - current, RHS - original HW");
+  Log();
 
-  struct OrbisKernelStat ost;
-  Log(sceKernelStat("/download0", &ost));
-  Log(sceKernelMkdir("/download0/temp/", 0777));
+  CHECK_TRUE(TestStat("/", &DumpedConstants::stat_root));
+  CHECK_TRUE(TestStat("/app0", &DumpedConstants::stat_root_app0));
+  CHECK_TRUE(TestStat("/app0/eboot.bin", &DumpedConstants::stat_root_app0_eboot));
+  CHECK_TRUE(TestStat("/app0/assets/misc/file.txt", &DumpedConstants::stat_root_app0_assets_misc_file));
+  CHECK_TRUE(TestStat("/data/therapist", &DumpedConstants::stat_root_data));
+  CHECK_TRUE(TestStat("/dev", &DumpedConstants::stat_root_dev));
+  CHECK_TRUE(TestStat("/dev/deci_stderr", &DumpedConstants::stat_blkdev));
+  CHECK_TRUE(TestLStat("/dev/deci_stderr"));
+  CHECK_TRUE(TestStat("/dev/deci_stdout", &DumpedConstants::stat_blkdev));
+  CHECK_TRUE(TestStat("/dev/stdin", nullptr));
+  CHECK_TRUE_TEXT(TestStat("/dev/stdout", nullptr), "Stat shouldn't work on /dev/stdout");
+  CHECK_TRUE_TEXT(!TestLStat("/dev/stdout"), "LStat shouldn't work on /dev/stdout");
+  CHECK_TRUE(TestStat("/dev/random", &DumpedConstants::stat_blkdev));
+  CHECK_TRUE(TestStat("/dev/urandom", &DumpedConstants::stat_blkdev));
+  CHECK_TRUE(TestStat("/host", &DumpedConstants::stat_root_host));
+  CHECK_TRUE(TestStat("/hostapp", &DumpedConstants::stat_root_hostapp));
+  CHECK_TRUE(TestStat("/av_contents", &DumpedConstants::stat_root_av_contents));
+  CHECK_TRUE_TEXT(!TestLStat("/av_contents"), "LStat shouldn't work on /av_contents");
 }
 
 void RunTests() {
@@ -390,8 +412,8 @@ void RunTests() {
   Log("\t       UID, GID are always 0");
   Log();
 
-  // ElEsDashElAy("/");
-  // ElEsDashElAy("/app0");
+  ElEsDashElAy("/");
+  ElEsDashElAy("/app0");
 
   //
   // Dirents
@@ -410,30 +432,6 @@ void RunTests() {
   //
   // Stat
   //
-
-  Log();
-  Log("\t<<<< STAT >>>>");
-  Log("\tLHS - emulated, RHS - OG");
-  Log();
-
-  TEST_CASE(TestStat("/", &DumpedConstants::stat_root), "Test complete", "Stat comparsion failed");
-  TEST_CASE(TestStat("/app0", &DumpedConstants::stat_root_app0), "Test complete", "Stat comparsion failed");
-  TEST_CASE(TestStat("/app0/eboot.bin", &DumpedConstants::stat_root_app0_eboot), "Test complete", "Stat comparsion failed");
-  TEST_CASE(TestStat("/app0/assets/misc/file.txt", &DumpedConstants::stat_root_app0_assets_misc_file), "Test complete", "Stat comparsion failed");
-  TEST_CASE(TestStat("/data/therapist", &DumpedConstants::stat_root_data), "Test complete", "Stat comparsion failed");
-  TEST_CASE(TestStat("/dev", &DumpedConstants::stat_root_dev), "Test complete", "Stat comparsion failed");
-  TEST_CASE(TestStat("/dev/deci_stderr", &DumpedConstants::stat_root_dev_deci_stderr), "Test complete", "Stat comparsion failed");
-  TEST_CASE(TestLStat("/dev/deci_stderr"), "Test complete", "Stat comparsion failed");
-  TEST_CASE(TestStat("/dev/deci_stdout", &DumpedConstants::stat_root_dev_deci_stdout), "Test complete", "Stat comparsion failed");
-  TEST_CASE(TestStat("/dev/stdin", nullptr), "Test complete [stat should fail]", "Stat comparsion failed");
-  TEST_CASE(TestStat("/dev/stdout", nullptr), "Test complete", "Stat worked on /dev/stdout");
-  TEST_CASE(!TestLStat("/dev/stdout"), "Test complete", "LStat worked on /dev/stdout");
-  TEST_CASE(TestStat("/dev/random", &DumpedConstants::stat_root_dev_random), "Test complete", "Stat comparsion failed");
-  TEST_CASE(TestStat("/dev/urandom", &DumpedConstants::stat_root_dev_urandom), "Test complete", "Stat comparsion failed");
-  TEST_CASE(TestStat("/host", &DumpedConstants::stat_root_host), "Test complete", "Stat comparsion failed");
-  TEST_CASE(TestStat("/hostapp", &DumpedConstants::stat_root_hostapp), "Test complete", "Stat comparsion failed");
-  TEST_CASE(TestStat("/av_contents", &DumpedConstants::stat_root_av_contents), "Test complete", "Stat comparsion failed");
-  TEST_CASE(!TestLStat("/av_contents"), "Test complete", "LStat worked on /av_contents");
 
   //
   // CURSED FILE CREATION

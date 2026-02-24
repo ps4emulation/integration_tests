@@ -223,12 +223,13 @@ bool DumpByRead(int dir_fd, int dump_fd, char* buffer, size_t size) {
     return false;
   }
 
-  s64 tbw = sceKernelWrite(dump_fd, buffer, tbr);
-  if (tbw != tbr) LogError("Written", tbw, "bytes out of", tbr, "bytes read");
+  s64 tbw = sceKernelWrite(dump_fd, buffer, size);
+  if (tbw != tbr) LogError("Written", tbw, "bytes out of", size, "bytes read");
   return true;
 }
 
 bool DumpByDirent(int dir_fd, int dump_fd, char* buffer, size_t size, s64* idx) {
+  // magic to determine how many trailing elements were cut
   memset(buffer, 0xAA, size);
 
   s64 tbr = sceKernelGetdirentries(dir_fd, buffer, size, idx);
@@ -243,8 +244,8 @@ bool DumpByDirent(int dir_fd, int dump_fd, char* buffer, size_t size, s64* idx) 
     return false;
   }
 
-  s64 tbw = sceKernelWrite(dump_fd, buffer, tbr);
-  if (tbw != tbr) LogError("Written", tbw, "bytes out of", tbr, "bytes read");
+  s64 tbw = sceKernelWrite(dump_fd, buffer, size);
+  if (tbw != tbr) LogError("Written", tbw, "bytes out of", size, "bytes read");
   return true;
 }
 
@@ -275,6 +276,7 @@ void DumpDirectory(int fd, int buffer_size, s64 offset, bool is_pfs) {
   if (0 == max_loops) LogError("Aborted");
 
   sceKernelClose(dirent_fd);
+  delete[] buffer;
 }
 
 } // namespace FS_Test
