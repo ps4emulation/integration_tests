@@ -37,7 +37,7 @@
     "args": [
       // change accordingly
       "${workspaceFolder}/tests/code/filesystem_dirents/dumps/1202",
-      "${userHome}/.local/share/shadps4/data/enderman/dumps"
+      "${userHome}/.local/share/shadPS4/data/enderman/dumps"
     ]
   },
     {

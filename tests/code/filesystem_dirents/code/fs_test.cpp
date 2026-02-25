@@ -165,7 +165,7 @@ void DumpDirectory(int fd, int buffer_size, s64 offset, bool is_pfs) {
   fs::path dirent_path =
       "/data/enderman/dumps/dirent_" + (is_pfs ? std::string("PFS_") : std::string("")) + std::to_string(buffer_size) + '+' + std::to_string(offset) + ".bin";
 
-  LogTest("Read", is_pfs ? "PFS" : "normal", "directory, fd =", fd, "buffer size =", buffer_size, "starting offset =", offset);
+  LogTest(is_pfs ? "PFS" : "normal", "directory, fd =", fd, "buffer size =", buffer_size, "starting offset =", offset);
 
   u16 max_loops = 0; // 65536 iterations lmao
   int read_fd   = sceKernelOpen(read_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0777);

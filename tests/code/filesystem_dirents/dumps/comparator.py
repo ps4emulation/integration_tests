@@ -1,12 +1,16 @@
 import os
 import sys
-import hashlib
 import re
 
 if len(sys.argv) != 3:
     print(f"comparator.py [PS4] [Emulator]")
     print("Compare dirent dumps between console and dump")
     sys.exit(0)
+
+regular_dirent_query_re = re.compile(b"(.{4}.{2}[\x02\x04\x08].)([ -~]{1,255})\x00")
+pfs_query_getdents_re = re.compile(
+    b"(.{4}[\x02\x04\x08]\x00{3}.{4}.{4})([ -~]{1,255})\x00"
+)
 
 dir_left = sys.argv[1]
 dir_right = sys.argv[2]
@@ -25,9 +29,10 @@ for filename in dir_left_contents:
     file_left_path = os.path.join(os.path.abspath(dir_left), filename)
     file_right_path = os.path.join(os.path.abspath(dir_right), filename)
     is_pfs = "PFS" in filename
+    is_read = "read" in filename
+    is_getdents = "dirent" in filename
 
-    # temporarily
-    if is_pfs:
+    if not (is_read or is_getdents):
         continue
 
     print()
@@ -44,14 +49,12 @@ for filename in dir_left_contents:
     with open(file_right_path, "rb") as rhsf:
         content_right = rhsf.read()
 
-    hash_left = hashlib.md5(content_left).hexdigest()
-    hash_right = hashlib.md5(content_right).hexdigest()
-    hash_match = hash_left == hash_right
+    if size_left == 0 and size_right == 0:
+        continue
 
-    print(f"Size:\t{size_match}\t{size_left}\t{size_right}")
-    print(f"MD5:\t{hash_match}\t{hash_left}\t{hash_right}")
+    print(f"Size:\t{size_left}\t{size_right}")
 
-    if size_match and hash_match:
+    if not size_match:
         continue
 
     left_file_list = []
@@ -62,9 +65,14 @@ for filename in dir_left_contents:
 
     left_skipped_bytes = []
     right_skipped_bytes = []
+    search_query = None
 
     prev_end = 0
-    search_query = re.finditer(b"(.{8})([ -~]{1,255})\x00", content_left)
+    lsresult = None
+    if is_pfs and is_read:
+        search_query = pfs_query_getdents_re.finditer(content_left)
+    else:
+        search_query = regular_dirent_query_re.finditer(content_left)
     for lsresult in search_query:
         left_file_list.append(lsresult.group(2))
         result_pos = lsresult.start()
@@ -73,9 +81,15 @@ for filename in dir_left_contents:
         if left_skipped_bytes_temp != 0:
             left_skipped_bytes.append(left_skipped_bytes_temp)
         prev_end = lsresult.end()
+    if lsresult is None:
+        print("Left: can't match file entries")
 
     prev_end = 0
-    search_query = re.finditer(b"(.{8})([ -~]{1,255})\x00", content_left)
+    lsresult = None
+    if is_pfs and is_read:
+        search_query = pfs_query_getdents_re.finditer(content_right)
+    else:
+        search_query = regular_dirent_query_re.finditer(content_right)
     for lsresult in search_query:
         right_file_list.append(lsresult.group(2))
         result_pos = lsresult.start()
@@ -85,6 +99,8 @@ for filename in dir_left_contents:
             right_skipped_bytes.append(right_skipped_bytes_temp)
 
         prev_end = lsresult.end()
+    if lsresult is None:
+        print("Right: can't match file entries")
 
     left_set = set(left_file_list)
     right_set = set(right_file_list)
@@ -130,8 +146,4 @@ for filename in dir_left_contents:
                 f"Right: Inconsistent skipped byted: L:{skipped_bytes}<=>R:{left_skipped_bytes[idx]}"
             )
 
-
-    
-
-    
     pass
