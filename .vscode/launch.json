@@ -4,32 +4,8 @@
   // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
   "version": "0.2.0",
   "configurations": [
-  {
-    "name": "Compare dumps (main)",
-    "type": "python",
-    "request": "launch",
-    "program": "${workspaceFolder}/tests/code/filesystem_dirents/dumps/comparator.py",
-    "console": "integratedTerminal",
-    "args": [
-      // change accordingly
-      "${workspaceFolder}/tests/code/filesystem_dirents/dumps/1202",
-      "${workspaceFolder}/tests/code/filesystem_dirents/dumps/af9cbb8-main"
-    ]
-  },
     {
-    "name": "Compare dumps (main mod)",
-    "type": "python",
-    "request": "launch",
-    "program": "${workspaceFolder}/tests/code/filesystem_dirents/dumps/comparator.py",
-    "console": "integratedTerminal",
-    "args": [
-      // change accordingly
-      "${workspaceFolder}/tests/code/filesystem_dirents/dumps/1202",
-      "${workspaceFolder}/tests/code/filesystem_dirents/dumps/af9cbb8-main-mod"
-    ]
-  },
-    {
-    "name": "Compare dumps (current)",
+    "name": "Compare dumps (current, linux)",
     "type": "python",
     "request": "launch",
     "program": "${workspaceFolder}/tests/code/filesystem_dirents/dumps/comparator.py",
@@ -41,6 +17,18 @@
     ]
   },
     {
+    "name": "Compare dumps (current, macOS)",
+    "type": "python",
+    "request": "launch",
+    "program": "${workspaceFolder}/tests/code/filesystem_dirents/dumps/comparator.py",
+    "console": "integratedTerminal",
+    "args": [
+      // change accordingly
+      "${workspaceFolder}/tests/code/filesystem_dirents/dumps/1202",
+      "${userHome}/Library/Application Support/shadPS4/data/enderman/dumps"
+    ]
+  },
+    {
     "name": "Compare dumps (qfs)",
     "type": "python",
     "request": "launch",
@@ -48,7 +36,7 @@
     "console": "integratedTerminal",
     "args": [
       "${workspaceFolder}/tests/code/filesystem_dirents/dumps/1202",
-      "${workspaceFolder}/tests/code/filesystem_dirents/dumps/08f4458-qfs"
+      "${workspaceFolder}/tests/code/filesystem_dirents/dumps/qfs-08f4458"
     ]
   }
   ]
