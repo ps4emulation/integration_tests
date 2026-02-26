@@ -1,16 +1,12 @@
 import os
 import sys
 import re
+from dataclasses import dataclass
 
 if len(sys.argv) != 3:
     print(f"comparator.py [PS4] [Emulator]")
     print("Compare dirent dumps between console and dump")
     sys.exit(0)
-
-regular_dirent_query_re = re.compile(b"(.{4}.{2}[\x02\x04\x08].)([ -~]{1,255})\x00")
-pfs_query_getdents_re = re.compile(
-    b"(.{4}[\x02\x04\x08]\x00{3}.{4}.{4})([ -~]{1,255})\x00"
-)
 
 dir_left = sys.argv[1]
 dir_right = sys.argv[2]
@@ -24,6 +20,45 @@ try:
 except:
     print("Error during listing directories")
     sys.exit(-1)
+
+
+@dataclass(kw_only=True)
+class Dirent:
+    chk: str
+    offset: int
+    end: int
+    fileno: str  # 4 for pfs, 4 for reg
+    entry_type: str  # 4 for pfs, 1 for reg
+    namelen: str  # 4 for pfs, 1 for reg
+    reclen: str  # 4 for pfs, 2 for reg
+    name: str  # up to 255 characters + null terminator
+    padding: str
+
+    def __repr__(self) -> str:
+        return self.chk
+
+    def __eq__(self, other):
+        if isinstance(other, Dirent):
+            return False
+        if (
+            (self.offset != other.offset)
+            # fileno is ignored, those can be different
+            or (self.entry_type != other.entry_type)
+            or (self.namelen != other.namelen)
+            or (self.reclen != other.reclen)
+            or (self.name != other.name)
+            or (len(self.padding) != len(other.padding))
+        ):
+            return False
+
+
+find_buffer_end_re = re.compile(b"\x00+(\xaa+)")
+regular_dirent_query_re = re.compile(
+    b"(?P<fileno>....)(?P<reclen>..)(?P<entry_type>[\x02\x04\x08])(?P<namelen>.)(?P<name>[ -~]{1,255})(?P<padding>\x00*)"
+)
+pfs_query_getdents_re = re.compile(
+    b"(?P<fileno>.{4})(?P<entry_type>[\x02\x04\x08]\x00{3})(?P<namelen>....)(?P<reclen>....)(?P<name>[ -~]{1,255})(?P<padding>\x00*)"
+)
 
 for filename in dir_left_contents:
     file_left_path = os.path.join(os.path.abspath(dir_left), filename)
@@ -49,101 +84,78 @@ for filename in dir_left_contents:
     with open(file_right_path, "rb") as rhsf:
         content_right = rhsf.read()
 
+    ### Verify size
+
     if size_left == 0 and size_right == 0:
+        print("Both are empty. Continuing...")
         continue
 
     print(f"Size:\t{size_left}\t{size_right}")
 
     if not size_match:
+        print("Error: sizes don't match. Continuing...")
         continue
 
-    left_file_list = []
-    right_file_list = []
-
-    left_dirent_offsets = []
-    right_dirent_offsets = []
-
-    left_skipped_bytes = []
-    right_skipped_bytes = []
+    #
+    ### Search for entries
+    ### Search for entry offsets
+    ### Search for skipped bytes (0-fills, cut off data)
+    #
+    left_dirent_list: list[Dirent] = []
+    right_dirent_list: list[Dirent] = []
     search_query = None
 
-    prev_end = 0
     lsresult = None
     if is_pfs and is_read:
         search_query = pfs_query_getdents_re.finditer(content_left)
     else:
         search_query = regular_dirent_query_re.finditer(content_left)
     for lsresult in search_query:
-        left_file_list.append(lsresult.group(2))
-        result_pos = lsresult.start()
-        left_dirent_offsets.append(result_pos)
-        left_skipped_bytes_temp = result_pos - prev_end
-        if left_skipped_bytes_temp != 0:
-            left_skipped_bytes.append(left_skipped_bytes_temp)
-        prev_end = lsresult.end()
+        dirent_init_dict = lsresult.groupdict()
+        dirent_init_dict["offset"] = lsresult.start()
+        dirent_init_dict["end"] = lsresult.end()
+        _name = dirent_init_dict["name"]
+        _reclen = dirent_init_dict["reclen"]
+        _offset = dirent_init_dict["offset"]
+        dirent_init_dict["chk"] = f"{_name[-2:]}{str(_offset)}{str(_reclen)}"
+        new_dirent = Dirent(**dirent_init_dict)
+        left_dirent_list.append(new_dirent)
     if lsresult is None:
         print("Left: can't match file entries")
 
-    prev_end = 0
     lsresult = None
     if is_pfs and is_read:
         search_query = pfs_query_getdents_re.finditer(content_right)
     else:
         search_query = regular_dirent_query_re.finditer(content_right)
     for lsresult in search_query:
-        right_file_list.append(lsresult.group(2))
-        result_pos = lsresult.start()
-        right_dirent_offsets.append(result_pos)
-        right_skipped_bytes_temp = result_pos - prev_end
-        if right_skipped_bytes_temp != 0:
-            right_skipped_bytes.append(right_skipped_bytes_temp)
-
-        prev_end = lsresult.end()
+        dirent_init_dict = lsresult.groupdict()
+        dirent_init_dict["offset"] = lsresult.start()
+        dirent_init_dict["end"] = lsresult.end()
+        _name = dirent_init_dict["name"]
+        _reclen = dirent_init_dict["reclen"]
+        _offset = dirent_init_dict["offset"]
+        dirent_init_dict["chk"] = f"{_name[-2:]}{str(_offset)}{str(_reclen)}"
+        new_dirent = Dirent(**dirent_init_dict)
+        right_dirent_list.append(new_dirent)
     if lsresult is None:
         print("Right: can't match file entries")
 
-    left_set = set(left_file_list)
-    right_set = set(right_file_list)
-    if len(left_set) != len(left_file_list):
-        print("Left has repeating filenames")
-    if len(right_set) != len(right_file_list):
-        print("Right has repeating filenames")
-    merged_results = set(left_file_list + right_file_list)
-    if (len(merged_results) != len(left_file_list)) or (
-        len(merged_results) != len(right_file_list)
-    ):
+    left_dirent_list_len = len(left_dirent_list)
+    right_dirent_list_len = len(right_dirent_list)
+
+    if left_dirent_list_len != right_dirent_list_len:
         print(
-            f"Unique differences between files: L:{len(left_file_list)}<->R:{len(right_file_list)}\tTotal:{len(merged_results)}"
+            f"Error: Different amount of dirents: L:{left_dirent_list_len} R:{right_dirent_list_len}. Continuing..."
         )
+        continue
 
-    for idx, left_excl_filename in enumerate(right_file_list):
-        if left_excl_filename not in right_file_list:
-            print(f"Right exclusive:{left_excl_filename}")
+    for idx, lval in enumerate(left_dirent_list):
+        rval = right_dirent_list[idx]
+        if repr(lval) == repr(rval):
+            continue
+        print(f"Mismatch at\tL:{lval.offset}\tR:{rval.offset}")
+        print(f"\t{lval.name}\t{rval.name}")
 
-    for idx, right_excl_filename in enumerate(left_file_list):
-        if right_excl_filename not in left_file_list:
-            print(f"Right exclusive:{right_excl_filename}")
-
-    for idx, offset_value in enumerate(left_dirent_offsets):
-        if offset_value != right_dirent_offsets[idx]:
-            print(
-                f"Left: Inconsistent offsets: L:{offset_value}<=>R:{right_dirent_offsets[idx]}"
-            )
-    for idx, offset_value in enumerate(right_dirent_offsets):
-        if offset_value != left_dirent_offsets[idx]:
-            print(
-                f"Right: Inconsistent offsets: L:{offset_value}<=>R:{left_dirent_offsets[idx]}"
-            )
-
-    for idx, skipped_bytes in enumerate(left_skipped_bytes):
-        if skipped_bytes != right_skipped_bytes[idx]:
-            print(
-                f"Left: Inconsistent skipped byted: L:{skipped_bytes}<=>R:{right_skipped_bytes[idx]}"
-            )
-    for idx, skipped_bytes in enumerate(right_skipped_bytes):
-        if skipped_bytes != left_skipped_bytes[idx]:
-            print(
-                f"Right: Inconsistent skipped byted: L:{skipped_bytes}<=>R:{left_skipped_bytes[idx]}"
-            )
-
+    print("Tests complete")
     pass

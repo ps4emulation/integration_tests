@@ -210,10 +210,12 @@ TEST(DirentTests, LseekPFSTests) {
 
 void RunTests() {
   std::string nf_path = "/data/enderman/filewithaverylongname";
+  std::string nf_path_longer = "/data/enderman/filewithunnecesarilylongnamejusttomesswitheveryone";
   char        nf_num[4] {0};
   for (u8 idx = 1; idx <= 50; idx++) {
     snprintf(nf_num, 4, "%02d", idx);
     touch(nf_path + std::string(nf_num));
+    touch(nf_path_longer + std::string(nf_num));
   }
 
   Log("---------------------");

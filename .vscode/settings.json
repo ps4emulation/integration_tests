@@ -17,5 +17,7 @@
   "editor.tabSize": 2,
   "editor.insertSpaces": true,
   "python.languageServer": "Pylance",
-  "python.formatting.provider": "black"
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter",
+  }
 }
