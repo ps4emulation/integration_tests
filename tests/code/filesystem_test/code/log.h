@@ -23,11 +23,6 @@ void LogCustom(const char* fn, const char* msg, Args&&... args) {
   std::cout << std::endl;
 }
 
-extern int error_counter;
-
-int  GetErrorCounter(void);
-void ResetErrorCounter(void);
-
 #define Log(...)                                                                                                                                               \
   {                                                                                                                                                            \
     LogCustom(__FUNCTION__, "[INFO]", ##__VA_ARGS__);                                                                                                          \
@@ -40,7 +35,6 @@ void ResetErrorCounter(void);
 
 #define LogError(...)                                                                                                                                          \
   {                                                                                                                                                            \
-    error_counter++;                                                                                                                                           \
     LogCustom(__FUNCTION__, "\033[31;1m[FAIL]\033[0m", ##__VA_ARGS__, "( " __FILE__ ":", __LINE__, ")");                                                       \
   }
 

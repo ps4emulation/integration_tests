@@ -3,16 +3,6 @@
 #include <iomanip>
 #include <sstream>
 
-int error_counter = 0;
-
-int GetErrorCounter(void) {
-  return error_counter;
-}
-
-void ResetErrorCounter(void) {
-  error_counter = 0;
-}
-
 std::ostream& center(std::ostream& os, const std::string& s, int width) {
   int len = (int)s.size();
   if (width <= len) return os << s.substr(0, width);

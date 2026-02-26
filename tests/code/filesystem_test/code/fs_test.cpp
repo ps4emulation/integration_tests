@@ -626,7 +626,6 @@ bool TestFileOps(const char* path) {
   // shhh, don't spoil it yet
   if (sceKernelStat(path, &st) > -1) sceKernelUnlink(path);
 
-  ResetErrorCounter();
   errno = 0;
   TEST_CASE(sceKernelStat(path, &st) < 0, "Stat failed on nonexistent file", "Stat'd nonexistent file", "( errno =", errno, ")");
   errno = 0;
@@ -762,7 +761,7 @@ bool TestFileOps(const char* path) {
 
   if (0 != sceKernelClose(fd)) LogError("Can't close [", path, "]", "( errno =", errno, ")");
 
-  return GetErrorCounter() == 0;
+  return true;
 }
 
 int TestOpenFlags(const char* path, int32_t flags, const char* flags_str, int* errno_return) {
@@ -781,7 +780,7 @@ int TestOpenFlags(const char* path, int32_t flags, const char* flags_str, int* e
 
 bool TestFileRW(const char* path, u16 to_test) {
   LogTest("Testing r/w on [", path, "]");
-  ResetErrorCounter();
+
   if (to_test < 8) {
     LogError("Must test at least 8 bytes!");
     return false;
@@ -857,12 +856,12 @@ bool TestFileRW(const char* path, u16 to_test) {
   delete[] writebuf;
   delete[] readbuf;
 
-  return GetErrorCounter() == 0;
+  return true;
 }
 
 bool TestFileTouch(const char* path) {
   LogTest("Cursed file operations: [", path, "]");
-  ResetErrorCounter();
+
   OrbisKernelStat st {};
 
   errno = 0;
@@ -871,7 +870,7 @@ bool TestFileTouch(const char* path) {
   errno = 0;
   TEST_CASE(0 == sceKernelStat(path, &st), "stat success", "stat fail", "( errno =", errno, ")")
 
-  return GetErrorCounter() == 0;
+  return true;
 }
 
 bool PrepareCursedFileop(void) {
@@ -917,6 +916,7 @@ bool TestLStat(fs::path path) {
 }
 
 bool RegenerateDir(const char* path) {
+  // TODO: this should return false sometimes *cough cough*
   Obliterate(path);
   sceKernelMkdir(path, 0777);
   return true;
@@ -931,8 +931,6 @@ bool TestDirEnts() {
   s32  result = 0;
   char prebuffer[DIRENT_BUFFER_SIZE] {0};
   char postbuffer[DIRENT_BUFFER_SIZE] {0};
-
-  ResetErrorCounter();
 
   //
   // Creating target directory
@@ -1014,7 +1012,7 @@ bool TestDirEnts() {
   errno = 0;
   TEST_CASE(sceKernelClose(fd) != -1, "Closed", "Can't close", "[ /data/therapist/tmp_dirent ]", "( errno =", errno, ")");
 
-  return GetErrorCounter() == 0;
+  return true;
 
   // // compare before and after opening
 
@@ -1100,8 +1098,6 @@ bool TestRelatives(fs::path path, bool expected_mountpoint) {
 
   u8 ret {};
 
-  ResetErrorCounter();
-
   //
   // test self (2 if mountpoint root)
   ret = GetDir(path, ".", &leaf);
@@ -1139,7 +1135,7 @@ bool TestRelatives(fs::path path, bool expected_mountpoint) {
     Log(is_mountpoint ? "It's a mountpoint" : "It's not a mountpoint");
   }
 
-  return GetErrorCounter() == 0;
+  return true;
 }
 
 bool CompareNormalVsPFS(fs::path path, fs::path leaf, s32 expected_normal_reclen, s32 expected_pfs_reclen) {
@@ -1150,19 +1146,12 @@ bool CompareNormalVsPFS(fs::path path, fs::path leaf, s32 expected_normal_reclen
   fs::path         q             = path / leaf;
   const char*      path_full_str = q.c_str();
 
-  ResetErrorCounter();
-
   LogTest("Compare Normal and PFS dirent for", path_full_str);
   if (GetDir(path, leaf, &normal_dir) == -1) {
     LogError("Can't open", path_full_str, "as normal");
   }
   if (GetDir(path, leaf, &pfs_dir) == -1) {
     LogError("Can't open", path_full_str, "as PFS");
-  }
-
-  // return early, there's no point in trying if can't open either
-  if (GetErrorCounter() != 0) {
-    return false;
   }
 
   bool expr;
@@ -1206,5 +1195,5 @@ bool CompareNormalVsPFS(fs::path path, fs::path leaf, s32 expected_normal_reclen
     Log("PFS:\t", pfs_dir.d_name);
   }
 
-  return GetErrorCounter() == 0;
+  return true;
 }

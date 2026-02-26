@@ -1,11 +1,12 @@
 #ifndef FS_TEST_H
 #define FS_TEST_H
 
+#define UNSIGNED_INT_EQUALS(expected, actual)            UNSIGNED_LONGS_EQUAL_LOCATION((uint32_t)expected, (uint32_t)actual, NULLPTR, __FILE__, __LINE__)
+#define UNSIGNED_INT_EQUALS_TEXT(expected, actual, text) UNSIGNED_LONGS_EQUAL_LOCATION((uint32_t)expected, (uint32_t)actual, text, __FILE__, __LINE__)
+
 #include "log.h"
 
 #include <orbis/libkernel.h>
-
-namespace FS_Test {
 
 using s8  = int8_t;
 using s16 = int16_t;
@@ -42,5 +43,4 @@ void    Obliterate(const char* path);
 int32_t touch(const char* path);
 int32_t touch(const std::string& path);
 
-} // namespace FS_Test
 #endif // FS_TEST_H

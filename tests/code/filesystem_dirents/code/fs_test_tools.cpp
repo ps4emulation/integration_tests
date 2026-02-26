@@ -4,8 +4,6 @@
 #include <orbis/libkernel.h>
 #include <vector>
 
-namespace FS_Test {
-
 namespace fs = std::filesystem;
 namespace oi = OrbisInternals;
 
@@ -51,5 +49,3 @@ void RegenerateDir(const char* path) {
   Obliterate(path);
   sceKernelMkdir(path, 0777);
 }
-
-} // namespace FS_Test

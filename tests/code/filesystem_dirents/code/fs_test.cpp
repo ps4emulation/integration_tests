@@ -2,14 +2,13 @@
 
 #include "orbis/UserService.h"
 
+#include <CppUTest/TestHarness.h>
 #include <chrono>
 #include <cstring>
 #include <filesystem>
 #include <sstream>
 #include <string>
 #include <vector>
-
-namespace FS_Test {
 
 std::vector<u32> read_sizes {// 8
                              7, 8, 9,
@@ -37,7 +36,6 @@ std::vector<u32> read_sizes {// 8
                              2137, 21, 37, 69, 420, 42, 123, 222, 666, 911, 112, 997,
                              // something for zoomers
                              67};
-std::vector<u32> read_sizes_pfs {65535, 65536, 65537};
 std::vector<u16> read_offsets {0, 1, 5, 10, 21, 37, 127, 128, 129, 400, 500, 512, 768, 1024, 111, 666, 420, 1234, 96, 42};
 
 namespace fs = std::filesystem;
@@ -47,9 +45,170 @@ bool DumpByRead(int dir_fd, int dump_fd, char* buffer, size_t size);
 bool DumpByDirent(int dir_fd, int dump_fd, char* buffer, size_t size, s64* idx);
 void DumpDirectory(int fd, int buffer_size, s64 offset, bool is_pfs = false);
 
+TEST_GROUP (DirentTests) {
+  void setup() {}
+  void teardown() {}
+};
+
+TEST(DirentTests, LseekRegularTests) {
+  int fd = sceKernelOpen("/data/enderman", O_DIRECTORY | O_RDONLY, 0777);
+  CHECK_COMPARE_TEXT(fd, >, 0, "Unable to open /data/enderman");
+
+  int status;
+
+  errno  = 0;
+  status = sceKernelLseek(fd, 0, 0);
+  UNSIGNED_LONGLONGS_EQUAL_TEXT(0, status, "START+0");
+  UNSIGNED_INT_EQUALS(0, errno);
+
+  errno  = 0;
+  status = sceKernelLseek(fd, -123, 0);
+  UNSIGNED_LONGLONGS_EQUAL_TEXT(ORBIS_KERNEL_ERROR_EINVAL, status, "START-123");
+  UNSIGNED_INT_EQUALS(EINVAL, errno);
+
+  errno  = 0;
+  status = sceKernelLseek(fd, 123456, 0);
+  UNSIGNED_LONGLONGS_EQUAL_TEXT(123456, status, "START+123456");
+  UNSIGNED_INT_EQUALS(0, errno);
+
+  errno  = 0;
+  status = sceKernelLseek(fd, 60, 0);
+  UNSIGNED_LONGLONGS_EQUAL_TEXT(60, status, "START+60");
+  UNSIGNED_INT_EQUALS(0, errno);
+
+  errno  = 0;
+  status = sceKernelLseek(fd, 0, 1);
+  UNSIGNED_LONGLONGS_EQUAL_TEXT(60, status, "CUR+0");
+  UNSIGNED_INT_EQUALS(0, errno);
+
+  errno  = 0;
+  status = sceKernelLseek(fd, 24, 1);
+  UNSIGNED_LONGLONGS_EQUAL_TEXT(84, status, "CUR+24");
+  UNSIGNED_INT_EQUALS(0, errno);
+
+  errno  = 0;
+  status = sceKernelLseek(fd, -24, 1);
+  UNSIGNED_LONGLONGS_EQUAL_TEXT(60, status, "CUR-24");
+  UNSIGNED_INT_EQUALS(EINVAL, errno);
+
+  errno  = 0;
+  status = sceKernelLseek(fd, -6666, 1);
+  UNSIGNED_LONGLONGS_EQUAL_TEXT(ORBIS_KERNEL_ERROR_EINVAL, status, "CUR-6666");
+  UNSIGNED_INT_EQUALS(EINVAL, errno);
+
+  errno  = 0;
+  status = sceKernelLseek(fd, 123456, 1);
+  UNSIGNED_LONGLONGS_EQUAL_TEXT(123516, status, "CUR+123456");
+  UNSIGNED_INT_EQUALS(0, errno);
+
+  errno  = 0;
+  status = sceKernelLseek(fd, 0, 2);
+  UNSIGNED_LONGLONGS_EQUAL_TEXT(2048, status, "END+0");
+  UNSIGNED_INT_EQUALS(0, errno);
+
+  errno  = 0;
+  status = sceKernelLseek(fd, 123456, 2);
+  UNSIGNED_LONGLONGS_EQUAL_TEXT(125504, status, "END+123456");
+  UNSIGNED_INT_EQUALS(0, errno);
+
+  errno  = 0;
+  status = sceKernelLseek(fd, 100, 2);
+  UNSIGNED_LONGLONGS_EQUAL_TEXT(2148, status, "END+100");
+  UNSIGNED_INT_EQUALS(0, errno);
+
+  errno  = 0;
+  status = sceKernelLseek(fd, -100, 2);
+  UNSIGNED_LONGLONGS_EQUAL_TEXT(1948, status, "END-100");
+  UNSIGNED_INT_EQUALS(EINVAL, errno);
+
+  errno  = 0;
+  status = sceKernelLseek(fd, -100000, 2);
+  UNSIGNED_LONGLONGS_EQUAL_TEXT(ORBIS_KERNEL_ERROR_EINVAL, status, "END-100000");
+  UNSIGNED_INT_EQUALS(EINVAL, errno);
+
+  sceKernelClose(fd);
+}
+
+TEST(DirentTests, LseekPFSTests) {
+  int fd = sceKernelOpen("/app0/assets/misc", O_DIRECTORY | O_RDONLY, 0777);
+  CHECK_COMPARE_TEXT(fd, >, 0, "Unable to open /app0/assets/misc");
+
+  s64 status;
+
+  errno  = 0;
+  status = sceKernelLseek(fd, 0, 0);
+  UNSIGNED_LONGLONGS_EQUAL_TEXT(0, status, "START+0");
+  UNSIGNED_INT_EQUALS(0, errno);
+
+  errno  = 0;
+  status = sceKernelLseek(fd, -123, 0);
+  UNSIGNED_LONGLONGS_EQUAL_TEXT(ORBIS_KERNEL_ERROR_EINVAL, status, "START-123");
+  UNSIGNED_INT_EQUALS(EINVAL, errno);
+
+  errno  = 0;
+  status = sceKernelLseek(fd, 123456, 0);
+  UNSIGNED_LONGLONGS_EQUAL_TEXT(123456, status, "START+123456");
+  UNSIGNED_INT_EQUALS(0, errno);
+
+  errno  = 0;
+  status = sceKernelLseek(fd, 60, 0);
+  UNSIGNED_LONGLONGS_EQUAL_TEXT(60, status, "START+60");
+  UNSIGNED_INT_EQUALS(0, errno);
+
+  errno  = 0;
+  status = sceKernelLseek(fd, 0, 1);
+  UNSIGNED_LONGLONGS_EQUAL_TEXT(60, status, "CUR+0");
+  UNSIGNED_INT_EQUALS(0, errno);
+
+  errno  = 0;
+  status = sceKernelLseek(fd, 24, 1);
+  UNSIGNED_LONGLONGS_EQUAL_TEXT(84, status, "CUR+24");
+  UNSIGNED_INT_EQUALS(0, errno);
+
+  errno  = 0;
+  status = sceKernelLseek(fd, -24, 1);
+  UNSIGNED_LONGLONGS_EQUAL_TEXT(60, status, "CUR-24");
+  UNSIGNED_INT_EQUALS(EINVAL, errno);
+
+  errno  = 0;
+  status = sceKernelLseek(fd, -6666, 1);
+  UNSIGNED_LONGLONGS_EQUAL_TEXT(ORBIS_KERNEL_ERROR_EINVAL, status, "CUR-6666");
+  UNSIGNED_INT_EQUALS(EINVAL, errno);
+
+  errno  = 0;
+  status = sceKernelLseek(fd, 123456, 1);
+  UNSIGNED_LONGLONGS_EQUAL_TEXT(123516, status, "CUR+123456");
+  UNSIGNED_INT_EQUALS(0, errno);
+
+  errno  = 0;
+  status = sceKernelLseek(fd, 0, 2);
+  UNSIGNED_LONGLONGS_EQUAL_TEXT(2048, status, "END+0");
+  UNSIGNED_INT_EQUALS(0, errno);
+
+  errno  = 0;
+  status = sceKernelLseek(fd, 123456, 2);
+  UNSIGNED_LONGLONGS_EQUAL_TEXT(125504, status, "END+123456");
+  UNSIGNED_INT_EQUALS(0, errno);
+
+  errno  = 0;
+  status = sceKernelLseek(fd, 100, 2);
+  UNSIGNED_LONGLONGS_EQUAL_TEXT(2148, status, "END+100");
+  UNSIGNED_INT_EQUALS(0, errno);
+
+  errno  = 0;
+  status = sceKernelLseek(fd, -100, 2);
+  UNSIGNED_LONGLONGS_EQUAL_TEXT(1948, status, "END-100");
+  UNSIGNED_INT_EQUALS(EINVAL, errno);
+
+  errno  = 0;
+  status = sceKernelLseek(fd, -100000, 2);
+  UNSIGNED_LONGLONGS_EQUAL_TEXT(ORBIS_KERNEL_ERROR_EINVAL, status, "END-100000");
+  UNSIGNED_INT_EQUALS(EINVAL, errno);
+
+  sceKernelClose(fd);
+}
+
 void RunTests() {
-  RegenerateDir("/data/enderman");
-  sceKernelMkdir("/data/enderman/dumps", 0777);
   std::string nf_path = "/data/enderman/filewithaverylongname";
   char        nf_num[4] {0};
   for (u8 idx = 1; idx <= 50; idx++) {
@@ -62,59 +221,22 @@ void RunTests() {
   Log("---------------------");
 
   int fd = sceKernelOpen("/data/enderman", O_DIRECTORY | O_RDONLY, 0777);
-  Log("Directory opened with fd=", fd);
-
-  Log("LSeek START+0=", sceKernelLseek(fd, 0, 0));
-  Log("LSeek START-123=", sceKernelLseek(fd, -123, 0));
-  Log("LSeek START+123456=", sceKernelLseek(fd, 123456, 0));
-  Log("LSeek START+60=", sceKernelLseek(fd, 60, 0));
-  Log("LSeek CUR+0=", sceKernelLseek(fd, 0, 1));
-  Log("LSeek CUR+24=", sceKernelLseek(fd, 24, 1));
-  Log("LSeek CUR-24=", sceKernelLseek(fd, -24, 1));
-  Log("LSeek CUR-6666=", sceKernelLseek(fd, -6666, 1));
-  Log("LSeek CUR+123456=", sceKernelLseek(fd, 123456, 1));
-  Log("LSeek END+0=", sceKernelLseek(fd, 0, 2));
-  Log("LSeek END+123456=", sceKernelLseek(fd, 123456, 2));
-  Log("LSeek END+100=", sceKernelLseek(fd, 100, 2));
-  Log("LSeek END-100=", sceKernelLseek(fd, -100, 2));
-  Log("LSeek END-100000=", sceKernelLseek(fd, -100000, 2));
-
   for (auto read_size: read_sizes) {
     for (auto read_offset: read_offsets) {
       DumpDirectory(fd, read_size, read_offset);
     }
   }
-
   sceKernelClose(fd);
 
   Log("------------------");
   Log("Dump PFS directory");
   Log("------------------");
   fd = sceKernelOpen("/app0/assets/misc", O_DIRECTORY | O_RDONLY, 0777);
-
-  Log("Directory opened with fd=", fd);
-
-  Log("LSeek START+0=", sceKernelLseek(fd, 0, 0));
-  Log("LSeek START-123=", sceKernelLseek(fd, -123, 0));
-  Log("LSeek START+123456=", sceKernelLseek(fd, 123456, 0));
-  Log("LSeek START+60=", sceKernelLseek(fd, 60, 0));
-  Log("LSeek CUR+0=", sceKernelLseek(fd, 0, 1));
-  Log("LSeek CUR+24=", sceKernelLseek(fd, 24, 1));
-  Log("LSeek CUR-24=", sceKernelLseek(fd, -24, 1));
-  Log("LSeek CUR-6666=", sceKernelLseek(fd, -6666, 1));
-  Log("LSeek CUR+123456=", sceKernelLseek(fd, 123456, 1));
-  Log("LSeek END+0=", sceKernelLseek(fd, 0, 2));
-  Log("LSeek END+123456=", sceKernelLseek(fd, 123456, 2));
-  Log("LSeek END+100=", sceKernelLseek(fd, 100, 2));
-  Log("LSeek END-100=", sceKernelLseek(fd, -100, 2));
-  Log("LSeek END-100000=", sceKernelLseek(fd, -100000, 2));
-
   for (auto read_size: read_sizes) {
     for (auto read_offset: read_offsets) {
       DumpDirectory(fd, read_size, read_offset, true);
     }
   }
-
   sceKernelClose(fd);
 }
 
@@ -129,11 +251,10 @@ bool DumpByRead(int dir_fd, int dump_fd, char* buffer, size_t size) {
     return false;
   }
   if (tbr == 0) {
-    LogSuccess("Read finished");
     return false;
   }
 
-  if (s64 tbw = sceKernelWrite(dump_fd, buffer, size); tbw != size) LogError("Written", tbw, "bytes out of", size, "bytes");
+  if (s64 tbw = sceKernelWrite(dump_fd, buffer, tbr); tbw != tbr) LogError("Written", tbw, "bytes out of", tbr, "bytes");
   return true;
 }
 
@@ -149,11 +270,10 @@ bool DumpByDirent(int dir_fd, int dump_fd, char* buffer, size_t size, s64* idx) 
     return false;
   }
   if (tbr == 0) {
-    LogSuccess("Dirent finished");
     return false;
   }
 
-  if (s64 tbw = sceKernelWrite(dump_fd, buffer, size); tbw != size) LogError("Written", tbw, "bytes out of", size, "bytes");
+  if (s64 tbw = sceKernelWrite(dump_fd, buffer, tbr); tbw != tbr) LogError("Written", tbw, "bytes out of", tbr, "bytes");
   return true;
 }
 
@@ -186,5 +306,3 @@ void DumpDirectory(int fd, int buffer_size, s64 offset, bool is_pfs) {
   sceKernelClose(dirent_fd);
   delete[] buffer;
 }
-
-} // namespace FS_Test

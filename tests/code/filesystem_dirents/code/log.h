@@ -39,7 +39,6 @@ void ResetErrorCounter(void);
 
 #define LogError(...)                                                                                                                                          \
   {                                                                                                                                                            \
-    error_counter++;                                                                                                                                           \
     LogCustom(__FUNCTION__, "\033[31;1m[FAIL]\033[0m", ##__VA_ARGS__, "( " __FILE__ ":", __LINE__, ")");                                                       \
   }
 
@@ -48,7 +47,7 @@ void ResetErrorCounter(void);
     LogCustom(__FUNCTION__, "\033[32;1m[SUCC]\033[0m", ##__VA_ARGS__);                                                                                         \
   }
 
-#define TEST(cond, success_str, fail_str, ...)                                                                                                                 \
+#define TEST_CASE(cond, success_str, fail_str, ...)                                                                                                            \
   {                                                                                                                                                            \
     if (cond) {                                                                                                                                                \
       LogSuccess(success_str, ##__VA_ARGS__);                                                                                                                  \
