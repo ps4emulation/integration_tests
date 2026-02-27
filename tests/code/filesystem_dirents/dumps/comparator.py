@@ -63,18 +63,23 @@ pfs_query_getdents_re = re.compile(
 error_badf = []
 error_bad_size = []
 error_bad_len = []
-error_mismatch_order=[]
+error_mismatch_order = []
 
-counter =0
-counter_completed=0
+counter = 0
+counter_completed = 0
 for filename in dir_left_contents:
-    counter+=1
+    if filename.endswith(".cue"):
+        continue
+    counter += 1
     file_left_path = os.path.join(os.path.abspath(dir_left), filename)
+    file_left_cue_path = os.path.join(os.path.abspath(dir_left), filename[:-4] + ".cue")
     file_right_path = os.path.join(os.path.abspath(dir_right), filename)
+    file_right_cue_path = os.path.join(
+        os.path.abspath(dir_right), filename[:-4] + ".cue"
+    )
     is_pfs = "PFS" in filename
     is_read = "read" in filename
     is_getdents = "dirent" in filename
-
 
     if not (is_read or is_getdents):
         error_badf.append(filename)
@@ -88,16 +93,22 @@ for filename in dir_left_contents:
     size_match = size_left == size_right
 
     content_left = None
+    content_left_cue = None
     content_right = None
+    content_right_cue = None
     with open(file_left_path, "rb") as lhsf:
         content_left = lhsf.read()
     with open(file_right_path, "rb") as rhsf:
         content_right = rhsf.read()
+    with open(file_left_cue_path, "rb") as lhsfc:
+        content_left_cue = lhsfc.read()
+    with open(file_right_cue_path, "rb") as rhsfc:
+        content_right_cue = rhsfc.read()
 
     ### Verify size
 
     if size_left == 0 and size_right == 0:
-        counter_completed+=1
+        counter_completed += 1
         print("Both are empty. Continuing...")
         continue
 
@@ -171,20 +182,21 @@ for filename in dir_left_contents:
         print(f"Mismatch at\tL:{lval.offset}\tR:{rval.offset}")
         print(f"\t{lval.name}\t{rval.name}")
 
-    counter_completed+=1
+    counter_completed += 1
     print("Tests complete")
     pass
 
+print()
 print(f"Error: Incompatible file: {len(error_badf)}/{counter}")
-for err_item in error_badf:print(f"{err_item} ",end='')
-print()
+# for err_item in error_badf:print(f"{err_item} ",end='')
+# print()
 print(f"Error: Mismatched size: {len(error_bad_size)}/{counter}")
-for err_item in error_bad_size:print(f"{err_item} ",end='')
-print()
+# for err_item in error_bad_size:print(f"{err_item} ",end='')
+# print()
 print(f"Error: Mismatched amount of dirents: {len(error_bad_len)}/{counter}")
-for err_item in error_bad_len:print(f"{err_item} ",end='')
-print()
+# for err_item in error_bad_len:print(f"{err_item} ",end='')
+# print()
 print(f"Error: Mismatched dirent order: {len(error_mismatch_order)}/{counter}")
-for err_item in error_mismatch_order:print(f"{err_item} ",end='')
-print()
+# for err_item in error_mismatch_order:print(f"{err_item} ",end='')
+# print()
 print(f"Passed: {counter_completed}/{counter}")
