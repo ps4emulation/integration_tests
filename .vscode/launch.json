@@ -1,0 +1,43 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+    "name": "Compare dumps (current, linux)",
+    "type": "python",
+    "request": "launch",
+    "program": "${workspaceFolder}/tests/code/filesystem_dirents/dumps/comparator.py",
+    "console": "integratedTerminal",
+    "args": [
+      // change accordingly
+      "${workspaceFolder}/tests/code/filesystem_dirents/dumps/1202",
+      "${userHome}/.local/share/shadPS4/data/enderman/dumps"
+    ]
+  },
+    {
+    "name": "Compare dumps (current, macOS)",
+    "type": "python",
+    "request": "launch",
+    "program": "${workspaceFolder}/tests/code/filesystem_dirents/dumps/comparator.py",
+    "console": "integratedTerminal",
+    "args": [
+      // change accordingly
+      "${workspaceFolder}/tests/code/filesystem_dirents/dumps/1202",
+      "${userHome}/Library/Application Support/shadPS4/data/enderman/dumps"
+    ]
+  },
+    {
+    "name": "Compare dumps (qfs)",
+    "type": "python",
+    "request": "launch",
+    "program": "${workspaceFolder}/tests/code/filesystem_dirents/dumps/comparator.py",
+    "console": "integratedTerminal",
+    "args": [
+      "${workspaceFolder}/tests/code/filesystem_dirents/dumps/1202",
+      "${workspaceFolder}/tests/code/filesystem_dirents/dumps/qfs-08f4458"
+    ]
+  }
+  ]
+}

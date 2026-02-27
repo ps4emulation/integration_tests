@@ -1,8 +1,11 @@
 build/
 **.bin
+**.cue
 **.pkg
 **.gp4
 **.sfo
 .*/
 !.github
 !.vscode
+.DS_Store
+.venv
