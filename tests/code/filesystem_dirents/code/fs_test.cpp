@@ -41,8 +41,8 @@ std::vector<u16> read_offsets {0, 1, 5, 10, 21, 37, 127, 128, 129, 400, 500, 512
 namespace fs = std::filesystem;
 namespace oi = OrbisInternals;
 
-bool DumpByRead(int dir_fd, int dump_fd, char* buffer, size_t size);
-bool DumpByDirent(int dir_fd, int dump_fd, char* buffer, size_t size, s64* idx);
+s64  DumpByRead(int dir_fd, int dump_fd, char* buffer, size_t size);
+s64  DumpByDirent(int dir_fd, int dump_fd, char* buffer, size_t size, s64* idx);
 void DumpDirectory(int fd, int buffer_size, s64 offset, bool is_pfs = false);
 
 TEST_GROUP (DirentTests) {
@@ -209,7 +209,7 @@ TEST(DirentTests, LseekPFSTests) {
 }
 
 void RunTests() {
-  std::string nf_path = "/data/enderman/filewithaverylongname";
+  std::string nf_path        = "/data/enderman/filewithaverylongname";
   std::string nf_path_longer = "/data/enderman/filewithunnecesarilylongnamejusttomesswitheveryone";
   char        nf_num[4] {0};
   for (u8 idx = 1; idx <= 50; idx++) {
@@ -242,7 +242,7 @@ void RunTests() {
   sceKernelClose(fd);
 }
 
-bool DumpByRead(int dir_fd, int dump_fd, char* buffer, size_t size) {
+s64 DumpByRead(int dir_fd, int dump_fd, char* buffer, size_t size) {
   memset(buffer, 0xAA, size);
 
   s64 tbr = sceKernelRead(dir_fd, buffer, size);
@@ -250,17 +250,17 @@ bool DumpByRead(int dir_fd, int dump_fd, char* buffer, size_t size) {
 
   if (tbr < 0) {
     LogError("Read finished with error:", tbr);
-    return false;
+    return 0;
   }
   if (tbr == 0) {
-    return false;
+    return 0;
   }
 
   if (s64 tbw = sceKernelWrite(dump_fd, buffer, tbr); tbw != tbr) LogError("Written", tbw, "bytes out of", tbr, "bytes");
-  return true;
+  return tbr;
 }
 
-bool DumpByDirent(int dir_fd, int dump_fd, char* buffer, size_t size, s64* idx) {
+s64 DumpByDirent(int dir_fd, int dump_fd, char* buffer, size_t size, s64* idx) {
   // magic to determine how many trailing elements were cut
   memset(buffer, 0xAA, size);
 
@@ -269,42 +269,61 @@ bool DumpByDirent(int dir_fd, int dump_fd, char* buffer, size_t size, s64* idx) 
 
   if (tbr < 0) {
     LogError("Dirent finished with error:", tbr);
-    return false;
+    return 0;
   }
   if (tbr == 0) {
-    return false;
+    return 0;
   }
 
   if (s64 tbw = sceKernelWrite(dump_fd, buffer, tbr); tbw != tbr) LogError("Written", tbw, "bytes out of", tbr, "bytes");
-  return true;
+  return tbr;
 }
 
 void DumpDirectory(int fd, int buffer_size, s64 offset, bool is_pfs) {
   char* buffer = new char[buffer_size] {0};
 
+  std::string file_basename =  (is_pfs ? std::string("PFS_") : std::string("")) + std::to_string(buffer_size) + '+' + std::to_string(offset);
+
   fs::path read_path =
-      "/data/enderman/dumps/read_" + (is_pfs ? std::string("PFS_") : std::string("")) + std::to_string(buffer_size) + '+' + std::to_string(offset) + ".bin";
+      "/data/enderman/dumps/read_" +file_basename + ".bin";
   fs::path dirent_path =
-      "/data/enderman/dumps/dirent_" + (is_pfs ? std::string("PFS_") : std::string("")) + std::to_string(buffer_size) + '+' + std::to_string(offset) + ".bin";
+      "/data/enderman/dumps/dirent_" + file_basename + ".bin";
+  fs::path read_cue_path =
+      "/data/enderman/dumps/read_" + file_basename+ ".cue";
+  fs::path dirent_cue_path =
+      "/data/enderman/dumps/dirent_" + file_basename + ".cue";
 
   LogTest(is_pfs ? "PFS" : "normal", "directory, fd =", fd, "buffer size =", buffer_size, "starting offset =", offset);
 
-  u16 max_loops = 0; // 65536 iterations lmao
-  int read_fd   = sceKernelOpen(read_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0777);
+  s64 tbr         = 0;
+  u16 max_loops   = 0; // 65536 iterations lmao
+  int fd_read     = sceKernelOpen(read_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0777);
+  int fd_read_cue = sceKernelOpen(read_cue_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0777);
   if (int _tmp = sceKernelLseek(fd, offset, 0); _tmp != offset) LogError("Lseek failed:", _tmp);
-  while (--max_loops && DumpByRead(fd, read_fd, buffer, buffer_size))
-    ;
+  while (--max_loops) {
+    tbr = DumpByRead(fd, fd_read, buffer, buffer_size);
+    sceKernelWrite(fd_read_cue, reinterpret_cast<u8*>(&tbr), sizeof(s64) / sizeof(u8));
+    if (tbr <= 0) break;
+  }
   if (0 == max_loops) LogError("Aborted");
-  sceKernelClose(read_fd);
+  sceKernelClose(fd_read);
+  sceKernelClose(fd_read_cue);
 
-  s64 idx       = 0;
-  max_loops     = 0;
-  int dirent_fd = sceKernelOpen(dirent_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0777);
+  s64 idx           = 0;
+  max_loops         = 0;
+  int fd_dirent     = sceKernelOpen(dirent_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0777);
+  int fd_dirent_cue = sceKernelOpen(dirent_cue_path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0777);
   if (int _tmp = sceKernelLseek(fd, offset, 0); _tmp != offset) LogError("Lseek failed:", _tmp);
-  while (--max_loops && DumpByDirent(fd, dirent_fd, buffer, buffer_size, &idx))
-    ;
+  while (--max_loops) {
+    tbr = DumpByDirent(fd, fd_dirent, buffer, buffer_size, &idx);
+    sceKernelWrite(fd_dirent_cue, reinterpret_cast<u8*>(&tbr), sizeof(s64) / sizeof(u8));
+    sceKernelWrite(fd_dirent_cue, reinterpret_cast<u8*>(&idx), sizeof(s64) / sizeof(u8));
+    if (tbr <= 0) break;
+  }
   if (0 == max_loops) LogError("Aborted");
 
-  sceKernelClose(dirent_fd);
+  sceKernelClose(fd_dirent);
+  sceKernelClose(fd_dirent_cue);
+
   delete[] buffer;
 }

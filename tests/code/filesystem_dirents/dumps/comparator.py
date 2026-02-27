@@ -60,14 +60,24 @@ pfs_query_getdents_re = re.compile(
     b"(?P<fileno>.{4})(?P<entry_type>[\x02\x04\x08]\x00{3})(?P<namelen>....)(?P<reclen>....)(?P<name>[ -~]{1,255})(?P<padding>\x00*)"
 )
 
+error_badf = []
+error_bad_size = []
+error_bad_len = []
+error_mismatch_order=[]
+
+counter =0
+counter_completed=0
 for filename in dir_left_contents:
+    counter+=1
     file_left_path = os.path.join(os.path.abspath(dir_left), filename)
     file_right_path = os.path.join(os.path.abspath(dir_right), filename)
     is_pfs = "PFS" in filename
     is_read = "read" in filename
     is_getdents = "dirent" in filename
 
+
     if not (is_read or is_getdents):
+        error_badf.append(filename)
         continue
 
     print()
@@ -87,6 +97,7 @@ for filename in dir_left_contents:
     ### Verify size
 
     if size_left == 0 and size_right == 0:
+        counter_completed+=1
         print("Both are empty. Continuing...")
         continue
 
@@ -94,6 +105,7 @@ for filename in dir_left_contents:
 
     if not size_match:
         print("Error: sizes don't match. Continuing...")
+        error_bad_size.append(filename)
         continue
 
     #
@@ -145,6 +157,7 @@ for filename in dir_left_contents:
     right_dirent_list_len = len(right_dirent_list)
 
     if left_dirent_list_len != right_dirent_list_len:
+        error_bad_len.append(filename)
         print(
             f"Error: Different amount of dirents: L:{left_dirent_list_len} R:{right_dirent_list_len}. Continuing..."
         )
@@ -154,8 +167,24 @@ for filename in dir_left_contents:
         rval = right_dirent_list[idx]
         if repr(lval) == repr(rval):
             continue
+        error_mismatch_order.append(filename)
         print(f"Mismatch at\tL:{lval.offset}\tR:{rval.offset}")
         print(f"\t{lval.name}\t{rval.name}")
 
+    counter_completed+=1
     print("Tests complete")
     pass
+
+print(f"Error: Incompatible file: {len(error_badf)}/{counter}")
+for err_item in error_badf:print(f"{err_item} ",end='')
+print()
+print(f"Error: Mismatched size: {len(error_bad_size)}/{counter}")
+for err_item in error_bad_size:print(f"{err_item} ",end='')
+print()
+print(f"Error: Mismatched amount of dirents: {len(error_bad_len)}/{counter}")
+for err_item in error_bad_len:print(f"{err_item} ",end='')
+print()
+print(f"Error: Mismatched dirent order: {len(error_mismatch_order)}/{counter}")
+for err_item in error_mismatch_order:print(f"{err_item} ",end='')
+print()
+print(f"Passed: {counter_completed}/{counter}")
